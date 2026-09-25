@@ -1,0 +1,505 @@
+@page "/server-management"
+@using BprDevKit.DatabaseManagement.Config
+@using BprDevKit.Utility
+@using System.IO
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<div class="container mt-4 pb-5">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="text-dark"><i class="bi bi-cpu-fill text-primary"></i> Server Configuration Management</h2>
+                @if (!_showAddForm)
+                {
+                    <button class="btn btn-primary px-4 py-2 shadow-sm" @onclick="OpenAddServerForm">
+                        <i class="bi bi-plus-lg me-1"></i> Add New Server
+                    </button>
+                }
+            </div>
+
+            @if (_bprMessage != null && !string.IsNullOrWhiteSpace(_bprMessage.Message))
+            {
+                <div class="alert @GetAlertClass(_bprMessage.MessageType) alert-dismissible fade show shadow-sm mb-4" role="alert">
+                    <i class="bi @GetAlertIcon(_bprMessage.MessageType) me-2"></i> @_bprMessage.Message
+                    <button type="button" class="btn-close" @onclick="ClearMessage"></button>
+                </div>
+            }
+
+            @if (!_showAddForm)
+            {
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-body p-0">
+                        @if (_savedServers.Count == 0)
+                        {
+                            <div class="text-center p-5">
+                                <i class="bi bi-server text-muted display-4"></i>
+                                <p class="text-muted mt-3 mb-0">No saved server configurations found. Create one to start managing your databases.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="ps-4">Server / Alias</th>
+                                            <th>Database Engine</th>
+                                            <th>Default DB</th>
+                                            <th>Authentication</th>
+                                            <th class="text-end pe-4">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var server in _savedServers)
+                                        {
+                                            <tr>
+                                                <td class="ps-4">
+                                                    <div class="font-weight-bold">@(string.IsNullOrEmpty(server.Server.Alias) ? server.Server.ServerName : server.Server.Alias)</div>
+                                                    <small class="text-muted font-monospace">@server.Server.ServerName</small>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-secondary-subtle text-secondary font-monospace">@server.Server.DatabaseServerType</span>
+                                                </td>
+                                                <td class="font-monospace">@server.Server.DefaultDatabase</td>
+                                                <td>
+                                                    <span class="badge @(server.Server.UseWindowsAuth ? "bg-info-subtle text-info" : "bg-warning-subtle text-warning")">
+                                                        @(server.Server.UseWindowsAuth ? "Windows Auth" : "SQL Server Auth")
+                                                    </span>
+                                                </td>
+                                                <td class="text-end pe-4">
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button class="btn btn-outline-primary" @onclick="() => EditServer(server)">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                        <button class="btn btn-outline-danger" @onclick="() => DeleteServer(server)">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- Modern Tabbed Form -->
+                <div class="card shadow border-0 mb-5">
+                    <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
+                        <h4 class="m-0 text-primary"><i class="bi bi-sliders"></i> @(_isEditMode ? "Edit" : "Configure") Server Configuration</h4>
+                        <button type="button" class="btn-close" @onclick="CancelForm"></button>
+                    </div>
+
+                    <!-- Tabs Header -->
+                    <ul class="nav nav-tabs px-4 pt-3 bg-light-subtle" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link @(_activeTab == "connection" ? "active" : "")" @onclick='() => SetActiveTab("connection")'>
+                                <i class="bi bi-plug-fill me-1"></i> Connection
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(_activeTab == "database" ? "active" : "")" @onclick='() => SetActiveTab("database")'>
+                                <i class="bi bi-database-fill-gear me-1"></i> Database Defaults
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(_activeTab == "security" ? "active" : "")" @onclick='() => SetActiveTab("security")'>
+                                <i class="bi bi-shield-lock-fill me-1"></i> Security
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(_activeTab == "logging" ? "active" : "")" @onclick='() => SetActiveTab("logging")'>
+                                <i class="bi bi-receipt-cutoff me-1"></i> Logging
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="card-body p-4">
+                        @if (_activeTab == "connection")
+                        {
+                            <!-- Tab 1: Connection -->
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label font-weight-bold">Server Name / IP Address</label>
+                                    <input type="text" class="form-control" @bind="_currentConfig.Server.ServerName" placeholder="e.g. localhost\SQLEXPRESS" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label font-weight-bold">Alias (Friendly Name)</label>
+                                    <input type="text" class="form-control" @bind="_currentConfig.Server.Alias" placeholder="e.g. Production DB" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Database Server Type</label>
+                                    <select class="form-select" @bind="_currentConfig.Server.DatabaseServerType">
+                                        @foreach (var type in Enum.GetValues<DatabaseServerType>())
+                                        {
+                                            <option value="@type">@type</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Default Database</label>
+                                    <input type="text" class="form-control" @bind="_currentConfig.Server.DefaultDatabase" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Port (Optional)</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Server.Port" placeholder="1433" />
+                                </div>
+
+                                <div class="col-12 my-3">
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" id="winAuth" @bind="_currentConfig.Server.UseWindowsAuth" />
+                                        <label class="form-check-label font-weight-bold" for="winAuth">Use Windows Authentication (Integrated Security)</label>
+                                    </div>
+                                </div>
+
+                                @if (!_currentConfig.Server.UseWindowsAuth)
+                                {
+                                    <div class="col-md-6">
+                                        <label class="form-label">Username</label>
+                                        <input type="text" class="form-control" @bind="_currentConfig.Server.Username" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Password</label>
+                                        <input type="password" class="form-control" @bind="_currentConfig.Server.Password" />
+                                    </div>
+                                }
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Connection Timeout (Seconds)</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Server.ConnectionTimeoutSeconds" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Command Timeout (Seconds)</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Server.CommandTimeout" />
+                                </div>
+                                <div class="col-12 mt-2">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="trustCert" @bind="_currentConfig.Server.TrustServerCertificate" />
+                                        <label class="form-check-label" for="trustCert">Trust Server Certificate</label>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else if (_activeTab == "database")
+                        {
+                            <!-- Tab 2: Database Defaults -->
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Default Schema</label>
+                                    <input type="text" class="form-control font-monospace" @bind="_currentConfig.Database.DefaultSchema" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Default File Group</label>
+                                    <input type="text" class="form-control font-monospace" @bind="_currentConfig.Database.DefaultFileGroup" />
+                                </div>
+
+                                <h6 class="mt-4 text-secondary"><i class="bi bi-hash"></i> Length Constraints (Characters)</h6>
+                                <div class="col-md-3">
+                                    <label class="form-label">Max Database Name</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Database.MaxDatabaseNameLength" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Max Schema Name</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Database.MaxSchemaNameLength" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Max Table Name</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Database.MaxTableNameLength" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Max Column Name</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Database.MaxColumnNameLength" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Max Index Name</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Database.MaxIndexNameLength" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Max Foreign Key Name</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Database.MaxForeignKeyNameLength" />
+                                </div>
+
+                                <h6 class="mt-4 text-secondary"><i class="bi bi-file-earmark-binary"></i> File Management Defaults</h6>
+                                <div class="col-md-3">
+                                    <label class="form-label">Data File Size (MB)</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Database.DefaultDataFileSizeMB" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Log File Size (MB)</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Database.DefaultLogFileSizeMB" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">File Growth (MB)</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Database.DefaultFileGrowthMB" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Log Growth (MB)</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Database.DefaultLogFileGrowthMB" />
+                                </div>
+                            </div>
+                        }
+                        else if (_activeTab == "security")
+                        {
+                            <!-- Tab 3: Security -->
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <div class="form-check form-switch p-3 bg-light rounded border">
+                                        <input type="checkbox" class="form-check-input ms-0 me-3" id="enableEnc" @bind="_currentConfig.Security.EnableEncryption" style="float: left;" />
+                                        <label class="form-check-label font-weight-bold" for="enableEnc">Enable AES Config File Encryption</label>
+                                        <div class="form-text text-muted mt-1">If enabled, connection configurations (*.enc.json) will be saved using secure AES encryption. This secures sensitive usernames and passwords.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else if (_activeTab == "logging")
+                        {
+                            <!-- Tab 4: Logging -->
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Log Level</label>
+                                    <select class="form-select" @bind="_currentConfig.Logging.LogLevel">
+                                        @foreach (var level in Enum.GetValues<LogLevel>())
+                                        {
+                                            <option value="@level">@level</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Max Log File Size (MB)</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Logging.MaxLogFileSizeMB" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Retention Period (Days)</label>
+                                    <input type="number" class="form-control" @bind="_currentConfig.Logging.RetentionDays" />
+                                </div>
+
+                                <div class="col-12 mt-4">
+                                    <div class="form-check mb-2">
+                                        <input type="checkbox" class="form-check-input" id="conLog" @bind="_currentConfig.Logging.EnableConsoleLogging" />
+                                        <label class="form-check-label" for="conLog">Enable Console Logging</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="fileLog" @bind="_currentConfig.Logging.EnableFileLogging" />
+                                        <label class="form-check-label" for="fileLog">Enable File Logging</label>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Action Buttons -->
+                        <div class="d-flex justify-content-end gap-2 border-top mt-4 pt-4">
+                            <button class="btn btn-outline-secondary px-4 py-2" @onclick="CancelForm">Cancel</button>
+                            <button class="btn btn-success px-5 py-2 shadow-sm" @onclick="SaveServerConfig">
+                                <i class="bi bi-check-lg me-1"></i> Save Configuration
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<ServerConfiguration> _savedServers = new();
+    private ServerConfiguration _currentConfig = new();
+    private bool _showAddForm = false;
+    private bool _isEditMode = false;
+    private string _activeTab = "connection";
+    private BprMessage? _bprMessage = null;
+    private string _selectedConfigPath = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadSavedServers();
+        await Task.CompletedTask;
+    }
+
+    private void SetActiveTab(string tab)
+    {
+        _activeTab = tab;
+        StateHasChanged();
+    }
+
+    private string GetAlertClass(MessageType type) => type switch
+    {
+        MessageType.Success => "alert-success",
+        MessageType.Error => "alert-danger",
+        MessageType.Warning => "alert-warning",
+        MessageType.Information => "alert-info",
+        MessageType.YesOrNo => "alert-primary",
+        _ => "alert-info"
+    };
+
+    private string GetAlertIcon(MessageType type) => type switch
+    {
+        MessageType.Success => "bi-check-circle-fill",
+        MessageType.Error => "bi-exclamation-octagon-fill",
+        MessageType.Warning => "bi-exclamation-triangle-fill",
+        MessageType.Information => "bi-info-circle-fill",
+        MessageType.YesOrNo => "bi-question-circle-fill",
+        _ => "bi-info-circle-fill"
+    };
+
+    private void ClearMessage()
+    {
+        _bprMessage = null;
+    }
+
+    private void LoadSavedServers()
+    {
+        _savedServers.Clear();
+        try
+        {
+            var configs = ServerConfiguration.LoadAllFromEncryptedFile(false);
+            if (configs.HasAny())
+            {
+                _savedServers.AddRange(configs);
+            }
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = new BprMessage($"Error loading configurations: {ex.Message}", MessageType.Error);
+        }
+    }
+
+    private void OpenAddServerForm()
+    {
+        _currentConfig = new ServerConfiguration();
+
+        // Populate system defaults from Constants
+        _currentConfig.Server.DefaultDatabase = "master";
+        _currentConfig.Server.UseWindowsAuth = true;
+        _currentConfig.Server.DatabaseServerType = DatabaseServerType.SqlServer;
+        _currentConfig.Server.ConnectionTimeoutSeconds = Constants.DatabaseConnectionTimeoutSeconds;
+        _currentConfig.Server.CommandTimeout = Constants.DatabaseCommandTimeoutSeconds;
+
+        _currentConfig.Database.DefaultSchema = Constants.DefaultSchema;
+        _currentConfig.Database.DefaultFileGroup = Constants.DefaultFileGroup;
+        _currentConfig.Database.MaxDatabaseNameLength = Constants.MaxDatabaseNameLength;
+        _currentConfig.Database.MaxSchemaNameLength = Constants.MaxSchemaNameLength;
+        _currentConfig.Database.MaxTableNameLength = Constants.MaxTableNameLength;
+        _currentConfig.Database.MaxColumnNameLength = Constants.MaxColumnNameLength;
+        _currentConfig.Database.MaxIndexNameLength = Constants.MaxIndexNameLength;
+        _currentConfig.Database.MaxForeignKeyNameLength = Constants.MaxForeignKeyNameLength;
+        _currentConfig.Database.DefaultDataFileSizeMB = Constants.DefaultInitialDataSizeMB;
+        _currentConfig.Database.DefaultLogFileSizeMB = Constants.DefaultInitialLogSizeMB;
+        _currentConfig.Database.DefaultFileGrowthMB = Constants.DefaultFileGrowthMB;
+        _currentConfig.Database.DefaultLogFileGrowthMB = Constants.DefaultLogFileGrowthMB;
+
+        _currentConfig.Security.EnableEncryption = true;
+
+        _currentConfig.Logging.LogLevel = LogLevel.Information;
+        _currentConfig.Logging.EnableConsoleLogging = true;
+        _currentConfig.Logging.EnableFileLogging = false;
+        _currentConfig.Logging.MaxLogFileSizeMB = 10;
+        _currentConfig.Logging.RetentionDays = 7;
+
+        _isEditMode = false;
+        _showAddForm = true;
+        _activeTab = "connection";
+        StateHasChanged();
+    }
+
+    private void EditServer(ServerConfiguration config)
+    {
+        _currentConfig = config;
+        _isEditMode = true;
+        _showAddForm = true;
+        _activeTab = "connection";
+        StateHasChanged();
+    }
+
+    private void CancelForm()
+    {
+        _showAddForm = false;
+        _isEditMode = false;
+        _currentConfig = new ServerConfiguration();
+        _selectedConfigPath = string.Empty;
+        StateHasChanged();
+    }
+
+    private void SaveServerConfig()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(_currentConfig.Server.ServerName))
+            {
+                _bprMessage = new BprMessage("Server name/IP is required.", MessageType.Warning);
+                return;
+            }
+
+            // Load all existing configurations
+            var allConfigs = ServerConfiguration.LoadAllFromEncryptedFile(false);
+
+            // Check if we're editing an existing configuration
+            var existingConfig = allConfigs.FirstOrDefault(c => c.Id == _currentConfig.Id);
+
+            if (existingConfig != null && _isEditMode)
+            {
+                // Update existing configuration
+                allConfigs.Remove(existingConfig);
+                allConfigs.Add(_currentConfig);
+            }
+            else if (!_isEditMode)
+            {
+                // Add new configuration
+                allConfigs.Add(_currentConfig);
+            }
+
+            // Save all configurations back to the file
+            ServerConfiguration.SaveAllToEncryptedFile(allConfigs);
+
+            _bprMessage = new BprMessage($"Configuration saved successfully to {Path.GetFileName(ServerConfiguration.GetServerConfigPath())}", MessageType.Success);
+            _showAddForm = false;
+            _isEditMode = false;
+            LoadSavedServers();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = new BprMessage($"Error saving configuration: {ex.Message}", MessageType.Error);
+        }
+    }
+
+    private void DeleteServer(ServerConfiguration config)
+    {
+        try
+        {
+            // Load all server configurations
+            var allConfigs = ServerConfiguration.LoadAllFromEncryptedFile();
+
+            // Find and remove the specific server configuration
+            var configToRemove = allConfigs.FirstOrDefault(c =>
+                c.Server.ServerName == config.Server.ServerName &&
+                c.Server.Alias == config.Server.Alias);
+
+            if (configToRemove != null)
+            {
+                allConfigs.Remove(configToRemove);
+
+                // Save the updated list back to the file
+                ServerConfiguration.SaveAllToEncryptedFile(allConfigs);
+
+                _bprMessage = new BprMessage($"Server configuration '{config.Server.ServerName}' deleted successfully.", MessageType.Success);
+                LoadSavedServers();
+            }
+            else
+            {
+                _bprMessage = new BprMessage("Server configuration not found.");
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = new BprMessage($"Error deleting server configuration: {ex.Message}", MessageType.Error);
+            StateHasChanged();
+        }
+    }
+}

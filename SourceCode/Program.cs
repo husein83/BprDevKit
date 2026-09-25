@@ -1,3 +1,7 @@
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+using BprDevKit.DatabaseManagement.Config;
+using BprDevKit.DatabaseManagement.Services;
 using BprDevKit.Components;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -5,6 +9,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Register configuration and services
+builder.Services.AddSingleton<ServerConfiguration>();
+builder.Services.AddSingleton<ISqlGenerator, SqlGenerator>();
+builder.Services.AddScoped<DatabaseManager>();
 
 var app = builder.Build();
 

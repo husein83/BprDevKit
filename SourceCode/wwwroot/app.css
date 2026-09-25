@@ -1,15 +1,70 @@
-html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+:root {
+    --sidebar-width: 280px;
+    --primary-color: #1a2a3a;
+    --secondary-color: #2c3e50;
+    --accent-color: #3498db;
+    --text-light: #ecf0f1;
+    --bg-light: #f8f9fa;
 }
 
-a, .btn-link {
-    color: #006bb7;
+body {
+    background-color: var(--bg-light);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-.btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+.main-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: var(--sidebar-width);
+    background-color: var(--primary-color);
+    color: var(--text-light);
+    transition: all 0.3s;
+    box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+}
+
+.sidebar-header {
+    padding: 2rem 1.5rem;
+    background: rgba(0,0,0,0.1);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.nav-link {
+    color: rgba(255,255,255,0.7);
+    padding: 0.8rem 1.5rem;
+    border-radius: 0;
+    margin: 0.2rem 0;
+    border-left: 4px solid transparent;
+}
+
+.nav-link:hover, .nav-link.active {
+    background-color: rgba(255,255,255,0.1);
+    color: white;
+    border-left-color: var(--accent-color);
+}
+
+.content-area {
+    flex: 1;
+    padding: 2rem;
+    overflow-y: auto;
+}
+
+.dashboard-card {
+    background: white;
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    margin-bottom: 2rem;
+}
+
+.dashboard-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
@@ -42,9 +97,17 @@ h1:focus {
     color: white;
 }
 
-    .blazor-error-boundary::after {
-        content: "An error has occurred."
-    }
+    /* Fix tab text color for readability */
+.nav-tabs .nav-link {
+    color: #333333 !important;
+    font-weight: 500;
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--accent-color) !important;
+    font-weight: 600;
+}
+
 
 .darker-border-checkbox.form-check-input {
     border-color: #929292;

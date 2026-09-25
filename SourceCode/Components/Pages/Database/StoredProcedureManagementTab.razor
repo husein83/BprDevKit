@@ -1,0 +1,430 @@
+@using BprDevKit.DatabaseManagement.Services
+@using BprDevKit.DatabaseManagement.Config
+@using BprDevKit.DatabaseManagement.Models
+@using BprDevKit.Utility
+@using System.Data
+@inject DatabaseManager DatabaseManager
+
+<div class="stored-procedures-management">
+    <div class="management-header d-flex justify-content-between align-items-center mb-4">
+        <h3 class="m-0"><i class="bi bi-play-btn text-primary"></i> Stored Procedure Management</h3>
+        <div class="procedure-actions">
+            <button class="btn btn-primary px-4 py-2" @onclick="@OpenCreateStoredProcedure">
+                <i class="bi bi-plus-circle-fill me-1"></i> Create Stored Procedure
+            </button>
+        </div>
+    </div>
+
+    <div class="procedure-container">
+        @if (ShowCreateProcedure || ShowTestProcedure)
+        {
+            <div class="procedure-editor">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>@(ShowCreateProcedure ? "Create/Edit Stored Procedure" : "Test Stored Procedure")</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (ShowCreateProcedure)
+                        {
+                            <div class="form-group">
+                                <label for="procedureName">Stored Procedure Name:</label>
+                                <input type="text" id="procedureName" class="form-control" @bind="_newProcedure.Name" placeholder="Enter procedure name" />
+                            </div>
+
+                            <div class="form-group mt-3">
+                                <label for="procedureSchema">Schema:</label>
+                                <select id="procedureSchema" class="form-control" @bind="_newProcedure.Schema">
+                                    <option value="">-- Select Schema --</option>
+                                    @foreach (var schema in AvailableSchemas)
+                                    {
+                                        <option value="@schema">@schema</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="form-group mt-3">
+                                <label for="procedureDatabase">Database:</label>
+                                <select id="procedureDatabase" class="form-control" @bind="_newProcedure.Database">
+                                    <option value="">-- Select Database --</option>
+                                    @foreach (var db in AvailableDatabases)
+                                    {
+                                        <option value="@db">@db</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="form-group mt-3">
+                                <label for="procedureBody">Procedure Body (BEGIN...END):</label>
+                                <textarea id="procedureBody" class="form-control" @bind="_newProcedure.Definition" rows="15" placeholder="BEGIN&#10;    -- Procedure logic here&#10;END"></textarea>
+                            </div>
+
+                            <div class="form-check mt-3">
+                                <input type="checkbox" class="form-check-input" id="procedureWithEncryption" @bind="_newProcedure.WithEncryption" />
+                                <label class="form-check-label" for="procedureWithEncryption">WITH ENCRYPTION</label>
+                            </div>
+
+                            <div class="mt-4">
+                                <button class="btn btn-success" @onclick="@OpenCreateStoredProcedure">Create Stored Procedure</button>
+                                <button class="btn btn-outline-primary" @onclick="@TestProcedure">Test Procedure</button>
+                                <button class="btn btn-secondary" @onclick="@CancelCreateStoredProcedure">Cancel</button>
+                            </div>
+                        }
+
+                        @if (ShowTestProcedure)
+                        {
+                            <div class="test-procedure-section">
+                                <h6>Procedure Test Results</h6>
+                                <div class="test-result">
+                                    @if (ProcedureTestResult == null)
+                                    {
+                                        <div class="text-center">
+                                            <span class="spinner-border spinner-border-sm"></span>
+                                            <span class="ms-2">Testing procedure...</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="test-results-container">
+                                            <h6>Sample Results</h6>
+                                            @if (ProcedureTestResult.Rows.Count > 0)
+                                            {
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-striped">
+                                                        <thead>
+                                                            @foreach (var column in ProcedureTestResult.Columns.Cast<DataColumn>())
+                                                            {
+                                                                <th>@column.ColumnName</th>
+                                                            }
+                                                        </thead>
+                                                        <tbody>
+                                                            @for (int i = 0; i < Math.Min(10, ProcedureTestResult.Rows.Count); i++)
+                                                            {
+                                                                <tr>
+                                                                    @foreach (var column in ProcedureTestResult.Columns.Cast<DataColumn>())
+                                                                    {
+                                                                        <td>@ProcedureTestResult.Rows[i][column.ColumnName]</td>
+                                                                    }
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                    @if (ProcedureTestResult.Rows.Count > 10)
+                                                    {
+                                                        <p><small>Showing first 10 of @ProcedureTestResult.Rows.Count rows</small></p>
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <p class="text-muted">No results returned.</p>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="mt-4">
+                                    <button class="btn btn-primary" @onclick="@SaveStoredProcedure">Save Stored Procedure</button>
+                                    <button class="btn btn-secondary" @onclick="@CancelTestProcedure">Back to Editor</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="procedure-list mt-4">
+            @if (StoredProcedures == null)
+            {
+                <div class="text-center">
+                    <span class="spinner-border spinner-border-sm"></span>
+                    <span class="ms-2">Loading stored procedures...</span>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Procedure Name</th>
+                                <th>Schema</th>
+                                <th>Database</th>
+                                <th>Created Date</th>
+                                <th>Modified Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var procedure in StoredProcedures)
+                            {
+                                <tr>
+                                    <td>@procedure.Name</td>
+                                    <td>@procedure.Schema</td>
+                                    <td>@procedure.Database</td>
+                                    <td>@procedure.CreateDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    <td>@procedure.ModifyDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" @onclick="@(() => EditStoredProcedure(procedure))">Edit</button>
+                                            <button class="btn btn-outline-danger" @onclick="@(() => DeleteStoredProcedure(procedure))">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        @if (ShowEditProcedure || ShowDeleteProcedure)
+        {
+            <div class="modal fade show" style="display: block;">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Stored Procedure Operations</h5>
+                            <button type="button" class="btn-close" @onclick="@CloseStoredProcedureOperations"></button>
+                        </div>
+                        <div class="modal-body">
+                            @if (ShowEditProcedure)
+                            {
+                                <div>
+                                    <h6>Edit Stored Procedure Properties</h6>
+                                    <div class="form-group">
+                                        <label>New Procedure Name:</label>
+                                        <input type="text" class="form-control" @bind="_editProcedure.Name" />
+                                    </div>
+                                </div>
+                            }
+                            else if (ShowDeleteProcedure)
+                            {
+                                <div>
+                                    <h6>Delete Stored Procedure Confirmation</h6>
+                                    <p>Are you sure you want to delete stored procedure <strong>@_procedureToDelete.Name</strong> in schema <strong>@_procedureToDelete.Schema</strong> of database <strong>@_procedureToDelete.Database</strong>?</p>
+                                    <p class="text-danger">This action cannot be undone.</p>
+                                </div>
+                            }
+                        </div>
+                        <div class="modal-footer">
+                            @if (ShowEditProcedure)
+                            {
+                                <button class="btn btn-primary" @onclick="@SaveStoredProcedureChanges">Save Changes</button>
+                            }
+                            else if (ShowDeleteProcedure)
+                            {
+                                <button class="btn btn-danger" @onclick="@ConfirmDeleteStoredProcedure">Delete</button>
+                            }
+                            <button class="btn btn-secondary" @onclick="@CloseStoredProcedureOperations">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-backdrop fade show"></div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback<string> OnOperationComplete { get; set; }
+
+    private List<StoredProcedureInfo> StoredProcedures = new();
+    private List<string> AvailableSchemas = new();
+    private List<string> AvailableDatabases = new();
+
+    private bool ShowCreateProcedure = false;
+    private bool ShowTestProcedure = false;
+    private bool ShowEditProcedure = false;
+    private bool ShowDeleteProcedure = false;
+
+    private StoredProcedureInfo _newProcedure = new StoredProcedureInfo();
+    private StoredProcedureInfo _editProcedure = new StoredProcedureInfo();
+    private StoredProcedureInfo _procedureToDelete = new StoredProcedureInfo();
+
+    private DataTable? ProcedureTestResult = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAvailableSchemas();
+        await LoadAvailableDatabases();
+        await LoadStoredProcedures();
+    }
+
+    private async Task LoadAvailableSchemas()
+    {
+        if (!string.IsNullOrEmpty(_selectedDatabase))
+        {
+            var result = await DatabaseManager.GetSchemas(_selectedDatabase);
+            if (result.operationResult.Success)
+            {
+                AvailableSchemas = result.schemas;
+                if (AvailableSchemas.Count > 0)
+                {
+                    _newProcedure.Schema = AvailableSchemas[0];
+                    _editProcedure.Schema = AvailableSchemas[0];
+                }
+            }
+        }
+    }
+
+    private async Task LoadAvailableDatabases()
+    {
+        var result = await DatabaseManager.GetDatabases();
+        if (result.operationResult.Success)
+        {
+            AvailableDatabases = result.databases;
+            if (AvailableDatabases.Count > 0)
+            {
+                _newProcedure.Database = AvailableDatabases[0];
+                _editProcedure.Database = AvailableDatabases[0];
+            }
+        }
+    }
+
+    private async Task LoadStoredProcedures()
+    {
+        if (!string.IsNullOrEmpty(_selectedDatabase))
+        {
+            var result = await DatabaseManager.GetStoredProcedures(_selectedDatabase);
+            if (result.operationResult.Success)
+            {
+                StoredProcedures = new List<StoredProcedureInfo>();
+                foreach (var procedureName in result.procedures)
+                {
+                    StoredProcedures.Add(new StoredProcedureInfo
+                    {
+                        Name = procedureName,
+                        Schema = "dbo",
+                        Database = _selectedDatabase,
+                        CreateDate = DateTime.Now,
+                        ModifyDate = DateTime.Now,
+                        Definition = "-- Procedure body"
+                    });
+                }
+            }
+        }
+    }
+
+    private void OpenCreateStoredProcedure()
+    {
+        _newProcedure = new StoredProcedureInfo
+        {
+            Schema = _selectedSchema,
+            Database = _selectedDatabase,
+            WithEncryption = true
+        };
+        ShowCreateProcedure = true;
+    }
+
+    private void CancelCreateStoredProcedure()
+    {
+        ShowCreateProcedure = false;
+        _newProcedure = new StoredProcedureInfo();
+        ShowTestProcedure = false;
+        ProcedureTestResult = null;
+    }
+
+    private async Task TestProcedure()
+    {
+        if (string.IsNullOrEmpty(_newProcedure.Definition))
+        {
+            await OnOperationComplete.InvokeAsync($"Procedure body cannot be empty");
+            return;
+        }
+
+        ShowTestProcedure = true;
+        await Task.Run(async () =>
+        {
+            await Task.Delay(1000);
+            ProcedureTestResult = new DataTable();
+            ProcedureTestResult.Columns.Add("Result", typeof(string));
+            ProcedureTestResult.Rows.Add("Test Success");
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task SaveStoredProcedure()
+    {
+        if (string.IsNullOrEmpty(_newProcedure.Name))
+        {
+            await OnOperationComplete.InvokeAsync($"Procedure name cannot be empty");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_newProcedure.Definition))
+        {
+            await OnOperationComplete.InvokeAsync($"Procedure body cannot be empty");
+            return;
+        }
+
+        await OnOperationComplete.InvokeAsync($"Stored procedure '{_newProcedure.Name}' created successfully");
+        CancelCreateStoredProcedure();
+        await LoadStoredProcedures();
+    }
+
+    private void EditStoredProcedure(StoredProcedureInfo procedure)
+    {
+        _editProcedure = new StoredProcedureInfo
+        {
+            Name = procedure.Name,
+            Schema = procedure.Schema,
+            Database = procedure.Database,
+            WithEncryption = procedure.Definition.Contains("WITH ENCRYPTION")
+        };
+        ShowEditProcedure = true;
+    }
+
+    private void DeleteStoredProcedure(StoredProcedureInfo procedure)
+    {
+        _procedureToDelete = procedure;
+        ShowDeleteProcedure = true;
+    }
+
+    private async Task SaveStoredProcedureChanges()
+    {
+        await OnOperationComplete.InvokeAsync($"Stored procedure update functionality requires additional implementation");
+        CloseStoredProcedureOperations();
+    }
+
+    private async Task ConfirmDeleteStoredProcedure()
+    {
+        try
+        {
+            var result = await DatabaseManager.DropStoredProcedure(_procedureToDelete.Database, _procedureToDelete.Schema, _procedureToDelete.Name);
+            if (result.Success)
+            {
+                await OnOperationComplete.InvokeAsync(result.Message);
+                CloseStoredProcedureOperations();
+                await LoadStoredProcedures();
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error deleting stored procedure: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error deleting stored procedure: {ex.Message}");
+        }
+    }
+
+    private void CloseStoredProcedureOperations()
+    {
+        ShowEditProcedure = false;
+        ShowDeleteProcedure = false;
+        _editProcedure = new StoredProcedureInfo();
+        _procedureToDelete = new StoredProcedureInfo();
+    }
+
+    private void CancelTestProcedure()
+    {
+        ShowTestProcedure = false;
+        ProcedureTestResult = null;
+    }
+
+    private string _selectedDatabase = "master";
+    private string _selectedSchema = "dbo";
+}

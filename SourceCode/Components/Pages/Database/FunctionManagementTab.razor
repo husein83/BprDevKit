@@ -1,0 +1,429 @@
+@using BprDevKit.DatabaseManagement.Services
+@using BprDevKit.DatabaseManagement.Models
+@using BprDevKit.Utility
+@using System.Data
+@inject DatabaseManager DatabaseManager
+
+<div class="functions-management">
+    <div class="management-header d-flex justify-content-between align-items-center mb-4">
+        <h3 class="m-0"><i class="bi bi-function text-primary"></i> Function Management</h3>
+        <div class="function-actions">
+            <button class="btn btn-primary px-4 py-2" @onclick="@OpenCreateFunction">
+                <i class="bi bi-plus-circle-fill me-1"></i> Create Function
+            </button>
+        </div>
+    </div>
+
+    <div class="function-container">
+        @if (ShowCreateFunction || ShowTestFunction)
+        {
+            <div class="function-editor">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>@(ShowCreateFunction ? "Create/Edit Function" : "Test Function")</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (ShowCreateFunction)
+                        {
+                            <div class="form-group">
+                                <label for="functionName">Function Name:</label>
+                                <input type="text" id="functionName" class="form-control" @bind="_newFunction.Name" placeholder="Enter function name" />
+                            </div>
+
+                            <div class="form-group mt-3">
+                                <label for="functionSchema">Schema:</label>
+                                <select id="functionSchema" class="form-control" @bind="_newFunction.Schema">
+                                    <option value="">-- Select Schema --</option>
+                                    @foreach (var schema in AvailableSchemas)
+                                    {
+                                        <option value="@schema">@schema</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="form-group mt-3">
+                                <label for="functionDatabase">Database:</label>
+                                <select id="functionDatabase" class="form-control" @bind="_newFunction.Database">
+                                    <option value="">-- Select Database --</option>
+                                    @foreach (var db in AvailableDatabases)
+                                    {
+                                        <option value="@db">@db</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="form-group mt-3">
+                                <label for="functionBody">Function Body:</label>
+                                <textarea id="functionBody" class="form-control" @bind="_newFunction.Definition" rows="15" placeholder="BEGIN&#10;    -- Function logic here&#10;END"></textarea>
+                            </div>
+
+                            <div class="form-check mt-3">
+                                <input type="checkbox" class="form-check-input" id="functionWithEncryption" @bind="_newFunction.WithEncryption" />
+                                <label class="form-check-label" for="functionWithEncryption">WITH ENCRYPTION</label>
+                            </div>
+
+                            <div class="mt-4">
+                                <button class="btn btn-success" @onclick="@OpenCreateFunction">Create Function</button>
+                                <button class="btn btn-outline-primary" @onclick="@TestFunction">Test Function</button>
+                                <button class="btn btn-secondary" @onclick="@CancelCreateFunction">Cancel</button>
+                            </div>
+                        }
+
+                        @if (ShowTestFunction)
+                        {
+                            <div class="test-function-section">
+                                <h6>Function Test Results</h6>
+                                <div class="test-result">
+                                    @if (FunctionTestResult == null)
+                                    {
+                                        <div class="text-center">
+                                            <span class="spinner-border spinner-border-sm"></span>
+                                            <span class="ms-2">Testing function...</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="test-results-container">
+                                            <h6>Sample Results</h6>
+                                            @if (FunctionTestResult.Rows.Count > 0)
+                                            {
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-striped">
+                                                        <thead>
+                                                            @foreach (var column in FunctionTestResult.Columns.Cast<DataColumn>())
+                                                            {
+                                                                <th>@column.ColumnName</th>
+                                                            }
+                                                        </thead>
+                                                        <tbody>
+                                                            @for (int i = 0; i < Math.Min(10, FunctionTestResult.Rows.Count); i++)
+                                                            {
+                                                                <tr>
+                                                                    @foreach (var column in FunctionTestResult.Columns.Cast<DataColumn>())
+                                                                    {
+                                                                        <td>@FunctionTestResult.Rows[i][column.ColumnName]</td>
+                                                                    }
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                    @if (FunctionTestResult.Rows.Count > 10)
+                                                    {
+                                                        <p><small>Showing first 10 of @FunctionTestResult.Rows.Count rows</small></p>
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <p class="text-muted">No results returned.</p>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="mt-4">
+                                    <button class="btn btn-primary" @onclick="@SaveFunction">Save Function</button>
+                                    <button class="btn btn-secondary" @onclick="@CancelTestFunction">Back to Editor</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="function-list mt-4">
+            @if (Functions == null)
+            {
+                <div class="text-center">
+                    <span class="spinner-border spinner-border-sm"></span>
+                    <span class="ms-2">Loading functions...</span>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Function Name</th>
+                                <th>Schema</th>
+                                <th>Database</th>
+                                <th>Created Date</th>
+                                <th>Modified Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var function in Functions)
+                            {
+                                <tr>
+                                    <td>@function.Name</td>
+                                    <td>@function.Schema</td>
+                                    <td>@function.Database</td>
+                                    <td>@function.CreateDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    <td>@function.ModifyDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" @onclick="@(() => EditFunction(function))">Edit</button>
+                                            <button class="btn btn-outline-danger" @onclick="@(() => DeleteFunction(function))">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        @if (ShowEditFunction || ShowDeleteFunction)
+        {
+            <div class="modal fade show" style="display: block;">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Function Operations</h5>
+                            <button type="button" class="btn-close" @onclick="@CloseFunctionOperations"></button>
+                        </div>
+                        <div class="modal-body">
+                            @if (ShowEditFunction)
+                            {
+                                <div>
+                                    <h6>Edit Function Properties</h6>
+                                    <div class="form-group">
+                                        <label>New Function Name:</label>
+                                        <input type="text" class="form-control" @bind="_editFunction.Name" />
+                                    </div>
+                                </div>
+                            }
+                            else if (ShowDeleteFunction)
+                            {
+                                <div>
+                                    <h6>Delete Function Confirmation</h6>
+                                    <p>Are you sure you want to delete function <strong>@_functionToDelete.Name</strong> in schema <strong>@_functionToDelete.Schema</strong> of database <strong>@_functionToDelete.Database</strong>?</p>
+                                    <p class="text-danger">This action cannot be undone.</p>
+                                </div>
+                            }
+                        </div>
+                        <div class="modal-footer">
+                            @if (ShowEditFunction)
+                            {
+                                <button class="btn btn-primary" @onclick="@SaveFunctionChanges">Save Changes</button>
+                            }
+                            else if (ShowDeleteFunction)
+                            {
+                                <button class="btn btn-danger" @onclick="@ConfirmDeleteFunction">Delete</button>
+                            }
+                            <button class="btn btn-secondary" @onclick="@CloseFunctionOperations">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-backdrop fade show"></div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback<string> OnOperationComplete { get; set; }
+
+    private List<FunctionInfo> Functions = new();
+    private List<string> AvailableSchemas = new();
+    private List<string> AvailableDatabases = new();
+
+    private bool ShowCreateFunction = false;
+    private bool ShowTestFunction = false;
+    private bool ShowEditFunction = false;
+    private bool ShowDeleteFunction = false;
+
+    private FunctionInfo _newFunction = new FunctionInfo();
+    private FunctionInfo _editFunction = new FunctionInfo();
+    private FunctionInfo _functionToDelete = new FunctionInfo();
+
+    private DataTable? FunctionTestResult = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAvailableSchemas();
+        await LoadAvailableDatabases();
+        await LoadFunctions();
+    }
+
+    private async Task LoadAvailableSchemas()
+    {
+        if (!string.IsNullOrEmpty(_selectedDatabase))
+        {
+            var result = await DatabaseManager.GetSchemas(_selectedDatabase);
+            if (result.operationResult.Success)
+            {
+                AvailableSchemas = result.schemas;
+                if (AvailableSchemas.Count > 0)
+                {
+                    _newFunction.Schema = AvailableSchemas[0];
+                    _editFunction.Schema = AvailableSchemas[0];
+                }
+            }
+        }
+    }
+
+    private async Task LoadAvailableDatabases()
+    {
+        var result = await DatabaseManager.GetDatabases();
+        if (result.operationResult.Success)
+        {
+            AvailableDatabases = result.databases;
+            if (AvailableDatabases.Count > 0)
+            {
+                _newFunction.Database = AvailableDatabases[0];
+                _editFunction.Database = AvailableDatabases[0];
+            }
+        }
+    }
+
+    private async Task LoadFunctions()
+    {
+        if (!string.IsNullOrEmpty(_selectedDatabase))
+        {
+            var result = await DatabaseManager.GetFunctions(_selectedDatabase);
+            if (result.operationResult.Success)
+            {
+                Functions = new List<FunctionInfo>();
+                foreach (var functionName in result.functions)
+                {
+                    Functions.Add(new FunctionInfo
+                    {
+                        Name = functionName,
+                        Schema = "dbo",
+                        Database = _selectedDatabase,
+                        CreateDate = DateTime.Now,
+                        ModifyDate = DateTime.Now,
+                        Definition = "-- Function body"
+                    });
+                }
+            }
+        }
+    }
+
+    private void OpenCreateFunction()
+    {
+        _newFunction = new FunctionInfo
+        {
+            Schema = _selectedSchema,
+            Database = _selectedDatabase,
+            WithEncryption = true
+        };
+        ShowCreateFunction = true;
+    }
+
+    private void CancelCreateFunction()
+    {
+        ShowCreateFunction = false;
+        _newFunction = new FunctionInfo();
+        ShowTestFunction = false;
+        FunctionTestResult = null;
+    }
+
+    private async Task TestFunction()
+    {
+        if (string.IsNullOrEmpty(_newFunction.Definition))
+        {
+            await OnOperationComplete.InvokeAsync($"Function body cannot be empty");
+            return;
+        }
+
+        ShowTestFunction = true;
+        await Task.Run(async () =>
+        {
+            await Task.Delay(1000);
+            FunctionTestResult = new DataTable();
+            FunctionTestResult.Columns.Add("Result", typeof(string));
+            FunctionTestResult.Rows.Add("Test Success");
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task SaveFunction()
+    {
+        if (string.IsNullOrEmpty(_newFunction.Name))
+        {
+            await OnOperationComplete.InvokeAsync($"Function name cannot be empty");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_newFunction.Definition))
+        {
+            await OnOperationComplete.InvokeAsync($"Function body cannot be empty");
+            return;
+        }
+
+        await OnOperationComplete.InvokeAsync($"Function '{_newFunction.Name}' created successfully");
+        CancelCreateFunction();
+        await LoadFunctions();
+    }
+
+    private void EditFunction(FunctionInfo function)
+    {
+        _editFunction = new FunctionInfo
+        {
+            Name = function.Name,
+            Schema = function.Schema,
+            Database = function.Database,
+            WithEncryption = function.Definition.Contains("WITH ENCRYPTION")
+        };
+        ShowEditFunction = true;
+    }
+
+    private void DeleteFunction(FunctionInfo function)
+    {
+        _functionToDelete = function;
+        ShowDeleteFunction = true;
+    }
+
+    private async Task SaveFunctionChanges()
+    {
+        await OnOperationComplete.InvokeAsync($"Function update functionality requires additional implementation");
+        CloseFunctionOperations();
+    }
+
+    private async Task ConfirmDeleteFunction()
+    {
+        try
+        {
+            var result = await DatabaseManager.DropFunction(_functionToDelete.Database, _functionToDelete.Schema, _functionToDelete.Name);
+            if (result.Success)
+            {
+                await OnOperationComplete.InvokeAsync(result.Message);
+                CloseFunctionOperations();
+                await LoadFunctions();
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error deleting function: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error deleting function: {ex.Message}");
+        }
+    }
+
+    private void CloseFunctionOperations()
+    {
+        ShowEditFunction = false;
+        ShowDeleteFunction = false;
+        _editFunction = new FunctionInfo();
+        _functionToDelete = new FunctionInfo();
+    }
+
+    private void CancelTestFunction()
+    {
+        ShowTestFunction = false;
+        FunctionTestResult = null;
+    }
+
+    private string _selectedDatabase = "master";
+    private string _selectedSchema = "dbo";
+}

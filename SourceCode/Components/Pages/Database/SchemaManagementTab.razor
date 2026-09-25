@@ -1,0 +1,320 @@
+@using BprDevKit.DatabaseManagement.Services
+@using BprDevKit.DatabaseManagement.Models
+@using BprDevKit.DatabaseManagement.Config
+@using BprDevKit.Utility
+@inject DatabaseManager DatabaseManager
+
+<div class="schemas-management">
+    <div class="management-header d-flex justify-content-between align-items-center mb-4">
+        <h3 class="m-0"><i class="bi bi-grid-3x3 text-primary"></i> Schema Management</h3>
+        <div class="schema-actions">
+            <button class="btn btn-primary px-4 py-2" @onclick="@OpenCreateSchema">
+                <i class="bi bi-plus-circle-fill me-1"></i> Create Schema
+            </button>
+        </div>
+    </div>
+
+    @if (ShowCreateSchema)
+    {
+        <div class="create-schema-form">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Create New Schema</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="schemaName">Schema Name:</label>
+                        <input type="text" id="schemaName" class="form-control" @bind="_newSchemaName" placeholder="Enter schema name" />
+                    </div>
+
+                    <div class="form-group mt-3">
+                        <label for="databaseSelect">Database:</label>
+                        <select id="databaseSelect" class="form-control" @bind="_selectedDatabase">
+                            <option value="">-- Select Database --</option>
+                            @foreach (var db in AvailableDatabases)
+                            {
+                                <option value="@db">@db</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mt-4">
+                        <button class="btn btn-success" @onclick="@CreateSchema">Create Schema</button>
+                        <button class="btn btn-secondary" @onclick="@CancelCreateSchema">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="schema-list mt-4">
+        @if (_schemas == null)
+        {
+            <div class="text-center">
+                <span class="spinner-border spinner-border-sm"></span>
+                <span class="ms-2">Loading schemas...</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Schema Name</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var schema in _schemas)
+                        {
+                            <tr>
+                                <td>@schema</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" @onclick="@(() => ViewSchema(schema))">View</button>
+                                        <button class="btn btn-outline-secondary" @onclick="@(() => EditSchema(schema))">Edit</button>
+                                        <button class="btn btn-outline-danger" @onclick="@(() => DeleteSchema(schema))">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    @if (ShowEditSchema || ShowDeleteSchema)
+    {
+        <div class="modal fade show" style="display: block;">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Schema Operations</h5>
+                        <button type="button" class="btn-close" @onclick="@CloseSchemaOperations"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (ShowEditSchema)
+                        {
+                            <div>
+                                <h6>Rename Schema</h6>
+                                <div class="form-group">
+                                    <label>New Schema Name:</label>
+                                    <input type="text" class="form-control" @bind="_newSchemaName" placeholder="Enter new schema name" />
+                                </div>
+                            </div>
+                        }
+                        else if (ShowDeleteSchema)
+                        {
+                            <div>
+                                <h6>Delete Schema Confirmation</h6>
+                                <p>Are you sure you want to delete schema <strong>@_schemaToDelete</strong>?</p>
+                                <p class="text-danger">This action cannot be undone.</p>
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        @if (ShowEditSchema)
+                        {
+                            <button class="btn btn-primary" @onclick="@SaveSchemaChanges">Save Changes</button>
+                        }
+                        else if (ShowDeleteSchema)
+                        {
+                            <button class="btn btn-danger" @onclick="@ConfirmDeleteSchema">Delete</button>
+                        }
+                        <button class="btn btn-secondary" @onclick="@CloseSchemaOperations">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback<string> OnOperationComplete { get; set; }
+
+    private List<string> _schemas = new();
+    private List<string> AvailableDatabases = new();
+    private string _selectedDatabase = string.Empty;
+    private bool ShowCreateSchema = false;
+    private bool ShowEditSchema = false;
+    private bool ShowDeleteSchema = false;
+    private string _newSchemaName = string.Empty;
+    private string _schemaToDelete = string.Empty;
+    private string _originalSchemaName = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSchemas();
+        await LoadAvailableDatabases();
+    }
+
+    private async Task LoadAvailableDatabases()
+    {
+        try
+        {
+            var result = await DatabaseManager.GetDatabases();
+            if (result.operationResult.Success)
+            {
+                AvailableDatabases = result.databases;
+                if (AvailableDatabases.Count > 0)
+                {
+                    _selectedDatabase = AvailableDatabases[0];
+                    await LoadSchemas();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error loading databases: {ex.Message}");
+        }
+    }
+
+    private async Task LoadSchemas(string databaseName)
+    {
+        if (string.IsNullOrEmpty(databaseName))
+            return;
+
+        try
+        {
+            var result = await DatabaseManager.GetSchemas(databaseName);
+            if (result.operationResult.Success)
+            {
+                _schemas = result.schemas;
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error loading schemas: {result.operationResult.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error loading schemas: {ex.Message}");
+        }
+    }
+
+    private async Task LoadSchemas()
+    {
+        if (!string.IsNullOrEmpty(_selectedDatabase))
+        {
+            await LoadSchemas(_selectedDatabase);
+        }
+    }
+
+    private void OpenCreateSchema()
+    {
+        _newSchemaName = string.Empty;
+        ShowCreateSchema = true;
+    }
+
+    private void CancelCreateSchema()
+    {
+        ShowCreateSchema = false;
+        _newSchemaName = string.Empty;
+    }
+
+    private async Task CreateSchema()
+    {
+        if (string.IsNullOrEmpty(_newSchemaName))
+        {
+            await OnOperationComplete.InvokeAsync($"Schema name cannot be empty");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_selectedDatabase))
+        {
+            await OnOperationComplete.InvokeAsync($"Please select a database");
+            return;
+        }
+
+        try
+        {
+            var result = await DatabaseManager.CreateSchema(_selectedDatabase, _newSchemaName);
+            if (result.Success)
+            {
+                await OnOperationComplete.InvokeAsync(result.Message);
+                ShowCreateSchema = false;
+                await LoadSchemas();
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error creating schema: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error creating schema: {ex.Message}");
+        }
+    }
+
+    private void EditSchema(string schemaName)
+    {
+        _originalSchemaName = schemaName;
+        _newSchemaName = schemaName;
+        ShowEditSchema = true;
+    }
+
+    private void DeleteSchema(string schemaName)
+    {
+        _schemaToDelete = schemaName;
+        ShowDeleteSchema = true;
+    }
+
+    private async Task SaveSchemaChanges()
+    {
+        if (string.IsNullOrEmpty(_newSchemaName))
+        {
+            await OnOperationComplete.InvokeAsync($"New schema name cannot be empty");
+            return;
+        }
+
+        if (_newSchemaName != _originalSchemaName)
+        {
+            // In a real implementation, you would need an ALTER SCHEMA statement
+            await OnOperationComplete.InvokeAsync($"Schema rename functionality requires additional implementation");
+        }
+        else
+        {
+            CloseSchemaOperations();
+        }
+    }
+
+    private async Task ConfirmDeleteSchema()
+    {
+        try
+        {
+            var result = await DatabaseManager.DropSchema(_selectedDatabase, _schemaToDelete);
+            if (result.Success)
+            {
+                await OnOperationComplete.InvokeAsync(result.Message);
+                CloseSchemaOperations();
+                await LoadSchemas();
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error deleting schema: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error deleting schema: {ex.Message}");
+        }
+    }
+
+    private void CloseSchemaOperations()
+    {
+        ShowEditSchema = false;
+        ShowDeleteSchema = false;
+        _newSchemaName = string.Empty;
+        _schemaToDelete = string.Empty;
+        _originalSchemaName = string.Empty;
+    }
+
+    private async Task ViewSchema(string schemaName)
+    {
+        await OnOperationComplete.InvokeAsync($"Schema '{schemaName}' details would be shown here in a real implementation");
+    }
+}

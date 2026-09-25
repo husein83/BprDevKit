@@ -1,0 +1,422 @@
+@using BprDevKit.DatabaseManagement.Services
+@using BprDevKit.DatabaseManagement.Models
+@using BprDevKit.DatabaseManagement.Config
+@using BprDevKit.Utility
+@inject DatabaseManager DatabaseManager
+@inject NavigationManager NavigationManager
+
+<div class="databases-management p-4">
+    <div class="management-header d-flex justify-content-between align-items-center mb-4">
+        <h3 class="m-0"><i class="bi bi-database-fill text-primary"></i> Database Management</h3>
+        <div class="database-actions">
+            <button class="btn btn-primary px-4 py-2" @onclick="@OpenCreateDatabase">
+                <i class="bi bi-plus-circle-fill"></i> Create Database
+            </button>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="database-list">
+                @if (_databases == null)
+                {
+                    <div class="text-center p-5">
+                        <span class="spinner-border text-primary spinner-border-sm"></span>
+                        <span class="ms-2">Loading databases...</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Database Name</th>
+                                    <th class="text-end pe-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var db in _databases)
+                                {
+                                    <tr>
+                                        <td class="ps-4 font-monospace">@db</td>
+                                        <td class="text-end pe-4">
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary" @onclick="@(() => ViewDatabase(db))">
+                                                    <i class="bi bi-info-circle"></i> View
+                                                </button>
+                                                <button class="btn btn-outline-secondary" @onclick="@(() => EditDatabase(db))">
+                                                    <i class="bi bi-pencil-square"></i> Edit
+                                                </button>
+                                                <button class="btn btn-outline-danger" @onclick="@(() => DeleteDatabase(db))">
+                                                    <i class="bi bi-trash"></i> Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (ShowCreateDatabase)
+    {
+        <div class="create-database-form">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Create New Database</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="dbName">Database Name:</label>
+                                <input type="text" id="dbName" class="form-control" @bind="_newDatabase.DatabaseName" placeholder="Enter database name" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="dataPath">Data File Path:</label>
+                                <input type="text" id="dataPath" class="form-control" @bind="_newDatabase.DataFilePath" placeholder="C:\Data\" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="initSize">Initial Size (MB):</label>
+                                <input type="number" id="initSize" class="form-control" @bind="_newDatabase.InitialSizeMB" placeholder="8" />
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="growthSize">File Growth (MB):</label>
+                                <input type="number" id="growthSize" class="form-control" @bind="_newDatabase.FileGrowthMB" placeholder="64" />
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="collation">Collation:</label>
+                                <select id="collation" class="form-control" @bind="_newDatabase.Collation">
+                                    <option value="">-- Select Collation --</option>
+                                    @foreach (var collation in AvailableCollations)
+                                    {
+                                        <option value="@collation">@collation</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="fileGroup">File Group:</label>
+                                <select id="fileGroup" class="form-control" @bind="_newDatabase.FileGroup">
+                                    <option value="">-- Select File Group --</option>
+                                    @foreach (var fg in AvailableFileGroups)
+                                    {
+                                        <option value="@fg">@fg</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group mt-3">
+                        <label for="recovery">Recovery Model:</label>
+                        <select id="recovery" class="form-control" @bind="_newDatabase.RecoveryModel">
+                            <option value="SIMPLE">Simple</option>
+                            <option value="FULL">Full</option>
+                            <option value="BULK_LOGGED">Bulk Logged</option>
+                        </select>
+                    </div>
+
+                    <div class="form-check mt-3">
+                        <input type="checkbox" class="form-check-input" id="autoShrink" @bind="_newDatabase.AutoShrink" />
+                        <label class="form-check-label" for="autoShrink">Auto Shrink</label>
+                    </div>
+
+                    <div class="mt-4">
+                        <button class="btn btn-success" @onclick="@CreateDatabase">Create Database</button>
+                        <button class="btn btn-secondary" @onclick="@CancelCreateDatabase">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (ShowEditDatabase || ShowDeleteDatabase)
+    {
+        <div class="modal fade show" style="display: block;">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Database Operations</h5>
+                        <button type="button" class="btn-close" @onclick="@CloseDatabaseOperations"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (ShowEditDatabase)
+                        {
+                            <div>
+                                <h6>Edit Database Properties</h6>
+                                <div class="form-group">
+                                    <label>Collation:</label>
+                                    <select class="form-control" @bind="_editDatabase.Collation">
+                                        <option value="">Use existing</option>
+                                        @foreach (var collation in AvailableCollations)
+                                        {
+                                            <option value="@collation">@collation</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                        }
+                        else if (ShowDeleteDatabase)
+                        {
+                            <div>
+                                <h6>Delete Database Confirmation</h6>
+                                <p>Are you sure you want to delete database <strong>@_databaseToDelete</strong>?</p>
+                                <p class="text-danger">This action cannot be undone.</p>
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        @if (ShowEditDatabase)
+                        {
+                            <button class="btn btn-primary" @onclick="@SaveDatabaseChanges">Save Changes</button>
+                        }
+                        else if (ShowDeleteDatabase)
+                        {
+                            <button class="btn btn-danger" @onclick="@ConfirmDeleteDatabase">Delete</button>
+                        }
+                        <button class="btn btn-secondary" @onclick="@CloseDatabaseOperations">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback<string> OnOperationComplete { get; set; }
+
+    private List<string> _databases = new();
+    private bool ShowCreateDatabase = false;
+    private bool ShowEditDatabase = false;
+    private bool ShowDeleteDatabase = false;
+    private DatabaseProcedure.Create _newDatabase = new();
+    private DatabaseProcedure.Alter _editDatabase = new();
+    private List<string> AvailableCollations = new();
+    private List<string> AvailableFileGroups = new();
+    private string _databaseToDelete = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDatabases();
+        await LoadCollations();
+        await LoadFileGroups();
+    }
+
+    private async Task LoadDatabases()
+    {
+        try
+        {
+            var result = await DatabaseManager.GetDatabases();
+            if (result.operationResult.Success)
+            {
+                _databases = result.databases;
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error loading databases: {result.operationResult.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error loading databases: {ex.Message}");
+        }
+    }
+
+    private async Task LoadCollations()
+    {
+        try
+        {
+            var result = await DatabaseManager.GetCollations();
+            if (result.operationResult.Success)
+            {
+                AvailableCollations = result.collations;
+            }
+        }
+        catch (Exception ex)
+        {
+            ExceptionHandler.HandleException(ex, rethrow: false);
+        }
+    }
+
+    private async Task LoadFileGroups()
+    {
+        try
+        {
+            var result = await DatabaseManager.GetFileGroups();
+            if (result.operationResult.Success)
+            {
+                AvailableFileGroups = result.fileGroups;
+            }
+        }
+        catch (Exception ex)
+        {
+            ExceptionHandler.HandleException(ex, rethrow: false);
+        }
+    }
+
+    private void OpenCreateDatabase()
+    {
+        _newDatabase = new DatabaseProcedure.Create
+        {
+            InitialSizeMB = 8,
+            FileGrowthMB = 64,
+            LogInitialSizeMB = 8,
+            LogFileGrowthMB = 64,
+            RecoveryModel = "SIMPLE",
+            AutoShrink = false,
+            AutoClose = false,
+            PageVerify = "CHECKSUM"
+        };
+        ShowCreateDatabase = true;
+    }
+
+    private void CancelCreateDatabase()
+    {
+        ShowCreateDatabase = false;
+        _newDatabase = new DatabaseProcedure.Create();
+    }
+
+    private async Task CreateDatabase()
+    {
+        try
+        {
+            var result = await DatabaseManager.CreateDatabase(_newDatabase);
+            if (result.Success)
+            {
+                await OnOperationComplete.InvokeAsync(result.Message);
+                await LoadDatabases();
+                CancelCreateDatabase();
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error creating database: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error creating database: {ex.Message}");
+        }
+    }
+
+    private void EditDatabase(string databaseName)
+    {
+        _editDatabase = new DatabaseProcedure.Alter
+        {
+            DatabaseName = databaseName
+        };
+        ShowEditDatabase = true;
+    }
+
+    private void DeleteDatabase(string databaseName)
+    {
+        _databaseToDelete = databaseName;
+        ShowDeleteDatabase = true;
+    }
+
+    private async Task SaveDatabaseChanges()
+    {
+        try
+        {
+            var result = await DatabaseManager.AlterDatabase(_editDatabase);
+            if (result.Success)
+            {
+                await OnOperationComplete.InvokeAsync(result.Message);
+                CloseDatabaseOperations();
+                await LoadDatabases();
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error updating database: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error updating database: {ex.Message}");
+        }
+    }
+
+    private async Task ConfirmDeleteDatabase()
+    {
+        try
+        {
+            var config = new DatabaseProcedure.Drop
+            {
+                DatabaseName = _databaseToDelete,
+                IgnoreIfNotExists = true,
+                ForceDisconnect = true
+            };
+
+            var result = await DatabaseManager.DropDatabase(config);
+            if (result.Success)
+            {
+                await OnOperationComplete.InvokeAsync(result.Message);
+                CloseDatabaseOperations();
+                await LoadDatabases();
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error deleting database: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error deleting database: {ex.Message}");
+        }
+    }
+
+    private void CloseDatabaseOperations()
+    {
+        ShowEditDatabase = false;
+        ShowDeleteDatabase = false;
+        _editDatabase = new DatabaseProcedure.Alter();
+        _databaseToDelete = string.Empty;
+    }
+
+    private async Task ViewDatabase(string databaseName)
+    {
+        try
+        {
+            var config = new DatabaseProcedure.Information
+            {
+                DatabaseName = databaseName
+            };
+
+            var result = await DatabaseManager.GetDatabaseInformation(config);
+            if (result.operationResult.Success)
+            {
+                await OnOperationComplete.InvokeAsync($"Database '{databaseName}' details retrieved successfully");
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error viewing database: {result.operationResult.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error viewing database: {ex.Message}");
+        }
+    }
+}

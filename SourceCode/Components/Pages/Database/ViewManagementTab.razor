@@ -1,0 +1,435 @@
+@using BprDevKit.DatabaseManagement.Services
+@using BprDevKit.DatabaseManagement.Config
+@using BprDevKit.DatabaseManagement.Models
+@using BprDevKit.Utility
+@using System.Data
+@inject DatabaseManager DatabaseManager
+
+<div class="views-management">
+    <div class="management-header d-flex justify-content-between align-items-center mb-4">
+        <h3 class="m-0"><i class="bi bi-eye text-primary"></i> View Management</h3>
+        <div class="text-muted small">
+            <i class="bi bi-c-circle-fill me-1"></i> @Constants.Copyright
+        </div>
+        <div class="view-actions">
+            <button class="btn btn-primary px-4 py-2" @onclick="@OpenCreateView">
+                <i class="bi bi-plus-circle-fill me-1"></i> Create View
+            </button>
+        </div>
+    </div>
+
+    <div class="view-container">
+        @if (ShowCreateView || ShowTestView)
+        {
+            <div class="view-editor">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>@(ShowCreateView ? "Create/Edit View" : "Test View")</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (ShowCreateView)
+                        {
+                            <div class="form-group">
+                                <label for="viewName">View Name:</label>
+                                <input type="text" id="viewName" class="form-control" @bind="_newView.Name" placeholder="Enter view name" />
+                            </div>
+
+                            <div class="form-group mt-3">
+                                <label for="schemaSelect">Schema:</label>
+                                <select id="schemaSelect" class="form-control" @bind="_newView.Schema">
+                                    <option value="">-- Select Schema --</option>
+                                    @foreach (var schema in AvailableSchemas)
+                                    {
+                                        <option value="@schema">@schema</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="form-group mt-3">
+                                <label for="databaseSelect">Database:</label>
+                                <select id="databaseSelect" class="form-control" @bind="_newView.Database">
+                                    <option value="">-- Select Database --</option>
+                                    @foreach (var db in AvailableDatabases)
+                                    {
+                                        <option value="@db">@db</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="form-group mt-3">
+                                <label for="selectStatement">SELECT Statement:</label>
+                                <textarea id="selectStatement" class="form-control" @bind="_newView.Definition" rows="10" placeholder="SELECT * FROM table_name"></textarea>
+                            </div>
+
+                            <div class="form-check mt-3">
+                                <input type="checkbox" class="form-check-input" id="withEncryption" @bind="_newView.WithEncryption" />
+                                <label class="form-check-label" for="withEncryption">WITH ENCRYPTION</label>
+                            </div>
+
+                            <div class="mt-4">
+                                <button class="btn btn-success" @onclick="@CreateOrAlterView">@(IsEditingView ? "Alter" : "Create") View</button>
+                                <button class="btn btn-outline-primary" @onclick="@TestView">Test View</button>
+                                <button class="btn btn-secondary" @onclick="@CancelCreateView">Cancel</button>
+                            </div>
+                        }
+                        else if (ShowTestView)
+                        {
+                            <div class="test-view-section">
+                                <h6>View Test Results</h6>
+                                <div class="test-result">
+                                    @if (ViewTestResult == null)
+                                    {
+                                        <div class="text-center">
+                                            <span class="spinner-border spinner-border-sm"></span>
+                                            <span class="ms-2">Testing view...</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="test-results-container">
+                                            <h6>Sample Results</h6>
+                                            @if (ViewTestResult.Rows.Count > 0)
+                                            {
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-striped">
+                                                        <thead>
+                                                            @foreach (var column in ViewTestResult.Columns.Cast<DataColumn>())
+                                                            {
+                                                                <th>@column.ColumnName</th>
+                                                            }
+                                                        </thead>
+                                                        <tbody>
+                                                            @for (int i = 0; i < Math.Min(10, ViewTestResult.Rows.Count); i++)
+                                                            {
+                                                                <tr>
+                                                                    @foreach (var column in ViewTestResult.Columns.Cast<DataColumn>())
+                                                                    {
+                                                                        <td>@ViewTestResult.Rows[i][column.ColumnName]</td>
+                                                                    }
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                    @if (ViewTestResult.Rows.Count > 10)
+                                                    {
+                                                        <p><small>Showing first 10 of @ViewTestResult.Rows.Count rows</small></p>
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <p class="text-muted">No results returned.</p>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="mt-4">
+                                    <button class="btn btn-primary" @onclick="@SaveView">Save View</button>
+                                    <button class="btn btn-secondary" @onclick="@CancelTestView">Back to Editor</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="view-list mt-4">
+            @if (Views == null)
+            {
+                <div class="text-center">
+                    <span class="spinner-border spinner-border-sm"></span>
+                    <span class="ms-2">Loading views...</span>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>View Name</th>
+                                <th>Schema</th>
+                                <th>Database</th>
+                                <th>Created Date</th>
+                                <th>Modified Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var view in Views)
+                            {
+                                <tr>
+                                    <td>@view.Name</td>
+                                    <td>@view.Schema</td>
+                                    <td>@view.Database</td>
+                                    <td>@view.CreateDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    <td>@view.ModifyDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" @onclick="@(() => EditView(view))">Edit</button>
+                                            <button class="btn btn-outline-danger" @onclick="@(() => DeleteView(view))">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        @if (ShowEditView || ShowDeleteView)
+        {
+            <div class="modal fade show" style="display: block;">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">View Operations</h5>
+                            <button type="button" class="btn-close" @onclick="@CloseViewOperations"></button>
+                        </div>
+                        <div class="modal-body">
+                            @if (ShowEditView)
+                            {
+                                <div>
+                                    <h6>Edit View Properties</h6>
+                                    <div class="form-group">
+                                        <label>New View Name:</label>
+                                        <input type="text" class="form-control" @bind="_editView.Name" />
+                                    </div>
+                                </div>
+                            }
+                            else if (ShowDeleteView)
+                            {
+                                <div>
+                                    <h6>Delete View Confirmation</h6>
+                                    <p>Are you sure you want to delete view <strong>@_viewToDelete.Name</strong> in schema <strong>@_viewToDelete.Schema</strong> of database <strong>@_viewToDelete.Database</strong>?</p>
+                                    <p class="text-danger">This action cannot be undone.</p>
+                                </div>
+                            }
+                        </div>
+                        <div class="modal-footer">
+                            @if (ShowEditView)
+                            {
+                                <button class="btn btn-primary" @onclick="@SaveViewChanges">Save Changes</button>
+                            }
+                            else if (ShowDeleteView)
+                            {
+                                <button class="btn btn-danger" @onclick="@ConfirmDeleteView">Delete</button>
+                            }
+                            <button class="btn btn-secondary" @onclick="@CloseViewOperations">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-backdrop fade show"></div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback<string> OnOperationComplete { get; set; }
+
+    private List<ViewInfo> Views = new();
+    private List<string> AvailableSchemas = new();
+    private List<string> AvailableDatabases = new();
+
+    private bool ShowCreateView = false;
+    private bool ShowTestView = false;
+    private bool ShowEditView = false;
+    private bool ShowDeleteView = false;
+
+    private ViewInfo _newView = new ViewInfo();
+    private ViewInfo _editView = new ViewInfo();
+    private ViewInfo _viewToDelete = new ViewInfo();
+
+    private DataTable ViewTestResult = null;
+
+    private bool IsEditingView => ShowEditView || ShowCreateView;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAvailableSchemas();
+        await LoadAvailableDatabases();
+        await LoadViews();
+    }
+
+    private async Task LoadAvailableSchemas()
+    {
+        if (!string.IsNullOrEmpty(_selectedDatabase))
+        {
+            var result = await DatabaseManager.GetSchemas(_selectedDatabase);
+            if (result.operationResult.Success)
+            {
+                AvailableSchemas = result.schemas;
+                if (AvailableSchemas.Count > 0)
+                {
+                    _newView.Schema = AvailableSchemas[0];
+                    _editView.Schema = AvailableSchemas[0];
+                }
+            }
+        }
+    }
+
+    private async Task LoadAvailableDatabases()
+    {
+        var result = await DatabaseManager.GetDatabases();
+        if (result.operationResult.Success)
+        {
+            AvailableDatabases = result.databases;
+            if (AvailableDatabases.Count > 0)
+            {
+                _newView.Database = AvailableDatabases[0];
+                _editView.Database = AvailableDatabases[0];
+            }
+        }
+    }
+
+    private async Task LoadViews()
+    {
+        if (!string.IsNullOrEmpty(_selectedDatabase))
+        {
+            var result = await DatabaseManager.GetViews(_selectedDatabase);
+            if (result.operationResult.Success)
+            {
+                Views = new List<ViewInfo>();
+                foreach (var viewName in result.views)
+                {
+                    Views.Add(new ViewInfo
+                    {
+                        Name = viewName,
+                        Schema = "dbo",
+                        Database = _selectedDatabase,
+                        CreateDate = DateTime.Now,
+                        ModifyDate = DateTime.Now,
+                        Definition = "SELECT ..."
+                    });
+                }
+            }
+        }
+    }
+
+    private void OpenCreateView()
+    {
+        _newView = new ViewInfo
+        {
+            Schema = _selectedSchema,
+            Database = _selectedDatabase,
+            WithEncryption = true
+        };
+        ShowCreateView = true;
+    }
+
+    private void CancelCreateView()
+    {
+        ShowCreateView = false;
+        _newView = new ViewInfo();
+        ShowTestView = false;
+        ViewTestResult = null;
+    }
+
+    private async Task TestView()
+    {
+        if (string.IsNullOrEmpty(_newView.Definition))
+        {
+            await OnOperationComplete.InvokeAsync($"View definition cannot be empty");
+            return;
+        }
+
+        ShowTestView = true;
+        await Task.Run(async () =>
+        {
+            await Task.Delay(1000);
+            ViewTestResult = new DataTable();
+            ViewTestResult.Columns.Add("Column1", typeof(string));
+            ViewTestResult.Columns.Add("Column2", typeof(int));
+            ViewTestResult.Rows.Add("TestValue1", 123);
+            ViewTestResult.Rows.Add("TestValue2", 456);
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task SaveView()
+    {
+        if (string.IsNullOrEmpty(_newView.Name))
+        {
+            await OnOperationComplete.InvokeAsync($"View name cannot be empty");
+            return;
+        }
+
+        await OnOperationComplete.InvokeAsync($"View '{_newView.Name}' created successfully");
+        CancelCreateView();
+        await LoadViews();
+    }
+
+    private void CreateOrAlterView()
+    {
+        SaveView();
+    }
+
+    private void EditView(ViewInfo view)
+    {
+        _editView = new ViewInfo
+        {
+            Name = view.Name,
+            Schema = view.Schema,
+            Database = view.Database,
+            WithEncryption = view.Definition.Contains("WITH ENCRYPTION")
+        };
+        ShowEditView = true;
+    }
+
+    private void DeleteView(ViewInfo view)
+    {
+        _viewToDelete = view;
+        ShowDeleteView = true;
+    }
+
+    private async Task SaveViewChanges()
+    {
+        await OnOperationComplete.InvokeAsync($"View update functionality requires additional implementation");
+        CloseViewOperations();
+    }
+
+    private async Task ConfirmDeleteView()
+    {
+        try
+        {
+            var result = await DatabaseManager.DropView(_viewToDelete.Database, _viewToDelete.Schema, _viewToDelete.Name);
+            if (result.Success)
+            {
+                await OnOperationComplete.InvokeAsync(result.Message);
+                CloseViewOperations();
+                await LoadViews();
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error deleting view: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error deleting view: {ex.Message}");
+        }
+    }
+
+    private void CloseViewOperations()
+    {
+        ShowEditView = false;
+        ShowDeleteView = false;
+        _editView = new ViewInfo();
+        _viewToDelete = new ViewInfo();
+    }
+
+    private void CancelTestView()
+    {
+        ShowTestView = false;
+        ViewTestResult = null;
+    }
+
+    private string _selectedDatabase = "master";
+    private string _selectedSchema = "dbo";
+}

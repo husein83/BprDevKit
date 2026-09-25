@@ -1,0 +1,484 @@
+@using BprDevKit.DatabaseManagement.Services
+@using BprDevKit.DatabaseManagement.Models
+@using BprDevKit.DatabaseManagement.Config
+@using BprDevKit.Utility
+@inject DatabaseManager DatabaseManager
+
+<div class="tables-management">
+    <div class="management-header d-flex justify-content-between align-items-center mb-4">
+        <h3 class="m-0"><i class="bi bi-table text-primary"></i> Table Management</h3>
+        <div class="table-actions">
+            <button class="btn btn-primary px-4 py-2" @onclick="@OpenCreateTable">
+                <i class="bi bi-plus-circle-fill me-1"></i> Create Table
+            </button>
+        </div>
+    </div>
+
+    <div class="table-container">
+        @if (ShowCreateTable)
+        {
+            <div class="table-editor">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Create New Table</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="schemaName">Schema:</label>
+                                    <select id="schemaName" class="form-control" @bind="_newTable.SchemaName">
+                                        <option value="">-- Select Schema --</option>
+                                        @foreach (var schema in AvailableSchemas)
+                                        {
+                                            <option value="@schema">@schema</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="tableName">Table Name:</label>
+                                    <input type="text" id="tableName" class="form-control" @bind="_newTable.TableName" placeholder="Enter table name" />
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="fileGroup">File Group:</label>
+                                    <select id="fileGroup" class="form-control" @bind="_newTable.FileGroup">
+                                        @foreach (var fg in AvailableFileGroups)
+                                        {
+                                            <option value="@fg">@fg</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group mt-3">
+                            <label for="description">Description:</label>
+                            <textarea id="description" class="form-control" @bind="_newTable.Description" rows="3" placeholder="Enter table description"></textarea>
+                        </div>
+
+                        <div class="mt-4">
+                            <button class="btn btn-success" @onclick="@CreateTable">Create Table</button>
+                            <button class="btn btn-secondary" @onclick="@CancelCreateTable">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (ShowColumnManager)
+        {
+            <div class="table-editor">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Manage Columns</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="column-management-section">
+                            <h6>Table Columns</h6>
+                            <div class="column-grid">
+                                @foreach (var column in _tableColumns)
+                                {
+                                    <div class="column-item">
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <h6>@column.ColumnName</h6>
+                                                <p><small>@column.DataType</small></p>
+                                                @if (column.IsPrimaryKey)
+                                                {
+                                                    <span class="badge bg-primary">PK</span>
+                                                }
+                                                @if (column.IsIdentity)
+                                                {
+                                                    <span class="badge bg-info">ID</span>
+                                                }
+                                                <div class="column-actions mt-2">
+                                                    <button class="btn btn-sm btn-outline-primary" @onclick="@(() => EditColumn(column))">Edit</button>
+                                                    <button class="btn btn-sm btn-outline-danger" @onclick="@(() => DeleteColumn(column))">Delete</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                <div class="column-item add-column">
+                                    <div class="card">
+                                        <div class="card-body text-center">
+                                            <button class="btn btn-outline-success" @onclick="@OpenAddColumn">+ Add Column</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="table-list mt-4">
+            @if (Tables == null)
+            {
+                <div class="text-center">
+                    <span class="spinner-border spinner-border-sm"></span>
+                    <span class="ms-2">Loading tables...</span>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Table Name</th>
+                                <th>Schema</th>
+                                <th>Columns</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var table in Tables)
+                            {
+                                <tr>
+                                    <td>@table</td>
+                                    <td>@_selectedSchema</td>
+                                    <td>@(GetColumnCount(_selectedDatabase, _selectedSchema, table) ?? 0)</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" @onclick="@(() => ViewTable(_selectedDatabase, _selectedSchema, table))">View</button>
+                                            <button class="btn btn-outline-secondary" @onclick="@(() => EditTable(_selectedDatabase, _selectedSchema, table))">Edit</button>
+                                            <button class="btn btn-outline-danger" @onclick="@(() => DeleteTable(_selectedDatabase, _selectedSchema, table))">Delete</button>
+                                            <button class="btn btn-outline-info" @onclick="@(() => ManageColumns(_selectedDatabase, _selectedSchema, table))">Columns</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (ShowEditTable)
+    {
+        <div class="modal fade show" style="display: block;">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Table Operations</h5>
+                        <button type="button" class="btn-close" @onclick="@CloseTableOperations"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div>
+                            <h6>Edit Table Properties</h6>
+                            <div class="form-group">
+                                <label>New Table Name:</label>
+                                <input type="text" class="form-control" @bind="_editTable.TableName" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" @onclick="@SaveTableChanges">Save Changes</button>
+                        <button class="btn btn-secondary" @onclick="@CloseTableOperations">Cancel</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-backdrop fade show"></div>
+        </div>
+    }
+
+    @if (ShowDeleteTable)
+    {
+        <div class="modal fade show" style="display: block;">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Table Operations</h5>
+                        <button type="button" class="btn-close" @onclick="@CloseTableOperations"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div>
+                            <h6>Delete Table Confirmation</h6>
+                            <p>Are you sure you want to delete table <strong>@_tableToDelete</strong> in schema <strong>@_schemaToDelete</strong> of database <strong>@_databaseToDelete</strong>?</p>
+                            <p class="text-danger">This action cannot be undone.</p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-danger" @onclick="@ConfirmDeleteTable">Delete</button>
+                        <button class="btn btn-secondary" @onclick="@CloseTableOperations">Cancel</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-backdrop fade show"></div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback<string> OnOperationComplete { get; set; }
+
+    private List<string> Tables = new();
+    private List<string> AvailableSchemas = new();
+    private List<string> AvailableFileGroups = new();
+    private List<ColumnProcedure.Create> _tableColumns = new();
+
+    private bool ShowCreateTable = false;
+    private bool ShowColumnManager = false;
+    private bool ShowEditTable = false;
+    private bool ShowDeleteTable = false;
+
+    private string _selectedDatabase = string.Empty;
+    private string _selectedSchema = "dbo";
+
+    private TableProcedure.Create _newTable = new();
+    private TableProcedure.Alter _editTable = new();
+
+    private string _tableToDelete = string.Empty;
+    private string _schemaToDelete = string.Empty;
+    private string _databaseToDelete = string.Empty;
+
+    private ColumnProcedure.Create _currentColumn = new();
+    private bool ShowEditColumn = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAvailableSchemas();
+        await LoadAvailableFileGroups();
+        await LoadTables();
+    }
+
+    private async Task LoadAvailableSchemas()
+    {
+        if (!string.IsNullOrEmpty(_selectedDatabase))
+        {
+            var result = await DatabaseManager.GetSchemas(_selectedDatabase);
+            if (result.operationResult.Success)
+            {
+                AvailableSchemas = result.schemas;
+                if (AvailableSchemas.Count > 0)
+                {
+                    _selectedSchema = AvailableSchemas[0];
+                }
+            }
+        }
+    }
+
+    private async Task LoadAvailableFileGroups()
+    {
+        var result = await DatabaseManager.GetFileGroups();
+        if (result.operationResult.Success)
+        {
+            AvailableFileGroups = result.fileGroups;
+        }
+    }
+
+    private async Task LoadTables()
+    {
+        if (!string.IsNullOrEmpty(_selectedDatabase) && !string.IsNullOrEmpty(_selectedSchema))
+        {
+            var result = await DatabaseManager.GetTables(_selectedDatabase, _selectedSchema);
+            if (result.operationResult.Success)
+            {
+                Tables = result.tables;
+            }
+        }
+    }
+
+    private int? GetColumnCount(string dbName, string schemaName, string tableName)
+    {
+        return null;
+    }
+
+    private void OpenCreateTable()
+    {
+        _newTable = new TableProcedure.Create
+        {
+            SchemaName = _selectedSchema,
+            FileGroup = "PRIMARY"
+        };
+        ShowCreateTable = true;
+    }
+
+    private void CancelCreateTable()
+    {
+        ShowCreateTable = false;
+        _newTable = new TableProcedure.Create();
+    }
+
+    private async Task CreateTable()
+    {
+        if (string.IsNullOrEmpty(_newTable.TableName))
+        {
+            await OnOperationComplete.InvokeAsync($"Table name cannot be empty");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_newTable.SchemaName))
+        {
+            await OnOperationComplete.InvokeAsync($"Schema name cannot be empty");
+            return;
+        }
+
+        try
+        {
+            var result = await DatabaseManager.CreateTable(_newTable);
+            if (result.Success)
+            {
+                await OnOperationComplete.InvokeAsync(result.Message);
+                ShowCreateTable = false;
+                await LoadTables();
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error creating table: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error creating table: {ex.Message}");
+        }
+    }
+
+    private void ManageColumns(string databaseName, string schemaName, string tableName)
+    {
+        _selectedDatabase = databaseName;
+        _selectedSchema = schemaName;
+        ShowColumnManager = true;
+        _tableColumns = new List<ColumnProcedure.Create>();
+    }
+
+    private void OpenAddColumn()
+    {
+        _currentColumn = new ColumnProcedure.Create
+        {
+            DatabaseName = _selectedDatabase,
+            SchemaName = _selectedSchema,
+            TableName = "temp"
+        };
+        ShowEditColumn = true;
+    }
+
+    private void EditColumn(ColumnProcedure.Create column)
+    {
+        _currentColumn = column;
+        ShowEditColumn = true;
+    }
+
+    private void DeleteColumn(ColumnProcedure.Create column)
+    {
+        _tableColumns.Remove(column);
+    }
+
+    private void CloseColumnManager()
+    {
+        ShowColumnManager = false;
+        ShowEditColumn = false;
+        _currentColumn = new ColumnProcedure.Create();
+    }
+
+    private void EditTable(string databaseName, string schemaName, string tableName)
+    {
+        _databaseToDelete = databaseName;
+        _schemaToDelete = schemaName;
+        _tableToDelete = tableName;
+
+        _editTable = new TableProcedure.Alter
+        {
+            DatabaseName = databaseName,
+            SchemaName = schemaName,
+            TableName = tableName
+        };
+        ShowEditTable = true;
+    }
+
+    private void DeleteTable(string databaseName, string schemaName, string tableName)
+    {
+        _databaseToDelete = databaseName;
+        _schemaToDelete = schemaName;
+        _tableToDelete = tableName;
+        ShowDeleteTable = true;
+    }
+
+    private async Task SaveTableChanges()
+    {
+        try
+        {
+            await OnOperationComplete.InvokeAsync($"Table update functionality requires additional implementation");
+            CloseTableOperations();
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error updating table: {ex.Message}");
+        }
+    }
+
+    private async Task ConfirmDeleteTable()
+    {
+        try
+        {
+            var config = new TableProcedure.Drop
+            {
+                DatabaseName = _databaseToDelete,
+                SchemaName = _schemaToDelete,
+                TableName = _tableToDelete,
+                IgnoreIfNotExists = true
+            };
+
+            var result = await DatabaseManager.DropTable(config);
+            if (result.Success)
+            {
+                await OnOperationComplete.InvokeAsync(result.Message);
+                CloseTableOperations();
+                await LoadTables();
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error deleting table: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error deleting table: {ex.Message}");
+        }
+    }
+
+    private void CloseTableOperations()
+    {
+        ShowEditTable = false;
+        ShowDeleteTable = false;
+        _editTable = new TableProcedure.Alter();
+        _databaseToDelete = string.Empty;
+        _schemaToDelete = string.Empty;
+        _tableToDelete = string.Empty;
+    }
+
+    private async Task ViewTable(string databaseName, string schemaName, string tableName)
+    {
+        try
+        {
+            var config = new TableProcedure.Information
+            {
+                DatabaseName = databaseName,
+                SchemaName = schemaName,
+                TableName = tableName
+            };
+
+            var result = await DatabaseManager.GetTableInformation(config);
+            if (result.operationResult.Success)
+            {
+                await OnOperationComplete.InvokeAsync($"Table '{schemaName}.{tableName}' details retrieved successfully");
+            }
+            else
+            {
+                await OnOperationComplete.InvokeAsync($"Error viewing table: {result.operationResult.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnOperationComplete.InvokeAsync($"Error viewing table: {ex.Message}");
+        }
+    }
+}
