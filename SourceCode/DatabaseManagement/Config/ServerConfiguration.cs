@@ -1,9 +1,10 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Collections.Generic;
+using System.Security.Cryptography;
 using Microsoft.Data.SqlClient;
 using BprDevKit.Utility;
 
@@ -19,6 +20,9 @@ namespace BprDevKit.DatabaseManagement.Config
         public DateTime CreateDate { get; set; }
 
         public DateTime? LastModifiedDate { get; set; }
+
+        [JsonIgnore]
+        public EntityState EntityState { get; set; } = EntityState.Unchanged;
 
         // Connection settings
         public ServerSettings Server { get; set; } = new();
@@ -62,11 +66,11 @@ namespace BprDevKit.DatabaseManagement.Config
         /// <summary>
         /// Save all server configurations to encrypted JSON file
         /// </summary>
-        public static void SaveAllToEncryptedFile(List<ServerConfiguration> configurations)
+        public static void SaveChangesToEncryptedFile(ServerConfiguration serverConfiguration)
         {
-            VerifyData(configurations);
+            var serverDataList = GetVerifiedList(serverConfiguration);
 
-            string jsonContent = JsonSerializer.Serialize(configurations, new JsonSerializerOptions
+            string jsonContent = JsonSerializer.Serialize(serverDataList, new JsonSerializerOptions
             {
                 WriteIndented = true,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -89,10 +93,8 @@ namespace BprDevKit.DatabaseManagement.Config
 
             if (configToRemove.HasAny())
             {
-                allConfigs.Remove(configToRemove!);
-
-                // Save the updated list back to the file
-                SaveAllToEncryptedFile(allConfigs);
+                configToRemove!.EntityState = EntityState.Deleted;
+                SaveChangesToEncryptedFile(configToRemove);
                 result = true;
             }
 
@@ -159,46 +161,59 @@ namespace BprDevKit.DatabaseManagement.Config
             return sr.ReadToEnd();
         }
 
-        private static void VerifyData(List<ServerConfiguration> serverConfigurations)
+        private static List<ServerConfiguration> GetVerifiedList(ServerConfiguration serverConfiguration)
         {
-            if (serverConfigurations.HasAny())
-            {
-                var savedData = LoadAllFromEncryptedFile(false);
+            var result = LoadAllFromEncryptedFile(false);
 
-                foreach (var item in serverConfigurations)
+            if (serverConfiguration.HasAny() && serverConfiguration.EntityState != EntityState.Unchanged)
+            {
+                if (result.Any(p => p.Server.ServerName == serverConfiguration.Server.ServerName &&
+                                    p.Server.DatabaseServerType == serverConfiguration.Server.DatabaseServerType &&
+                                    p.Id != serverConfiguration.Id))
                 {
-                    if (savedData.Any(p => p.Server.ServerName == item.Server.ServerName &&
-                                           p.Server.DatabaseServerType == item.Server.DatabaseServerType &&
-                                           p.Id != item.Id))
+                    throw new Exception($"Server {serverConfiguration.Server.ServerName} already exists");
+                }
+                if (serverConfiguration.Server.UseWindowsAuth)
+                {
+                    serverConfiguration.Server.Username = null;
+                    serverConfiguration.Server.Password = null;
+                }
+                if (serverConfiguration.Id.HasValue && serverConfiguration.EntityState == EntityState.Modified) // Modify
+                {
+                    var previousData = result.FirstOrDefault(p => p.Id == serverConfiguration.Id);
+                    if (previousData.HasAny())
                     {
-                        throw new Exception($"Server {item.Server.ServerName} already exists");
+                        serverConfiguration.CreateDate = previousData!.CreateDate;
+                        serverConfiguration.LastModifiedDate = DateTime.UtcNow;
                     }
-                    if (item.Server.UseWindowsAuth)
+                    else
                     {
-                        item.Server.Username = null;
-                        item.Server.Password = null;
-                    }
-                    if (item.Id.HasValue) // Modify
-                    {
-                        var previousData = savedData.FirstOrDefault(p => p.Id == item.Id);
-                        if (previousData.HasAny())
-                        {
-                            item.CreateDate = previousData!.CreateDate;
-                            item.LastModifiedDate = DateTime.UtcNow;
-                        }
-                        else
-                        {
-                            throw new Exception("Invalid server configure modified");
-                        }
-                    }
-                    else // Insert
-                    {
-                        item.Id = Guid.NewGuid();
-                        item.CreateDate = DateTime.UtcNow;
-                        item.LastModifiedDate = null;
+                        throw new Exception("Invalid server configure modified");
                     }
                 }
+                else if (serverConfiguration.EntityState == EntityState.Added) // Insert
+                {
+                    serverConfiguration.Id = Guid.NewGuid();
+                    serverConfiguration.CreateDate = DateTime.UtcNow;
+                    serverConfiguration.LastModifiedDate = null;
+                }
+                switch (serverConfiguration.EntityState)
+                {
+                    case EntityState.Added:
+                        result.Add(serverConfiguration);
+                        break;
+
+                    case EntityState.Modified:
+                        result.RemoveAll(p => p.Id == serverConfiguration.Id);
+                        result.Add(serverConfiguration);
+                        break;
+
+                    case EntityState.Deleted:
+                        result.RemoveAll(p => p.Id == serverConfiguration.Id);
+                        break;
+                }
             }
+            return result;
         }
     }
 
@@ -248,8 +263,6 @@ namespace BprDevKit.DatabaseManagement.Config
     /// </summary>
     public class DatabaseSettings
     {
-        public string DefaultSchema { get; set; } = BprDevKit.Utility.Constants.DefaultSchema;
-        public string DefaultFileGroup { get; set; } = BprDevKit.Utility.Constants.DefaultFileGroup;
         public int MaxDatabaseNameLength { get; set; } = BprDevKit.Utility.Constants.MaxDatabaseNameLength;
         public int MaxSchemaNameLength { get; set; } = BprDevKit.Utility.Constants.MaxSchemaNameLength;
         public int MaxTableNameLength { get; set; } = BprDevKit.Utility.Constants.MaxTableNameLength;

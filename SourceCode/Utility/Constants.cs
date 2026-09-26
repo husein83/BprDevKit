@@ -58,21 +58,6 @@ namespace BprDevKit.Utility
         /// <summary>Maximum foreign key name length</summary>
         public const int MaxForeignKeyNameLength = 128;
 
-        /// <summary>Default file group for new tables</summary>
-        public const string DefaultFileGroup = "PRIMARY";
-
-        /// <summary>Default schema for new objects</summary>
-        public const string DefaultSchema = "dbo";
-
-        /// <summary>Default recovery model for new databases</summary>
-        public const string DefaultRecoveryModel = "SIMPLE";
-
-        /// <summary>Default page verify option for new databases</summary>
-        public const string DefaultPageVerify = "CHECKSUM";
-
-        /// <summary>Default collation for new databases</summary>
-        public const string DefaultCollation = "SQL_Latin1_General_CP1_CI_AS";
-
         /// <summary>Default initial size for database data files (MB)</summary>
         public const int DefaultInitialDataSizeMB = 8;
 
@@ -84,15 +69,6 @@ namespace BprDevKit.Utility
 
         /// <summary>Default file growth for database log files (MB)</summary>
         public const int DefaultLogFileGrowthMB = 64;
-
-        /// <summary>Default identity seed</summary>
-        public const int DefaultIdentitySeed = 1;
-
-        /// <summary>Default identity increment</summary>
-        public const int DefaultIdentityIncrement = 1;
-
-        /// <summary>Default fill factor for indexes</summary>
-        public const short DefaultFillFactor = 80;
 
         #endregion
     }

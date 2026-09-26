@@ -44,4 +44,12 @@ namespace BprDevKit.Utility
         Success,
         YesOrNo
     }
+
+    public enum EntityState
+    {
+        Unchanged,
+        Modified,
+        Added,
+        Deleted
+    }
 }

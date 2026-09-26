@@ -47,6 +47,8 @@
                                             <th>Database Engine</th>
                                             <th>Default DB</th>
                                             <th>Authentication</th>
+                                            <th>Created</th>
+                                            <th>Last Modified</th>
                                             <th class="text-end pe-4">Actions</th>
                                         </tr>
                                     </thead>
@@ -67,13 +69,32 @@
                                                         @(server.Server.UseWindowsAuth ? "Windows Auth" : "SQL Server Auth")
                                                     </span>
                                                 </td>
+                                                <td class="text-muted small">@server.CreateDate.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
+                                                <td class="text-muted small">
+                                                    @if (server.LastModifiedDate.HasValue)
+                                                    {
+                                                        @server.LastModifiedDate.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm")
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted fst-italic">—</span>
+                                                    }
+                                                </td>
                                                 <td class="text-end pe-4">
-                                                    <div class="btn-group btn-group-sm">
-                                                        <button class="btn btn-outline-primary" @onclick="() => EditServer(server)">
-                                                            <i class="bi bi-pencil"></i>
+                                                    <div class="btn-group btn-group-sm" role="group">
+                                                        <button class="btn btn-outline-primary"
+                                                                @onclick="() => EditServer(server)"
+                                                                title="Edit server configuration"
+                                                                data-bs-toggle="tooltip"
+                                                                data-bs-placement="top">
+                                                            <i class="bi bi-pencil-square fs-5"></i>
                                                         </button>
-                                                        <button class="btn btn-outline-danger" @onclick="() => DeleteServer(server)">
-                                                            <i class="bi bi-trash"></i>
+                                                        <button class="btn btn-outline-danger"
+                                                                @onclick="() => ConfirmDeleteServer(server)"
+                                                                title="Delete server configuration"
+                                                                data-bs-toggle="tooltip"
+                                                                data-bs-placement="top">
+                                                            <i class="bi bi-trash3 fs-5"></i>
                                                         </button>
                                                     </div>
                                                 </td>
@@ -85,6 +106,39 @@
                         }
                     </div>
                 </div>
+
+                @if (_showDeleteConfirmation)
+                {
+                    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);" tabindex="-1" role="dialog">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content shadow-lg">
+                                <div class="modal-header bg-danger text-white">
+                                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>Confirm Delete</h5>
+                                    <button type="button" class="btn-close btn-close-white" @onclick="CancelDeleteConfirmation"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>Are you sure you want to delete the server configuration <strong>@(_serverToDelete?.Server.Alias ?? _serverToDelete?.Server.ServerName)</strong>?</p>
+                                    <p class="text-muted small mb-0">
+                                        Server: @_serverToDelete?.Server.ServerName<br />
+                                        Type: @_serverToDelete?.Server.DatabaseServerType<br />
+                                    </p>
+                                    <div class="alert alert-warning mt-3 mb-0">
+                                        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                        This action cannot be undone.
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button class="btn btn-outline-secondary" @onclick="CancelDeleteConfirmation">
+                                        <i class="bi bi-x-lg me-1"></i> Cancel
+                                    </button>
+                                    <button class="btn btn-danger" @onclick="DeleteServerConfirmed">
+                                        <i class="bi bi-trash3 me-1"></i> Yes, Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
             }
             else
             {
@@ -189,20 +243,6 @@
                         {
                             <!-- Tab 2: Database Defaults -->
                             <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Default Schema</label>
-                                    <input type="text" class="form-control font-monospace" @bind="_currentConfig.Database.DefaultSchema" />
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Default File Group</label>
-                                    <input type="text" class="form-control font-monospace" @bind="_currentConfig.Database.DefaultFileGroup" />
-                                </div>
-
-                                <h6 class="mt-4 text-secondary"><i class="bi bi-hash"></i> Length Constraints (Characters)</h6>
-                                <div class="col-md-3">
-                                    <label class="form-label">Max Database Name</label>
-                                    <input type="number" class="form-control" @bind="_currentConfig.Database.MaxDatabaseNameLength" />
-                                </div>
                                 <div class="col-md-3">
                                     <label class="form-label">Max Schema Name</label>
                                     <input type="number" class="form-control" @bind="_currentConfig.Database.MaxSchemaNameLength" />
@@ -314,6 +354,10 @@
     private BprMessage? _bprMessage = null;
     private string _selectedConfigPath = string.Empty;
 
+    // Delete confirmation
+    private bool _showDeleteConfirmation = false;
+    private ServerConfiguration? _serverToDelete = null;
+
     protected override async Task OnInitializedAsync()
     {
         LoadSavedServers();
@@ -378,9 +422,6 @@
         _currentConfig.Server.DatabaseServerType = DatabaseServerType.SqlServer;
         _currentConfig.Server.ConnectionTimeoutSeconds = Constants.DatabaseConnectionTimeoutSeconds;
         _currentConfig.Server.CommandTimeout = Constants.DatabaseCommandTimeoutSeconds;
-
-        _currentConfig.Database.DefaultSchema = Constants.DefaultSchema;
-        _currentConfig.Database.DefaultFileGroup = Constants.DefaultFileGroup;
         _currentConfig.Database.MaxDatabaseNameLength = Constants.MaxDatabaseNameLength;
         _currentConfig.Database.MaxSchemaNameLength = Constants.MaxSchemaNameLength;
         _currentConfig.Database.MaxTableNameLength = Constants.MaxTableNameLength;
@@ -434,26 +475,17 @@
                 return;
             }
 
-            // Load all existing configurations
-            var allConfigs = ServerConfiguration.LoadAllFromEncryptedFile(false);
-
-            // Check if we're editing an existing configuration
-            var existingConfig = allConfigs.FirstOrDefault(c => c.Id == _currentConfig.Id);
-
-            if (existingConfig.HasAny() && _isEditMode)
+            if (_isEditMode)
             {
-                // Update existing configuration
-                allConfigs.Remove(existingConfig!);
-                allConfigs.Add(_currentConfig);
+                _currentConfig.EntityState = EntityState.Modified;
             }
             else if (!_isEditMode)
             {
-                // Add new configuration
-                allConfigs.Add(_currentConfig);
+                _currentConfig.EntityState = EntityState.Added;
             }
 
             // Save all configurations back to the file
-            ServerConfiguration.SaveAllToEncryptedFile(allConfigs);
+            ServerConfiguration.SaveChangesToEncryptedFile(_currentConfig);
 
             string serverTitle = string.IsNullOrWhiteSpace(_currentConfig.Server.Alias) ? _currentConfig.Server.ServerName : $"{_currentConfig.Server.Alias} ({_currentConfig.Server.ServerName})";
             _bprMessage = new BprMessage($"Configuration for {serverTitle} saved successfully", MessageType.Success);
@@ -489,5 +521,28 @@
             _bprMessage = new BprMessage($"Error deleting server configuration: {ex.Message}", MessageType.Error);
             StateHasChanged();
         }
+    }
+
+    private void ConfirmDeleteServer(ServerConfiguration config)
+    {
+        _serverToDelete = config;
+        _showDeleteConfirmation = true;
+        StateHasChanged();
+    }
+
+    private void CancelDeleteConfirmation()
+    {
+        _showDeleteConfirmation = false;
+        _serverToDelete = null;
+        StateHasChanged();
+    }
+
+    private void DeleteServerConfirmed()
+    {
+        if (_serverToDelete != null)
+        {
+            DeleteServer(_serverToDelete);
+        }
+        CancelDeleteConfirmation();
     }
 }
