@@ -14,7 +14,11 @@ namespace BprDevKit.DatabaseManagement.Config
     /// </summary>
     public class ServerConfiguration
     {
-        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid? Id { get; set; }
+
+        public DateTime CreateDate { get; set; }
+
+        public DateTime? LastModifiedDate { get; set; }
 
         // Connection settings
         public ServerSettings Server { get; set; } = new();
@@ -71,6 +75,28 @@ namespace BprDevKit.DatabaseManagement.Config
             string filePath = GetServerConfigPath();
             string encryptedContent = EncryptContent(jsonContent);
             File.WriteAllText(filePath, encryptedContent);
+        }
+
+        public static bool TryDeleteServerById(Guid id)
+        {
+            bool result = false;
+
+            // Load all server configurations
+            var allConfigs = LoadAllFromEncryptedFile();
+
+            // Find and remove the specific server configuration
+            var configToRemove = allConfigs.FirstOrDefault(c => c.Id == id);
+
+            if (configToRemove.HasAny())
+            {
+                allConfigs.Remove(configToRemove!);
+
+                // Save the updated list back to the file
+                SaveAllToEncryptedFile(allConfigs);
+                result = true;
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -137,9 +163,13 @@ namespace BprDevKit.DatabaseManagement.Config
         {
             if (serverConfigurations.HasAny())
             {
+                var savedData = LoadAllFromEncryptedFile(false);
+
                 foreach (var item in serverConfigurations)
                 {
-                    if (serverConfigurations.Any(p => p.Server.ServerName == item.Server.ServerName && p.Id != item.Id))
+                    if (savedData.Any(p => p.Server.ServerName == item.Server.ServerName &&
+                                           p.Server.DatabaseServerType == item.Server.DatabaseServerType &&
+                                           p.Id != item.Id))
                     {
                         throw new Exception($"Server {item.Server.ServerName} already exists");
                     }
@@ -147,6 +177,25 @@ namespace BprDevKit.DatabaseManagement.Config
                     {
                         item.Server.Username = null;
                         item.Server.Password = null;
+                    }
+                    if (item.Id.HasValue) // Modify
+                    {
+                        var previousData = savedData.FirstOrDefault(p => p.Id == item.Id);
+                        if (previousData.HasAny())
+                        {
+                            item.CreateDate = previousData!.CreateDate;
+                            item.LastModifiedDate = DateTime.UtcNow;
+                        }
+                        else
+                        {
+                            throw new Exception("Invalid server configure modified");
+                        }
+                    }
+                    else // Insert
+                    {
+                        item.Id = Guid.NewGuid();
+                        item.CreateDate = DateTime.UtcNow;
+                        item.LastModifiedDate = null;
                     }
                 }
             }

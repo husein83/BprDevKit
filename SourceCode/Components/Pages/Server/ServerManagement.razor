@@ -440,10 +440,10 @@
             // Check if we're editing an existing configuration
             var existingConfig = allConfigs.FirstOrDefault(c => c.Id == _currentConfig.Id);
 
-            if (existingConfig != null && _isEditMode)
+            if (existingConfig.HasAny() && _isEditMode)
             {
                 // Update existing configuration
-                allConfigs.Remove(existingConfig);
+                allConfigs.Remove(existingConfig!);
                 allConfigs.Add(_currentConfig);
             }
             else if (!_isEditMode)
@@ -455,7 +455,8 @@
             // Save all configurations back to the file
             ServerConfiguration.SaveAllToEncryptedFile(allConfigs);
 
-            _bprMessage = new BprMessage($"Configuration saved successfully to {Path.GetFileName(ServerConfiguration.GetServerConfigPath())}", MessageType.Success);
+            string serverTitle = string.IsNullOrWhiteSpace(_currentConfig.Server.Alias) ? _currentConfig.Server.ServerName : $"{_currentConfig.Server.Alias} ({_currentConfig.Server.ServerName})";
+            _bprMessage = new BprMessage($"Configuration for {serverTitle} saved successfully", MessageType.Success);
             _showAddForm = false;
             _isEditMode = false;
             LoadSavedServers();
@@ -471,21 +472,8 @@
     {
         try
         {
-            // Load all server configurations
-            var allConfigs = ServerConfiguration.LoadAllFromEncryptedFile();
-
-            // Find and remove the specific server configuration
-            var configToRemove = allConfigs.FirstOrDefault(c =>
-                c.Server.ServerName == config.Server.ServerName &&
-                c.Server.Alias == config.Server.Alias);
-
-            if (configToRemove != null)
+            if (config.HasAny() && config.Id.HasValue && ServerConfiguration.TryDeleteServerById(config.Id.Value))
             {
-                allConfigs.Remove(configToRemove);
-
-                // Save the updated list back to the file
-                ServerConfiguration.SaveAllToEncryptedFile(allConfigs);
-
                 _bprMessage = new BprMessage($"Server configuration '{config.Server.ServerName}' deleted successfully.", MessageType.Success);
                 LoadSavedServers();
             }
