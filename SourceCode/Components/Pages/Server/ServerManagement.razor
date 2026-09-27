@@ -1,5 +1,5 @@
 @page "/server-management"
-@using BprDevKit.DatabaseManagement.Config
+@using BprDevKit.Config
 @using BprDevKit.Utility
 @using System.IO
 @inject NavigationManager NavigationManager
@@ -161,16 +161,6 @@
                                 <i class="bi bi-database-fill-gear me-1"></i> Database Defaults
                             </button>
                         </li>
-                        <li class="nav-item">
-                            <button class="nav-link @(_activeTab == "security" ? "active" : "")" @onclick='() => SetActiveTab("security")'>
-                                <i class="bi bi-shield-lock-fill me-1"></i> Security
-                            </button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link @(_activeTab == "logging" ? "active" : "")" @onclick='() => SetActiveTab("logging")'>
-                                <i class="bi bi-receipt-cutoff me-1"></i> Logging
-                            </button>
-                        </li>
                     </ul>
 
                     <div class="card-body p-4">
@@ -283,53 +273,6 @@
                                 </div>
                             </div>
                         }
-                        else if (_activeTab == "security")
-                        {
-                            <!-- Tab 3: Security -->
-                            <div class="row g-3">
-                                <div class="col-12">
-                                    <div class="form-check form-switch p-3 bg-light rounded border">
-                                        <input type="checkbox" class="form-check-input ms-0 me-3" id="enableEnc" @bind="_currentConfig.Security.EnableEncryption" style="float: left;" />
-                                        <label class="form-check-label font-weight-bold" for="enableEnc">Enable AES Config File Encryption</label>
-                                        <div class="form-text text-muted mt-1">If enabled, connection configurations (*.enc.json) will be saved using secure AES encryption. This secures sensitive usernames and passwords.</div>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                        else if (_activeTab == "logging")
-                        {
-                            <!-- Tab 4: Logging -->
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Log Level</label>
-                                    <select class="form-select" @bind="_currentConfig.Logging.LogLevel">
-                                        @foreach (var level in Enum.GetValues<LogLevel>())
-                                        {
-                                            <option value="@level">@level</option>
-                                        }
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Max Log File Size (MB)</label>
-                                    <input type="number" class="form-control" @bind="_currentConfig.Logging.MaxLogFileSizeMB" />
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Retention Period (Days)</label>
-                                    <input type="number" class="form-control" @bind="_currentConfig.Logging.RetentionDays" />
-                                </div>
-
-                                <div class="col-12 mt-4">
-                                    <div class="form-check mb-2">
-                                        <input type="checkbox" class="form-check-input" id="conLog" @bind="_currentConfig.Logging.EnableConsoleLogging" />
-                                        <label class="form-check-label" for="conLog">Enable Console Logging</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input type="checkbox" class="form-check-input" id="fileLog" @bind="_currentConfig.Logging.EnableFileLogging" />
-                                        <label class="form-check-label" for="fileLog">Enable File Logging</label>
-                                    </div>
-                                </div>
-                            </div>
-                        }
 
                         <!-- Action Buttons -->
                         <div class="d-flex justify-content-end gap-2 border-top mt-4 pt-4">
@@ -433,14 +376,6 @@
         _currentConfig.Database.DefaultFileGrowthMB = Constants.DefaultFileGrowthMB;
         _currentConfig.Database.DefaultLogFileGrowthMB = Constants.DefaultLogFileGrowthMB;
 
-        _currentConfig.Security.EnableEncryption = true;
-
-        _currentConfig.Logging.LogLevel = LogLevel.Information;
-        _currentConfig.Logging.EnableConsoleLogging = true;
-        _currentConfig.Logging.EnableFileLogging = false;
-        _currentConfig.Logging.MaxLogFileSizeMB = 10;
-        _currentConfig.Logging.RetentionDays = 7;
-
         _isEditMode = false;
         _showAddForm = true;
         _activeTab = "connection";
@@ -485,7 +420,7 @@
             }
 
             // Save all configurations back to the file
-            ServerConfiguration.SaveChangesToEncryptedFile(_currentConfig);
+            ServerConfiguration.SaveChanges(_currentConfig);
 
             string serverTitle = string.IsNullOrWhiteSpace(_currentConfig.Server.Alias) ? _currentConfig.Server.ServerName : $"{_currentConfig.Server.Alias} ({_currentConfig.Server.ServerName})";
             _bprMessage = new BprMessage($"Configuration for {serverTitle} saved successfully", MessageType.Success);

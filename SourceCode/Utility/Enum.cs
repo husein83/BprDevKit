@@ -2,9 +2,12 @@
 
 namespace BprDevKit.Utility
 {
-    /// <summary>
-    /// Application enumeration values
-    /// </summary>
+    public enum BprDevConfig
+    {
+        ApplicationConfiguration,
+        ServerConfiguration,
+    }
+
     public enum LogLevel
     {
         Trace = 0,
@@ -13,6 +16,12 @@ namespace BprDevKit.Utility
         Warning = 3,
         Error = 4,
         Critical = 5
+    }
+
+    public enum Language
+    {
+        English,
+        Persian
     }
 
     public enum DatabaseServerType

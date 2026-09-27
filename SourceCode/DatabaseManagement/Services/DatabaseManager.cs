@@ -4,10 +4,10 @@ using System.Data;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
-using BprDevKit.DatabaseManagement.Config;
 using BprDevKit.DatabaseManagement.Models;
 using BprDevKit.DatabaseManagement.Services;
 using BprDevKit.Utility;
+using BprDevKit.Config;
 
 namespace BprDevKit.DatabaseManagement.Services
 {

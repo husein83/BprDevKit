@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
-using BprDevKit.DatabaseManagement.Config;
 using BprDevKit.DatabaseManagement.Services;
 using BprDevKit.Components;
+using BprDevKit.Config;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,5 +32,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+ApplicationConfiguration.LoadConfig();
 
 app.Run();
