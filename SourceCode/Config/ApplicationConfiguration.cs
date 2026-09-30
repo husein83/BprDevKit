@@ -42,7 +42,7 @@ namespace BprDevKit.Config
         {
             if (applicationConfiguration.TryDevSerialize(out var jsonContent))
             {
-                string filePath = DevFunctions.GetConfigurationPath(BprDevConfig.ServerConfiguration, out bool isExistsFile);
+                string filePath = DevFunctions.GetConfigurationPath(BprDevConfig.ApplicationConfiguration, out bool isExistsFile);
                 string encryptedContent = jsonContent.EncryptContent();
                 File.WriteAllText(filePath, encryptedContent);
                 Config = applicationConfiguration;
@@ -62,7 +62,7 @@ namespace BprDevKit.Config
     /// </summary>
     public class SecuritySettings
     {
-        public bool EnableConfigFileEncryption { get; set; } = true;
+
     }
 
     /// <summary>

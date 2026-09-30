@@ -31,9 +31,6 @@ namespace BprDevKit.Utility
         /// <summary>Encrypted server configuration file name</summary>
         public const string EncryptedServerConfigFileName = "server-configuration.enc.json";
 
-        /// <summary>Server configuration file name</summary>
-        public const string ServerConfigFileName = "server-configuration.json";
-
         /// <summary>Encryption key for encrypt configuration file</summary>
         public const string EncryptionKey = "BprDevKit-Tools-Encryption-Key-2026";
 

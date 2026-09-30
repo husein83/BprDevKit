@@ -9,12 +9,17 @@
     <div class="row">
         <div class="col-md-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2 class="text-dark"><i class="bi bi-cpu-fill text-primary"></i> Server Configuration Management</h2>
-                @if (!_showAddForm)
+                <h2 class="text-dark"><i class="bi bi-cpu-fill text-primary"></i> Server & Application Settings</h2>
+                @if (!_showAddForm && !_showAppAddForm)
                 {
-                    <button class="btn btn-primary px-4 py-2 shadow-sm" @onclick="OpenAddServerForm">
-                        <i class="bi bi-plus-lg me-1"></i> Add New Server
-                    </button>
+                    <div class="btn-group gap-2">
+                        <button class="btn btn-primary px-4 py-2 shadow-sm" @onclick="OpenAddServerForm">
+                            <i class="bi bi-plus-lg me-1"></i> Add New Server
+                        </button>
+                        <button class="btn btn-outline-primary px-4 py-2 shadow-sm" @onclick="OpenApplicationForm">
+                            <i class="bi bi-gear-fill me-1"></i> Application Settings
+                        </button>
+                    </div>
                 }
             </div>
 
@@ -26,7 +31,7 @@
                 </div>
             }
 
-            @if (!_showAddForm)
+            @if (!_showAddForm && !_showAppAddForm)
             {
                 <div class="card shadow-sm border-0 mb-4">
                     <div class="card-body p-0">
@@ -140,16 +145,83 @@
                     </div>
                 }
             }
+            else if (_showAppAddForm)
+            {
+                <!-- Application Configuration Tabbed Form -->
+                <div class="card shadow border-0 mb-5">
+                    <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
+                        <h4 class="m-0 text-primary"><i class="bi bi-gear-fill"></i> Application Settings</h4>
+                        <button type="button" class="btn-close" @onclick="CancelApplicationForm"></button>
+                    </div>
+
+                    <!-- Tabs Header for Application Settings -->
+                    <ul class="nav nav-tabs px-4 pt-3 bg-light-subtle" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link @(_appActiveTab == "logging" ? "active" : "")" @onclick='() => SetAppActiveTab("logging")'>
+                                <i class="bi bi-bell-fill me-1"></i> Logging
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="card-body p-4">
+                        @if (_appActiveTab == "logging")
+                        {
+                            <!-- Tab 1: Logging Settings -->
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label font-weight-bold">Log Level</label>
+                                    <select class="form-select" @bind="_appConfig.Logging.LogLevel">
+                                        @foreach (var level in Enum.GetValues<LogLevel>())
+                                        {
+                                            <option value="@level">@level</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label font-weight-bold">Enable Console Logging</label>
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" id="enableConsoleLogging" @bind="_appConfig.Logging.EnableConsoleLogging" />
+                                        <label class="form-check-label font-weight-bold" for="enableConsoleLogging">Enable</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label font-weight-bold">Enable File Logging</label>
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" id="enableFileLogging" @bind="_appConfig.Logging.EnableFileLogging" />
+                                        <label class="form-check-label font-weight-bold" for="enableFileLogging">Enable</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label font-weight-bold">Max Log File Size (MB)</label>
+                                    <input type="number" class="form-control" @bind="_appConfig.Logging.MaxLogFileSizeMB" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label font-weight-bold">Retention Days</label>
+                                    <input type="number" class="form-control" @bind="_appConfig.Logging.RetentionDays" />
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Action Buttons for Application Settings -->
+                        <div class="d-flex justify-content-end gap-2 border-top mt-4 pt-4">
+                            <button class="btn btn-outline-secondary px-4 py-2" @onclick="CancelApplicationForm">Cancel</button>
+                            <button class="btn btn-success px-5 py-2 shadow-sm" @onclick="SaveApplicationConfig">
+                                <i class="bi bi-check-lg me-1"></i> Save Application Settings
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
             else
             {
-                <!-- Modern Tabbed Form -->
+                <!-- Main Tabbed Form for Server Configuration -->
                 <div class="card shadow border-0 mb-5">
                     <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
                         <h4 class="m-0 text-primary"><i class="bi bi-sliders"></i> @(_isEditMode ? "Edit" : "Configure") Server Configuration</h4>
                         <button type="button" class="btn-close" @onclick="CancelForm"></button>
                     </div>
 
-                    <!-- Tabs Header -->
+                    <!-- Tabs Header for Server Settings -->
                     <ul class="nav nav-tabs px-4 pt-3 bg-light-subtle" role="tablist">
                         <li class="nav-item">
                             <button class="nav-link @(_activeTab == "connection" ? "active" : "")" @onclick='() => SetActiveTab("connection")'>
@@ -274,7 +346,7 @@
                             </div>
                         }
 
-                        <!-- Action Buttons -->
+                        <!-- Action Buttons for Server Configuration -->
                         <div class="d-flex justify-content-end gap-2 border-top mt-4 pt-4">
                             <button class="btn btn-outline-secondary px-4 py-2" @onclick="CancelForm">Cancel</button>
                             <button class="btn btn-success px-5 py-2 shadow-sm" @onclick="SaveServerConfig">
@@ -301,15 +373,27 @@
     private bool _showDeleteConfirmation = false;
     private ServerConfiguration? _serverToDelete = null;
 
+    // Application Configuration
+    private bool _showAppAddForm = false;
+    private string _appActiveTab = "logging";
+    private ApplicationConfiguration _appConfig = new();
+
     protected override async Task OnInitializedAsync()
     {
         LoadSavedServers();
+        LoadApplicationConfig();
         await Task.CompletedTask;
     }
 
     private void SetActiveTab(string tab)
     {
         _activeTab = tab;
+        StateHasChanged();
+    }
+
+    private void SetAppActiveTab(string tab)
+    {
+        _appActiveTab = tab;
         StateHasChanged();
     }
 
@@ -382,6 +466,14 @@
         StateHasChanged();
     }
 
+    private void OpenApplicationForm()
+    {
+        _appConfig = ApplicationConfiguration.Config;
+        _showAppAddForm = true;
+        _appActiveTab = "logging";
+        StateHasChanged();
+    }
+
     private void EditServer(ServerConfiguration config)
     {
         _currentConfig = config;
@@ -397,6 +489,13 @@
         _isEditMode = false;
         _currentConfig = new ServerConfiguration();
         _selectedConfigPath = string.Empty;
+        StateHasChanged();
+    }
+
+    private void CancelApplicationForm()
+    {
+        _showAppAddForm = false;
+        LoadApplicationConfig();
         StateHasChanged();
     }
 
@@ -433,6 +532,28 @@
         {
             _bprMessage = new BprMessage($"Error saving configuration: {ex.Message}", MessageType.Error);
         }
+    }
+
+    private void SaveApplicationConfig()
+    {
+        try
+        {
+            ApplicationConfiguration.SaveChanges(_appConfig);
+            _bprMessage = new BprMessage("Application configuration saved successfully", MessageType.Success);
+            _showAppAddForm = false;
+            LoadApplicationConfig();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = new BprMessage($"Error saving application configuration: {ex.Message}", MessageType.Error);
+        }
+    }
+
+    private void LoadApplicationConfig()
+    {
+        ApplicationConfiguration.LoadConfig();
+        _appConfig = ApplicationConfiguration.Config;
     }
 
     private void DeleteServer(ServerConfiguration config)

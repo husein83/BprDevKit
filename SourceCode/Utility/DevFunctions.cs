@@ -18,10 +18,7 @@ namespace BprDevKit.Utility
 
                 case BprDevConfig.ServerConfiguration:
                     {
-                        if (ApplicationConfiguration.Config.Security.EnableConfigFileEncryption)
-                            folderName = Constants.EncryptedServerConfigFileName;
-                        else
-                            folderName = Constants.ServerConfigFileName;
+                        folderName = Constants.EncryptedServerConfigFileName;
                     }
                     break;
 
