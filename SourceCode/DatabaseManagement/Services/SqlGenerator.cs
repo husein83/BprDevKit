@@ -144,6 +144,7 @@ WHERE d.name = {QUOTENAME(config.DatabaseName, "'")};";
             return "SELECT name FROM sys.filegroups ORDER BY name;";
         }
         #endregion
+
         #region Schema Operations
         public string GenerateCreateSchemaScript(string databaseName, string schemaName)
         {
