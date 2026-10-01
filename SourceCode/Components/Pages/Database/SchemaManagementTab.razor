@@ -136,6 +136,12 @@
     [Parameter]
     public EventCallback<string> OnOperationComplete { get; set; }
 
+    [Parameter]
+    public ServerConfiguration? ServerConfig { get; set; }
+
+    [Parameter]
+    public string DatabaseName { get; set; } = string.Empty;
+
     private List<string> _schemas = new();
     private List<string> AvailableDatabases = new();
     private string _selectedDatabase = string.Empty;
@@ -148,6 +154,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _selectedDatabase = DatabaseName;
         await LoadSchemas();
         await LoadAvailableDatabases();
     }

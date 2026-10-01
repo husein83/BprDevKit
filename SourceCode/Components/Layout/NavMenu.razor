@@ -1,35 +1,37 @@
 @using BprDevKit.Utility
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">BprDevKit</a>
+<div class="sidebar-shell">
+    <div class="sidebar-brand">
+        <a href="" class="brand-link" aria-label="BprDevKit home">
+            <span class="brand-mark">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.75A2.75 2.75 0 0 1 7.75 2h8.5A2.75 2.75 0 0 1 19 4.75v14.5A2.75 2.75 0 0 1 16.25 22h-8.5A2.75 2.75 0 0 1 5 19.25V4.75Zm3 2.5v2h8v-2H8Zm0 5v4.5h3v-4.5H8Zm5 0v4.5h3v-4.5h-3Z" /></svg>
+            </span>
+            <span><strong>BprDevKit</strong><small>SQL workspace</small></span>
+        </a>
+        <label class="navbar-toggler" for="sidebar-menu-toggle" aria-label="Toggle navigation menu"><span></span><span></span><span></span></label>
     </div>
-</div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+    <input id="sidebar-menu-toggle" type="checkbox" class="sidebar-menu-toggle" />
 
-<div class="nav-scrollable d-flex flex-column" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+    <div class="nav-scrollable" onclick="document.querySelector('.sidebar-menu-toggle').checked = false">
+        <nav class="sidebar-nav" aria-label="Main navigation">
+            <NavLink class="side-link" href="" Match="NavLinkMatch.All">
+                <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10.5 9-7 9 7v9.25A1.25 1.25 0 0 1 19.75 21H15v-6H9v6H4.25A1.25 1.25 0 0 1 3 19.75V10.5Z" /></svg></span>
+                <span>Home</span>
             </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="dashboard">
-                <span class="bi bi-database-fill" aria-hidden="true"></span> Dashboard
+            <NavLink class="side-link" href="database-management">
+                <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5C4 3.57 7.58 2 12 2s8 1.57 8 3.5S16.42 9 12 9 4 7.43 4 5.5Zm0 6C4 13.43 7.58 15 12 15s8-1.57 8-3.5v4C20 17.43 16.42 19 12 19s-8-1.57-8-3.5v-4Zm0 6C4 19.43 7.58 21 12 21s8-1.57 8-3.5v-1.1C18.17 20.4 15.2 21 12 21s-6.17-.6-8-1.6v-1.9Z" /></svg></span>
+                <span>DatabaseManagement</span>
             </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="server-management">
-                <span class="bi bi-gear-fill" aria-hidden="true"></span> Settings
+            <NavLink class="side-link" href="server-management">
+                <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.25a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Zm0 2.25c.8 0 1.57-.16 2.27-.45l1.6 1.6-1.2 2.08 1.55 2.68 2.4-.62 1.2 2.08-1.74 1.74-2.08-1.2-2.68 1.55.62 2.4H10.8l.62-2.4-2.68-1.55-2.08 1.2-1.74-1.74 1.2-2.08-1.55-2.68-2.4.62v-2.4l2.4.62 1.55-2.68-1.2-2.08 1.74-1.74 2.08 1.2c.7-.29 1.47-.45 2.27-.45Zm0 2.5a2.25 2.25 0 1 0 0 4.5 2.25 2.25 0 0 0 0-4.5Z" /></svg></span>
+                <span>Settings</span>
             </NavLink>
-        </div>
-    </nav>
+        </nav>
 
-    <footer class="mt-auto py-3 text-center text-white-50">
-        <div class="fs-6">
-            <i class="bi bi-c-circle-fill me-1"></i> @Constants.Copyright
-        </div>
-    </footer>
+        <footer class="sidebar-footer">
+            <span class="footer-dot"></span>
+            <span>@Constants.Copyright</span>
+        </footer>
+    </div>
 </div>

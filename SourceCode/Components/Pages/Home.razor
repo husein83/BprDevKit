@@ -1,12 +1,27 @@
-@using BprDevKit.Utility
 @page "/"
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="text-dark">Database Management Dashboard</h2>
+<div class="home-page">
+    <section class="home-hero">
+        <p class="home-eyebrow">BprDevKit workspace</p>
+        <h1>Choose where you want to start</h1>
+        <p>Manage SQL Server databases or update the connection and application preferences.</p>
+    </section>
+
+    <section class="home-actions" aria-label="Main areas">
+        <a class="home-action-card database-action" href="database-management">
+            <span class="home-action-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5C4 3.57 7.58 2 12 2s8 1.57 8 3.5S16.42 9 12 9 4 7.43 4 5.5Zm0 6C4 13.43 7.58 15 12 15s8-1.57 8-3.5v4C20 17.43 16.42 19 12 19s-8-1.57-8-3.5v-4Zm0 6C4 19.43 7.58 21 12 21s8-1.57 8-3.5v-1.1C18.17 20.4 15.2 21 12 21s-6.17-.6-8-1.6v-1.9Z" /></svg>
+            </span>
+            <span class="home-action-body"><strong>DatabaseManagement</strong><small>Create, inspect, and manage databases on configured SQL Server instances.</small></span>
+            <span class="home-action-arrow" aria-hidden="true">→</span>
+        </a>
+
+        <a class="home-action-card settings-action" href="server-management">
+            <span class="home-action-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.25a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Zm0 2.25c.8 0 1.57-.16 2.27-.45l1.6 1.6-1.2 2.08 1.55 2.68 2.4-.62 1.2 2.08-1.74 1.74-2.08-1.2-2.68 1.55.62 2.4H10.8l.62-2.4-2.68-1.55-2.08 1.2-1.74-1.74 1.2-2.08-1.55-2.68-2.4.62v-2.4l2.4.62 1.55-2.68-1.2-2.08 1.74-1.74 2.08 1.2c.7-.29 1.47-.45 2.27-.45Zm0 2.5a2.25 2.25 0 1 0 0 4.5 2.25 2.25 0 0 0 0-4.5Z" /></svg>
+            </span>
+            <span class="home-action-body"><strong>Settings</strong><small>Configure servers, database defaults, logging, and application preferences.</small></span>
+            <span class="home-action-arrow" aria-hidden="true">→</span>
+        </a>
+    </section>
 </div>
-
-<DatabaseManagementTab @ref="_databaseTab" />
-
-@code {
-    private DatabaseManagementTab? _databaseTab;
-}

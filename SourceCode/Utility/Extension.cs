@@ -154,7 +154,23 @@ namespace BprDevKit.Utility
         }
         public static bool TryDevSerialize<TValue>(this TValue source, out string result) where TValue : class
         {
-            return source.ToListOrEmpty().TryDevSerialize(out result);
+            result = string.Empty;
+            try
+            {
+                if (source.HasAny())
+                {
+                    result = JsonSerializer.Serialize(source, new JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    });
+                }
+            }
+            catch (Exception)
+            {
+                // Ignore
+            }
+            return !string.IsNullOrWhiteSpace(result);
         }
         #endregion
     }

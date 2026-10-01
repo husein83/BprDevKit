@@ -1,0 +1,117 @@
+.home-page {
+    display: grid;
+    gap: 1.5rem;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding-top: min(10vh, 5rem);
+}
+
+.home-hero {
+    max-width: 42rem;
+}
+
+.home-eyebrow {
+    margin-bottom: 0.65rem;
+    color: #2563eb;
+    font-size: 0.75rem;
+    font-weight: 750;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.home-hero h1 {
+    margin-bottom: 0.8rem;
+    color: #172554;
+    font-size: clamp(2rem, 4vw, 3.25rem);
+    font-weight: 760;
+    letter-spacing: -0.05em;
+}
+
+.home-hero > p:last-child {
+    margin: 0;
+    color: #64748b;
+    font-size: 1.05rem;
+    line-height: 1.7;
+}
+
+.home-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.home-action-card {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    min-height: 12rem;
+    padding: 1.5rem;
+    color: #1e293b;
+    text-decoration: none;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.home-action-card:hover {
+    color: #1e293b;
+    border-color: #bfdbfe;
+    box-shadow: 0 20px 35px rgba(15, 23, 42, 0.1);
+    transform: translateY(-4px);
+}
+
+.home-action-icon {
+    display: grid;
+    flex: 0 0 3.4rem;
+    width: 3.4rem;
+    height: 3.4rem;
+    place-items: center;
+    color: #fff;
+    border-radius: 0.9rem;
+}
+
+.home-action-icon svg {
+    width: 1.55rem;
+    height: 1.55rem;
+    fill: currentColor;
+}
+
+.database-action .home-action-icon { background: linear-gradient(135deg, #2563eb, #4f46e5); }
+.settings-action .home-action-icon { background: linear-gradient(135deg, #0f766e, #059669); }
+
+.home-action-body {
+    display: grid;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.home-action-body strong {
+    color: #172554;
+    font-size: 1.05rem;
+}
+
+.home-action-body small {
+    color: #64748b;
+    font-size: 0.86rem;
+    line-height: 1.55;
+}
+
+.home-action-arrow {
+    margin-left: auto;
+    color: #94a3b8;
+    font-size: 1.35rem;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.home-action-card:hover .home-action-arrow {
+    color: #2563eb;
+    transform: translateX(4px);
+}
+
+@media (max-width: 767.98px) {
+    .home-page { padding-top: 2rem; }
+    .home-actions { grid-template-columns: 1fr; }
+    .home-action-card { min-height: 9rem; }
+}

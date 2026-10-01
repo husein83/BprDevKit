@@ -1,0 +1,180 @@
+.database-management-page {
+    --management-navy: #12243f;
+    --management-blue: #2563eb;
+    --management-indigo: #4f46e5;
+    --management-slate: #64748b;
+    --management-border: #e2e8f0;
+    --management-surface: rgba(255, 255, 255, 0.96);
+    max-width: 1500px;
+    margin: 0 auto;
+}
+
+.management-hero {
+    position: relative;
+    overflow: hidden;
+    padding: 2rem;
+    color: #f8fafc;
+    border-radius: 1.25rem;
+    background:
+        radial-gradient(circle at top right, rgba(96, 165, 250, 0.38), transparent 33%),
+        linear-gradient(125deg, var(--management-navy), #1e3a8a 58%, var(--management-indigo));
+    box-shadow: 0 20px 45px rgba(30, 58, 138, 0.18);
+}
+
+.management-hero::after {
+    position: absolute;
+    right: -2.75rem;
+    bottom: -5rem;
+    width: 14rem;
+    height: 14rem;
+    content: "";
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.75rem rgba(255, 255, 255, 0.04), 0 0 0 3.5rem rgba(255, 255, 255, 0.025);
+}
+
+.management-hero > div,
+.management-hero > span {
+    position: relative;
+    z-index: 1;
+}
+
+.management-hero .text-primary {
+    color: #bfdbfe !important;
+    letter-spacing: 0.12em;
+}
+
+.management-hero h1 {
+    font-weight: 750;
+    letter-spacing: -0.035em;
+}
+
+.management-hero .text-muted {
+    color: #dbeafe !important;
+}
+
+.management-hero .badge {
+    color: #14532d !important;
+    background: #dcfce7 !important;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
+}
+
+.server-selection-sticky {
+    top: 3.5rem;
+}
+
+.server-selection-card {
+    overflow: hidden;
+    border: 1px solid rgba(191, 219, 254, 0.8) !important;
+    border-radius: 1rem;
+    background: linear-gradient(105deg, var(--management-surface), rgba(239, 246, 255, 0.96));
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08) !important;
+    backdrop-filter: blur(14px);
+}
+
+.server-selection-card .form-label {
+    color: var(--management-navy);
+}
+
+.server-selection-card .form-select {
+    min-height: 3.1rem;
+    color: #1e293b;
+    border-color: #bfdbfe;
+    border-radius: 0.75rem;
+    box-shadow: none;
+}
+
+.server-selection-card .form-select:focus {
+    border-color: var(--management-blue);
+    box-shadow: 0 0 0 0.25rem rgba(37, 99, 235, 0.12);
+}
+
+.server-selection-card .btn {
+    min-height: 3.1rem;
+    border-radius: 0.75rem;
+}
+
+.server-selection-card .badge {
+    padding: 0.5rem 0.7rem;
+    font-weight: 500;
+    color: #334155 !important;
+    background: rgba(255, 255, 255, 0.78) !important;
+}
+
+.management-workspace {
+    overflow: hidden;
+    border: 1px solid var(--management-border) !important;
+    border-radius: 1rem;
+    background: var(--management-surface);
+    box-shadow: 0 16px 35px rgba(15, 23, 42, 0.06) !important;
+}
+
+.management-workspace .card-header {
+    padding: 1.1rem 1.25rem 0.85rem;
+    background: #fbfdff !important;
+}
+
+.management-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 0.25rem;
+}
+
+.management-tabs .nav-item {
+    min-width: 8.6rem;
+}
+
+.management-tab {
+    padding: 0.7rem 0.8rem;
+    color: var(--management-slate) !important;
+    font-size: 0.9rem;
+    font-weight: 650;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    border-radius: 0.7rem !important;
+    transition: all 0.18s ease;
+}
+
+.management-tab:hover:not(:disabled) {
+    color: var(--management-blue) !important;
+    background: #eff6ff;
+}
+
+.management-tab.active {
+    color: #fff !important;
+    background: linear-gradient(135deg, var(--management-blue), var(--management-indigo));
+    box-shadow: 0 8px 16px rgba(37, 99, 235, 0.22);
+}
+
+.management-tab:disabled {
+    color: #cbd5e1 !important;
+    cursor: not-allowed;
+}
+
+.management-workspace .card-body {
+    min-height: 29rem;
+}
+
+@media (max-width: 767.98px) {
+    .database-management-page {
+        padding-right: 0.75rem !important;
+        padding-left: 0.75rem !important;
+    }
+
+    .management-hero {
+        padding: 1.5rem;
+        border-radius: 1rem;
+    }
+
+    .management-hero h1 {
+        font-size: 1.65rem;
+    }
+
+    .server-selection-sticky {
+        top: 0;
+    }
+
+    .management-workspace .card-body {
+        min-height: 24rem;
+    }
+}

@@ -30,16 +30,15 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateCreateDatabaseScript(config)
-                };
+                if (await DatabaseExistsAsync(config.DatabaseName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Database [{config.DatabaseName}] already exists.");
 
-                return await ExecuteInTransaction(scripts, "Database created successfully", $"Database '{config.DatabaseName}' created successfully");
+                var script = _sqlGenerator.GenerateCreateDatabaseScript(config);
+                return await ExecuteDatabaseCommand(script, $"Database '{config.DatabaseName}' created successfully.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error creating database: {ex.Message}");
+                return OperationResult.ErrorResult($"Error creating database: {ex.Message} The database may have been created before a later setting failed; verify the server state.", ex);
             }
         }
 
@@ -47,16 +46,18 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateAlterDatabaseScript(config)
-                };
+                if (!await DatabaseExistsAsync(config.DatabaseName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Database [{config.DatabaseName}] does not exist.");
 
-                return await ExecuteInTransaction(scripts, "Database altered successfully", $"Database '{config.DatabaseName}' altered successfully");
+                if (!HasDatabaseChanges(config))
+                    return OperationResult.ErrorResult("[BprDevKit] Select at least one database setting to update.");
+
+                var script = _sqlGenerator.GenerateAlterDatabaseScript(config);
+                return await ExecuteDatabaseCommand(script, $"Database '{config.DatabaseName}' updated successfully.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error altering database: {ex.Message}");
+                return OperationResult.ErrorResult($"Error updating database: {ex.Message}", ex);
             }
         }
 
@@ -64,16 +65,19 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
+                if (!await DatabaseExistsAsync(config.DatabaseName))
                 {
-                    _sqlGenerator.GenerateDropDatabaseScript(config)
-                };
+                    return config.IgnoreIfNotExists
+                        ? OperationResult.SuccessResult($"[BprDevKit] Database [{config.DatabaseName}] does not exist. Skipping.")
+                        : OperationResult.ErrorResult($"[BprDevKit] Database [{config.DatabaseName}] does not exist.");
+                }
 
-                return await ExecuteInTransaction(scripts, "Database dropped successfully", $"Database '{config.DatabaseName}' dropped successfully");
+                var script = _sqlGenerator.GenerateDropDatabaseScript(config);
+                return await ExecuteDatabaseCommand(script, $"Database '{config.DatabaseName}' dropped successfully.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error dropping database: {ex.Message}");
+                return OperationResult.ErrorResult($"Error dropping database: {ex.Message}", ex);
             }
         }
 
@@ -82,20 +86,19 @@ namespace BprDevKit.DatabaseManagement.Services
             try
             {
                 var sql = _sqlGenerator.GenerateGetDatabaseInfoScript(config);
-                var results = await ExecuteQuery(sql);
+                var result = await ExecuteQuery(sql);
 
-                if (results == null)
-                    return (OperationResult.ErrorResult("No database information found"), null);
+                if (result.Rows.Count == 0)
+                    return (OperationResult.ErrorResult($"Database '{config.DatabaseName}' was not found."), null);
 
-                return (OperationResult.SuccessResult($"Retrieved information for database '{config.DatabaseName}'"), results);
+                return (OperationResult.SuccessResult($"Retrieved information for database '{config.DatabaseName}'."), result);
             }
             catch (Exception ex)
             {
-                return (OperationResult.ErrorResult($"Error retrieving database information: {ex.Message}"), null);
+                return (OperationResult.ErrorResult($"Error retrieving database information: {ex.Message}", ex), null);
             }
         }
         #endregion
-
         #region Schema Operations
         public async Task<OperationResult> CreateSchema(string databaseName, string schemaName)
         {
@@ -1136,18 +1139,59 @@ namespace BprDevKit.DatabaseManagement.Services
         #endregion
 
         #region Private Methods
+        private async Task<bool> DatabaseExistsAsync(string databaseName)
+        {
+            if (string.IsNullOrWhiteSpace(databaseName))
+                return false;
+
+            using var connection = new SqlConnection(_config.Server.BuildConnectionString());
+            await connection.OpenAsync();
+
+            using var command = new SqlCommand("SELECT 1 FROM sys.databases WHERE name = @databaseName;", connection)
+            {
+                CommandTimeout = _config.Server.CommandTimeout
+            };
+            command.Parameters.AddWithValue("@databaseName", databaseName);
+
+            return await command.ExecuteScalarAsync() is not null;
+        }
+
+        private static bool HasDatabaseChanges(DatabaseProcedure.Alter config)
+        {
+            return !string.IsNullOrWhiteSpace(config.Collation)
+                || !string.IsNullOrWhiteSpace(config.RecoveryModel)
+                || config.CompatibilityLevel.HasValue
+                || config.IsReadOnly.HasValue
+                || config.AutoShrink.HasValue
+                || config.AutoClose.HasValue
+                || !string.IsNullOrWhiteSpace(config.PageVerify);
+        }
+
+        private async Task<OperationResult> ExecuteDatabaseCommand(string sql, string successMessage)
+        {
+            using var connection = new SqlConnection(_config.Server.BuildConnectionString());
+            await connection.OpenAsync();
+
+            using var command = new SqlCommand(sql, connection)
+            {
+                CommandTimeout = _config.Server.CommandTimeout
+            };
+            await command.ExecuteNonQueryAsync();
+
+            return OperationResult.SuccessResult(successMessage);
+        }
         private async Task<OperationResult> ExecuteInTransaction(List<string> scripts, string successMessage, string customMessage)
         {
             var connectionString = _config.Server.BuildConnectionString();
             using var connection = new SqlConnection(connectionString);
             await connection.OpenAsync();
 
-            using var transaction = await connection.BeginTransactionAsync();
+            using var transaction = connection.BeginTransaction();
             try
             {
                 foreach (var script in scripts)
                 {
-                    using var command = new SqlCommand(script, connection)
+                    using var command = new SqlCommand(script, connection, transaction)
                     {
                         CommandTimeout = _config.Server.CommandTimeout
                     };
@@ -1163,7 +1207,7 @@ namespace BprDevKit.DatabaseManagement.Services
             {
                 try
                 {
-                    await transaction.RollbackAsync();
+                    transaction.Rollback();
                 }
                 catch
                 {
@@ -1171,6 +1215,13 @@ namespace BprDevKit.DatabaseManagement.Services
                 }
                 return OperationResult.ErrorResult($"Transaction failed and was rolled back: {ex.Message}", ex);
             }
+        }
+
+        private static string QUOTENAME(string name, string quoteChar = "'")
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return name;
+            return quoteChar + name.Replace(quoteChar, quoteChar + quoteChar) + quoteChar;
         }
 
         private async Task<DataTable> ExecuteQuery(string sql)

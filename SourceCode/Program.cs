@@ -14,6 +14,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddSingleton<ServerConfiguration>();
 builder.Services.AddSingleton<ISqlGenerator, SqlGenerator>();
 builder.Services.AddScoped<DatabaseManager>();
+builder.Services.AddSingleton<DatabaseManagerFactory>();
 
 var app = builder.Build();
 

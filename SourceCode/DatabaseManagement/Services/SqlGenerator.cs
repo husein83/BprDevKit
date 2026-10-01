@@ -15,134 +15,118 @@ namespace BprDevKit.DatabaseManagement.Services
         #region Database Operations
         public string GenerateCreateDatabaseScript(DatabaseProcedure.Create config)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine("USE master;")
-                .AppendLine("GO")
-                .AppendLine()
-                .AppendLine("CREATE DATABASE " + QUOTENAME(config.DatabaseName))
+            ValidateCreateConfiguration(config);
+
+            var dataFilePath = BuildDatabaseFilePath(config.DataFilePath, config.DatabaseName, ".mdf");
+            var logDirectory = string.IsNullOrWhiteSpace(config.LogFilePath) ? config.DataFilePath : config.LogFilePath;
+            var logFilePath = BuildDatabaseFilePath(logDirectory!, config.DatabaseName, "_log.ldf");
+            var maxSize = config.MaxSizeMB.HasValue ? $"{config.MaxSizeMB.Value}MB" : "UNLIMITED";
+            var logMaxSize = config.LogMaxSizeMB.HasValue ? $"{config.LogMaxSizeMB.Value}MB" : "UNLIMITED";
+
+            var builder = new StringBuilder();
+            builder.AppendLine("CREATE DATABASE " + QUOTENAME(config.DatabaseName))
                 .AppendLine("ON PRIMARY")
                 .AppendLine("(")
                 .AppendLine("    NAME = " + QUOTENAME(config.DatabaseName, "'"))
-                .AppendLine("    FILENAME = '" + config.DataFilePath + "'")
+                .AppendLine("    FILENAME = " + QUOTENAME(dataFilePath, "'"))
                 .AppendLine("    SIZE = " + config.InitialSizeMB + "MB")
-                .AppendLine("    MAXSIZE = " + (config.MaxSizeMB.HasValue ? config.MaxSizeMB.Value + "MB" : "UNLIMITED"))
+                .AppendLine("    MAXSIZE = " + maxSize)
                 .AppendLine("    FILEGROWTH = " + config.FileGrowthMB + "MB")
                 .AppendLine(")")
                 .AppendLine("LOG ON")
                 .AppendLine("(")
                 .AppendLine("    NAME = " + QUOTENAME(config.DatabaseName + "_log", "'"))
-                .AppendLine("    FILENAME = '" + (config.LogFilePath ?? config.DataFilePath) + "'")
+                .AppendLine("    FILENAME = " + QUOTENAME(logFilePath, "'"))
                 .AppendLine("    SIZE = " + config.LogInitialSizeMB + "MB")
-                .AppendLine("    MAXSIZE = " + (config.LogMaxSizeMB.HasValue ? config.LogMaxSizeMB.Value + "MB" : "UNLIMITED"))
+                .AppendLine("    MAXSIZE = " + logMaxSize)
                 .AppendLine("    FILEGROWTH = " + config.LogFileGrowthMB + "MB")
                 .AppendLine(")");
 
             if (!string.IsNullOrWhiteSpace(config.Collation))
-                sb.AppendLine("COLLATE " + config.Collation);
+                builder.AppendLine("COLLATE " + config.Collation + ";");
+            else
+                builder.AppendLine(";");
 
-            sb.AppendLine("GO")
-                .AppendLine();
+            if (!string.IsNullOrWhiteSpace(config.FileGroup) && !string.Equals(config.FileGroup, "PRIMARY", StringComparison.OrdinalIgnoreCase))
+                builder.AppendLine($"ALTER DATABASE {QUOTENAME(config.DatabaseName)} ADD FILEGROUP {QUOTENAME(config.FileGroup)};");
 
-            // Apply settings
-            sb.AppendLine("ALTER DATABASE " + QUOTENAME(config.DatabaseName) + " SET RECOVERY " + config.RecoveryModel)
-                .AppendLine("GO")
-                .AppendLine()
-                .AppendLine("ALTER DATABASE " + QUOTENAME(config.DatabaseName) + " SET " + (config.IsReadOnly ? "READ_ONLY" : "READ_WRITE"))
-                .AppendLine("GO")
-                .AppendLine()
-                .AppendLine("ALTER DATABASE " + QUOTENAME(config.DatabaseName) + " SET AUTO_SHRINK " + (config.AutoShrink ? "ON" : "OFF"))
-                .AppendLine("GO")
-                .AppendLine()
-                .AppendLine("ALTER DATABASE " + QUOTENAME(config.DatabaseName) + " SET AUTO_CLOSE " + (config.AutoClose ? "ON" : "OFF"))
-                .AppendLine("GO")
-                .AppendLine()
-                .AppendLine("ALTER DATABASE " + QUOTENAME(config.DatabaseName) + " SET PAGE_VERIFY " + config.PageVerify)
-                .AppendLine("GO");
+            AppendDatabaseSettings(
+                builder,
+                config.DatabaseName,
+                config.RecoveryModel,
+                config.CompatibilityLevel,
+                config.IsReadOnly,
+                config.AutoShrink,
+                config.AutoClose,
+                config.PageVerify);
 
-            if (config.CompatibilityLevel.HasValue)
-                sb.AppendLine("ALTER DATABASE " + QUOTENAME(config.DatabaseName) + " SET COMPATIBILITY_LEVEL = " + config.CompatibilityLevel.Value)
-                    .AppendLine("GO")
-                    .AppendLine();
-
-            sb.AppendLine("PRINT N'[BprDevKit] Database [' + " + QUOTENAME(config.DatabaseName) + " + N'] created successfully.'")
-                .AppendLine("GO");
-
-            return sb.ToString();
+            return builder.ToString();
         }
 
         public string GenerateAlterDatabaseScript(DatabaseProcedure.Alter config)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine("USE master;")
-                .AppendLine("GO")
-                .AppendLine()
-                .AppendLine("ALTER DATABASE " + QUOTENAME(config.DatabaseName));
+            ValidateAlterConfiguration(config);
 
+            var builder = new StringBuilder();
             if (!string.IsNullOrWhiteSpace(config.Collation))
-                sb.AppendLine("SET COLLATE " + config.Collation)
-                    .AppendLine("GO")
-                    .AppendLine();
+                builder.AppendLine($"ALTER DATABASE {QUOTENAME(config.DatabaseName)} COLLATE {config.Collation};");
 
-            if (!string.IsNullOrWhiteSpace(config.RecoveryModel))
-                sb.AppendLine("SET RECOVERY " + config.RecoveryModel)
-                    .AppendLine("GO")
-                    .AppendLine();
+            AppendDatabaseSettings(
+                builder,
+                config.DatabaseName,
+                config.RecoveryModel,
+                config.CompatibilityLevel,
+                config.IsReadOnly,
+                config.AutoShrink,
+                config.AutoClose,
+                config.PageVerify);
 
-            if (config.CompatibilityLevel.HasValue)
-                sb.AppendLine("SET COMPATIBILITY_LEVEL = " + config.CompatibilityLevel.Value)
-                    .AppendLine("GO")
-                    .AppendLine();
-
-            if (config.IsReadOnly.HasValue)
-                sb.AppendLine("SET " + (config.IsReadOnly.Value ? "READ_ONLY" : "READ_WRITE"))
-                    .AppendLine("GO")
-                    .AppendLine();
-
-            if (config.AutoShrink.HasValue)
-                sb.AppendLine("SET AUTO_SHRINK " + (config.AutoShrink.Value ? "ON" : "OFF"))
-                    .AppendLine("GO")
-                    .AppendLine();
-
-            if (config.AutoClose.HasValue)
-                sb.AppendLine("SET AUTO_CLOSE " + (config.AutoClose.Value ? "ON" : "OFF"))
-                    .AppendLine("GO")
-                    .AppendLine();
-
-            if (!string.IsNullOrWhiteSpace(config.PageVerify))
-                sb.AppendLine("SET PAGE_VERIFY " + config.PageVerify)
-                    .AppendLine("GO")
-                    .AppendLine();
-
-            sb.AppendLine("PRINT N'[BprDevKit] Database [' + " + QUOTENAME(config.DatabaseName) + " + N'] altered successfully.'")
-                .AppendLine("GO");
-
-            return sb.ToString();
+            return builder.ToString();
         }
 
         public string GenerateDropDatabaseScript(DatabaseProcedure.Drop config)
         {
-            return $"USE master; GO\n\nDROP DATABASE {QUOTENAME(config.DatabaseName)}; GO\n\nPRINT N'[BprDevKit] Database [{config.DatabaseName}] dropped successfully.'; GO";
+            ValidateDatabaseName(config.DatabaseName);
+
+            if (IsSystemDatabase(config.DatabaseName))
+                throw new InvalidOperationException("[BprDevKit] Dropping system databases is not allowed.");
+
+            var builder = new StringBuilder();
+            if (config.ForceDisconnect)
+                builder.AppendLine($"ALTER DATABASE {QUOTENAME(config.DatabaseName)} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;");
+
+            builder.AppendLine($"DROP DATABASE {QUOTENAME(config.DatabaseName)};");
+            return builder.ToString();
         }
 
         public string GenerateGetDatabaseInfoScript(DatabaseProcedure.Information config)
         {
-            return $@"USE {QUOTENAME(config.DatabaseName)};
-SELECT
-    name AS DatabaseName,
-    create_date AS CreateDate,
-    modify_date AS ModifyDate,
-    compatibility_level AS CompatibilityLevel,
-    recovery_model_desc AS RecoveryModel,
-    is_read_only AS IsReadOnly,
-    is_auto_shrink_on AS IsAutoShrink,
-    is_auto_close_on AS IsAutoClose,
-    page_verify_option_desc AS PageVerify,
-    CASE
-        WHEN source_database_id = 0 THEN 'System'
-        ELSE 'User'
-    END AS DatabaseType
-FROM sys.databases
-WHERE name = '{config.DatabaseName}';";
+            ValidateDatabaseName(config.DatabaseName);
+
+            return $@"SELECT
+    d.name AS DatabaseName,
+    d.database_id AS DatabaseId,
+    d.collation_name AS Collation,
+    d.compatibility_level AS CompatibilityLevel,
+    d.recovery_model_desc AS RecoveryModel,
+    d.page_verify_option_desc AS PageVerify,
+    d.is_read_only AS IsReadOnly,
+    d.is_auto_shrink_on AS AutoShrink,
+    d.is_auto_close_on AS AutoClose,
+    d.state_desc AS [State],
+    d.create_date AS CreateDate,
+    dataFile.physical_name AS DataFilePath,
+    dataFile.size * 8 / 1024 AS DataFileSizeMB,
+    CASE WHEN dataFile.max_size = -1 THEN 'UNLIMITED' ELSE CONVERT(varchar(20), dataFile.max_size * 8 / 1024) + ' MB' END AS DataFileMaxSize,
+    dataFile.growth * 8 / 1024 AS DataFileGrowthMB,
+    logFile.physical_name AS LogFilePath,
+    logFile.size * 8 / 1024 AS LogFileSizeMB,
+    CASE WHEN logFile.max_size = -1 THEN 'UNLIMITED' ELSE CONVERT(varchar(20), logFile.max_size * 8 / 1024) + ' MB' END AS LogFileMaxSize,
+    logFile.growth * 8 / 1024 AS LogFileGrowthMB
+FROM sys.databases AS d
+LEFT JOIN sys.master_files AS dataFile ON d.database_id = dataFile.database_id AND dataFile.type = 0 AND dataFile.file_id = 1
+LEFT JOIN sys.master_files AS logFile ON d.database_id = logFile.database_id AND logFile.type = 1 AND logFile.file_id = 2
+WHERE d.name = {QUOTENAME(config.DatabaseName, "'")};";
         }
 
         public string GenerateGetDatabasesScript()
@@ -160,7 +144,6 @@ WHERE name = '{config.DatabaseName}';";
             return "SELECT name FROM sys.filegroups ORDER BY name;";
         }
         #endregion
-
         #region Schema Operations
         public string GenerateCreateSchemaScript(string databaseName, string schemaName)
         {
@@ -832,7 +815,103 @@ WHERE s.name = '{schemaName}' AND f.name = '{funcName}' AND f.type = 'FN';";
         #endregion
 
         #region Helper Methods
-        private static string QUOTENAME(string name, string quoteChar = "'")
+         private static void AppendDatabaseSettings(
+            StringBuilder builder,
+            string databaseName,
+            string? recoveryModel,
+            short? compatibilityLevel,
+            bool? isReadOnly,
+            bool? autoShrink,
+            bool? autoClose,
+            string? pageVerify)
+        {
+            if (!string.IsNullOrWhiteSpace(recoveryModel))
+                builder.AppendLine($"ALTER DATABASE {QUOTENAME(databaseName)} SET RECOVERY {recoveryModel.ToUpperInvariant()} WITH NO_WAIT;");
+
+            if (compatibilityLevel.HasValue)
+                builder.AppendLine($"ALTER DATABASE {QUOTENAME(databaseName)} SET COMPATIBILITY_LEVEL = {compatibilityLevel.Value};");
+
+            if (autoShrink.HasValue)
+                builder.AppendLine($"ALTER DATABASE {QUOTENAME(databaseName)} SET AUTO_SHRINK {(autoShrink.Value ? "ON" : "OFF")};");
+
+            if (autoClose.HasValue)
+                builder.AppendLine($"ALTER DATABASE {QUOTENAME(databaseName)} SET AUTO_CLOSE {(autoClose.Value ? "ON" : "OFF")};");
+
+            if (!string.IsNullOrWhiteSpace(pageVerify))
+                builder.AppendLine($"ALTER DATABASE {QUOTENAME(databaseName)} SET PAGE_VERIFY {pageVerify.ToUpperInvariant()} WITH NO_WAIT;");
+
+            if (isReadOnly.HasValue)
+                builder.AppendLine($"ALTER DATABASE {QUOTENAME(databaseName)} SET {(isReadOnly.Value ? "READ_ONLY" : "READ_WRITE")} WITH NO_WAIT;");
+        }
+
+        private static string BuildDatabaseFilePath(string directory, string databaseName, string extension)
+        {
+            return directory.TrimEnd('\\') + "\\" + databaseName + extension;
+        }
+
+        private static void ValidateCreateConfiguration(DatabaseProcedure.Create config)
+        {
+            ValidateDatabaseName(config.DatabaseName);
+
+            if (string.IsNullOrWhiteSpace(config.DataFilePath))
+                throw new InvalidOperationException("[BprDevKit] DataFilePath cannot be empty.");
+
+            ValidateSizes(config.InitialSizeMB, config.MaxSizeMB, config.FileGrowthMB, config.LogInitialSizeMB, config.LogMaxSizeMB, config.LogFileGrowthMB);
+            ValidateDatabaseOptions(config.RecoveryModel, config.PageVerify, config.CompatibilityLevel, config.Collation);
+
+            if (!string.IsNullOrWhiteSpace(config.FileGroup) && config.FileGroup.Length > 128)
+                throw new InvalidOperationException("[BprDevKit] FileGroup cannot exceed 128 characters.");
+        }
+
+        private static void ValidateAlterConfiguration(DatabaseProcedure.Alter config)
+        {
+            ValidateDatabaseName(config.DatabaseName);
+            ValidateDatabaseOptions(config.RecoveryModel, config.PageVerify, config.CompatibilityLevel, config.Collation);
+        }
+
+        private static void ValidateDatabaseName(string databaseName)
+        {
+            if (string.IsNullOrWhiteSpace(databaseName))
+                throw new InvalidOperationException("[BprDevKit] Database name cannot be empty.");
+
+            if (databaseName.Length > 128)
+                throw new InvalidOperationException("[BprDevKit] Database name cannot exceed 128 characters.");
+        }
+
+        private static void ValidateSizes(int initialSize, int? maxSize, int fileGrowth, int logInitialSize, int? logMaxSize, int logFileGrowth)
+        {
+            if (initialSize <= 0 || fileGrowth <= 0 || logInitialSize <= 0 || logFileGrowth <= 0)
+                throw new InvalidOperationException("[BprDevKit] Database file sizes and growth values must be greater than zero.");
+
+            if (maxSize.HasValue && maxSize.Value < initialSize)
+                throw new InvalidOperationException("[BprDevKit] MaxSizeMB cannot be less than InitialSizeMB.");
+
+            if (logMaxSize.HasValue && logMaxSize.Value < logInitialSize)
+                throw new InvalidOperationException("[BprDevKit] LogMaxSizeMB cannot be less than LogInitialSizeMB.");
+        }
+
+        private static void ValidateDatabaseOptions(string? recoveryModel, string? pageVerify, short? compatibilityLevel, string? collation)
+        {
+            if (!string.IsNullOrWhiteSpace(recoveryModel) &&
+                !new[] { "SIMPLE", "FULL", "BULK_LOGGED" }.Contains(recoveryModel, StringComparer.OrdinalIgnoreCase))
+                throw new InvalidOperationException("[BprDevKit] RecoveryModel must be SIMPLE, FULL, or BULK_LOGGED.");
+
+            if (!string.IsNullOrWhiteSpace(pageVerify) &&
+                !new[] { "CHECKSUM", "TORN_PAGE_DETECTION", "NONE" }.Contains(pageVerify, StringComparer.OrdinalIgnoreCase))
+                throw new InvalidOperationException("[BprDevKit] PageVerify must be CHECKSUM, TORN_PAGE_DETECTION, or NONE.");
+
+            if (compatibilityLevel.HasValue && compatibilityLevel.Value <= 0)
+                throw new InvalidOperationException("[BprDevKit] CompatibilityLevel must be greater than zero.");
+
+            if (!string.IsNullOrWhiteSpace(collation) && !System.Text.RegularExpressions.Regex.IsMatch(collation, "^[A-Za-z0-9_]+$"))
+                throw new InvalidOperationException("[BprDevKit] Collation contains unsupported characters.");
+        }
+
+        private static bool IsSystemDatabase(string databaseName)
+        {
+            return new[] { "master", "model", "msdb", "tempdb" }.Contains(databaseName, StringComparer.OrdinalIgnoreCase);
+        }
+       private static string QUOTENAME(string name, string quoteChar = "'")
         {
             if (string.IsNullOrWhiteSpace(name))
                 return name;

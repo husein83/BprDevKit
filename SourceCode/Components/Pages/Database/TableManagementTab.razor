@@ -220,6 +220,12 @@
     [Parameter]
     public EventCallback<string> OnOperationComplete { get; set; }
 
+    [Parameter]
+    public ServerConfiguration? ServerConfig { get; set; }
+
+    [Parameter]
+    public string DatabaseName { get; set; } = string.Empty;
+
     private List<string> Tables = new();
     private List<string> AvailableSchemas = new();
     private List<string> AvailableFileGroups = new();
@@ -247,6 +253,13 @@
     {
         await LoadAvailableSchemas();
         await LoadAvailableFileGroups();
+        await LoadTables();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _selectedDatabase = DatabaseName;
+        await LoadAvailableSchemas();
         await LoadTables();
     }
 

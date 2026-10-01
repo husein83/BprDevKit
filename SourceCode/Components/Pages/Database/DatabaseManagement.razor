@@ -1,0 +1,212 @@
+@page "/database-management"
+@using BprDevKit.Config
+@using BprDevKit.DatabaseManagement.Services
+@using BprDevKit.Utility
+@inject DatabaseManagerFactory DatabaseManagerFactory
+@rendermode InteractiveServer
+
+<div class="container-fluid py-4 px-lg-5 database-management-page">
+    <section class="management-hero d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+        <div>
+            <p class="text-primary text-uppercase fw-semibold small mb-1">BprDevKit</p>
+            <h1 class="h2 mb-1"><i class="bi bi-database-gear me-2"></i>Database Management</h1>
+            <p class="text-muted mb-0">Select a saved SQL Server configuration before managing its databases.</p>
+        </div>
+        @if (_selectedServer is not null)
+        {
+            <span class="badge rounded-pill text-bg-success px-3 py-2 align-self-lg-start">
+                <i class="bi bi-check-circle-fill me-1"></i> Server selected
+            </span>
+        }
+    </section>
+
+    <section class="sticky-top pt-2 mb-4" style="z-index: 1020;">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-3 p-lg-4">
+                <div class="row g-3 align-items-end">
+                    <div class="col-lg-8">
+                        <label class="form-label fw-semibold" for="server-configuration">
+                            <i class="bi bi-server me-1 text-primary"></i> Server configuration
+                        </label>
+                        <select id="server-configuration"
+                                class="form-select form-select-lg"
+                                @bind="_selectedServerId"
+                                @bind:after="OnServerSelected"
+                                disabled="@_isLoadingServers">
+                            <option value="">-- Select a configured server --</option>
+                            @foreach (var server in _serverConfigurations)
+                            {
+                                <option value="@server.Id">@GetServerDisplayName(server)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-lg-4 d-flex gap-2">
+                        <button class="btn btn-outline-secondary flex-fill" type="button" @onclick="RefreshServers" disabled="@_isLoadingServers">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                        </button>
+                        <button class="btn btn-outline-danger" type="button" @onclick="ClearServerSelection" disabled="@(_selectedServer is null)">
+                            <i class="bi bi-x-lg"></i><span class="visually-hidden">Clear selected server</span>
+                        </button>
+                    </div>
+                </div>
+
+                @if (_isLoadingServers)
+                {
+                    <div class="form-text mt-2"><span class="spinner-border spinner-border-sm me-1"></span> Loading server configurations…</div>
+                }
+                else if (_serverConfigurations.Count == 0)
+                {
+                    <div class="alert alert-warning mb-0 mt-3">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        No server configuration is available. <a href="server-management" class="alert-link">Create one in Settings</a> first.
+                    </div>
+                }
+                else if (!string.IsNullOrWhiteSpace(_loadError))
+                {
+                    <div class="alert alert-danger mb-0 mt-3"><i class="bi bi-x-octagon-fill me-2"></i>@_loadError</div>
+                }
+                else if (_selectedServer is not null)
+                {
+                    <div class="d-flex flex-wrap gap-2 mt-3 small">
+                        <span class="badge text-bg-light border"><i class="bi bi-hdd-network me-1"></i>@_selectedServer.Server.ServerName</span>
+                        <span class="badge text-bg-light border"><i class="bi bi-shield-lock me-1"></i>@(_selectedServer.Server.UseWindowsAuth ? "Windows authentication" : "SQL Server authentication")</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </section>
+
+    <section class="management-workspace card shadow-sm border-0">
+        <div class="card-header bg-white border-bottom-0 pt-3 px-3 px-lg-4">
+            <ul class="management-tabs nav nav-pills nav-fill gap-2" role="tablist">
+                @foreach (var tab in ManagementTabs)
+                {
+                    <li class="nav-item" role="presentation">
+                        <button class="management-tab nav-link @(_activeTab == tab.Key ? "active" : "")"
+                                type="button"
+                                @onclick="() => SetActiveTab(tab.Key)"
+                                disabled="@(_selectedServer is null)">
+                            <i class="bi @tab.Icon me-1"></i>@tab.Title
+                        </button>
+                    </li>
+                }
+            </ul>
+        </div>
+        <div class="card-body p-3 p-lg-4">
+            @if (_selectedServer is null)
+            {
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-server display-5"></i>
+                    <h2 class="h5 mt-3">Select a server to begin</h2>
+                    <p class="mb-0">Database tabs are unavailable until a server configuration is selected.</p>
+                </div>
+            }
+            else if (_activeTab == "databases")
+            {
+                <DatabaseManagementTab ServerConfig="_selectedServer" OnOperationComplete="NotifyOperationCompleted" />
+            }
+            else
+            {
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-tools display-5"></i>
+                    <h2 class="h5 mt-3">@GetActiveTab().Title is next</h2>
+                    <p class="mb-0">The selected server is preserved; this area will be implemented in the next phase.</p>
+                </div>
+            }
+        </div>
+    </section>
+</div>
+
+@code {
+    private static readonly (string Key, string Title, string Icon)[] ManagementTabs =
+    {
+        ("databases", "Databases", "bi-database-fill"),
+        ("tables", "Tables", "bi-table"),
+        ("schemas", "Schemas", "bi-diagram-3"),
+        ("views", "Views", "bi-eye"),
+        ("procedures", "Procedures", "bi-braces"),
+        ("functions", "Functions", "bi-function")
+    };
+
+    private List<ServerConfiguration> _serverConfigurations = new();
+    private ServerConfiguration? _selectedServer;
+    private Guid? _selectedServerId;
+    private string _activeTab = "databases";
+    private bool _isLoadingServers;
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadServerConfigurations();
+    }
+
+    private async Task LoadServerConfigurations()
+    {
+        _isLoadingServers = true;
+        _loadError = null;
+
+        try
+        {
+            _serverConfigurations = ServerConfiguration.LoadAllFromEncryptedFile(false)
+                .Where(configuration => configuration.Id.HasValue)
+                .OrderBy(GetServerDisplayName)
+                .ToList();
+        }
+        catch (Exception exception)
+        {
+            _serverConfigurations.Clear();
+            _loadError = $"Unable to load server configurations: {exception.Message}";
+        }
+        finally
+        {
+            _isLoadingServers = false;
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private Task OnServerSelected()
+    {
+        _selectedServer = _selectedServerId.HasValue
+            ? _serverConfigurations.FirstOrDefault(configuration => configuration.Id == _selectedServerId)
+            : null;
+        _activeTab = "databases";
+        return Task.CompletedTask;
+    }
+
+    private async Task RefreshServers()
+    {
+        ClearServerSelection();
+        await LoadServerConfigurations();
+    }
+
+    private void ClearServerSelection()
+    {
+        _selectedServerId = null;
+        _selectedServer = null;
+        _activeTab = "databases";
+    }
+
+    private void SetActiveTab(string tab)
+    {
+        if (_selectedServer is not null)
+            _activeTab = tab;
+    }
+
+    private (string Key, string Title, string Icon) GetActiveTab()
+    {
+        return ManagementTabs.First(tab => tab.Key == _activeTab);
+    }
+
+    private static string GetServerDisplayName(ServerConfiguration configuration)
+    {
+        return string.IsNullOrWhiteSpace(configuration.Server.Alias)
+            ? configuration.Server.ServerName
+            : $"{configuration.Server.Alias} ({configuration.Server.ServerName})";
+    }
+
+    private Task NotifyOperationCompleted(string message)
+    {
+        return Task.CompletedTask;
+    }
+}
