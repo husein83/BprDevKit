@@ -327,39 +327,57 @@
 
     private async Task TestFunction()
     {
-        if (string.IsNullOrEmpty(_newFunction.Definition))
+        if (string.IsNullOrWhiteSpace(_newFunction.Database))
         {
-            await OnOperationComplete.InvokeAsync($"Function body cannot be empty");
+            await OnOperationComplete.InvokeAsync("Database must be selected");
             return;
         }
 
-        ShowTestFunction = true;
-        await Task.Run(async () =>
+        if (string.IsNullOrWhiteSpace(_newFunction.Name) || string.IsNullOrWhiteSpace(_newFunction.Definition))
         {
-            await Task.Delay(1000);
-            FunctionTestResult = new DataTable();
-            FunctionTestResult.Columns.Add("Result", typeof(string));
-            FunctionTestResult.Rows.Add("Test Success");
+            await OnOperationComplete.InvokeAsync("Function name and body cannot be empty");
+            return;
+        }
 
-            StateHasChanged();
-        });
+        var result = await DatabaseManager.TestFunction(_newFunction.Database, _newFunction.Name, _newFunction.Definition);
+        if (!result.operationResult.Success)
+        {
+            await OnOperationComplete.InvokeAsync($"Function test failed: {result.operationResult.Message}");
+            return;
+        }
+
+        FunctionTestResult = result.functionTestResult;
+        ShowTestFunction = true;
     }
 
     private async Task SaveFunction()
     {
-        if (string.IsNullOrEmpty(_newFunction.Name))
+        if (string.IsNullOrWhiteSpace(_newFunction.Name))
         {
-            await OnOperationComplete.InvokeAsync($"Function name cannot be empty");
+            await OnOperationComplete.InvokeAsync("Function name cannot be empty");
             return;
         }
 
-        if (string.IsNullOrEmpty(_newFunction.Definition))
+        if (string.IsNullOrWhiteSpace(_newFunction.Schema) || string.IsNullOrWhiteSpace(_newFunction.Database))
         {
-            await OnOperationComplete.InvokeAsync($"Function body cannot be empty");
+            await OnOperationComplete.InvokeAsync("Schema and database must be selected");
             return;
         }
 
-        await OnOperationComplete.InvokeAsync($"Function '{_newFunction.Name}' created successfully");
+        if (string.IsNullOrWhiteSpace(_newFunction.Definition))
+        {
+            await OnOperationComplete.InvokeAsync("Function body cannot be empty");
+            return;
+        }
+
+        var result = await DatabaseManager.CreateFunction(_newFunction.Database, _newFunction.Schema, _newFunction.Name, _newFunction.Definition, _newFunction.WithEncryption);
+        if (!result.Success)
+        {
+            await OnOperationComplete.InvokeAsync($"Error creating function: {result.Message}");
+            return;
+        }
+
+        await OnOperationComplete.InvokeAsync(result.Message);
         CancelCreateFunction();
         await LoadFunctions();
     }

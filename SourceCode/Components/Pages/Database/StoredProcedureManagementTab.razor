@@ -328,39 +328,57 @@
 
     private async Task TestProcedure()
     {
-        if (string.IsNullOrEmpty(_newProcedure.Definition))
+        if (string.IsNullOrWhiteSpace(_newProcedure.Database))
         {
-            await OnOperationComplete.InvokeAsync($"Procedure body cannot be empty");
+            await OnOperationComplete.InvokeAsync("Database must be selected");
             return;
         }
 
-        ShowTestProcedure = true;
-        await Task.Run(async () =>
+        if (string.IsNullOrWhiteSpace(_newProcedure.Name) || string.IsNullOrWhiteSpace(_newProcedure.Definition))
         {
-            await Task.Delay(1000);
-            ProcedureTestResult = new DataTable();
-            ProcedureTestResult.Columns.Add("Result", typeof(string));
-            ProcedureTestResult.Rows.Add("Test Success");
+            await OnOperationComplete.InvokeAsync("Procedure name and body cannot be empty");
+            return;
+        }
 
-            StateHasChanged();
-        });
+        var result = await DatabaseManager.TestStoredProcedure(_newProcedure.Database, _newProcedure.Name, _newProcedure.Definition);
+        if (!result.operationResult.Success)
+        {
+            await OnOperationComplete.InvokeAsync($"Procedure test failed: {result.operationResult.Message}");
+            return;
+        }
+
+        ProcedureTestResult = result.procedureTestResult;
+        ShowTestProcedure = true;
     }
 
     private async Task SaveStoredProcedure()
     {
-        if (string.IsNullOrEmpty(_newProcedure.Name))
+        if (string.IsNullOrWhiteSpace(_newProcedure.Name))
         {
-            await OnOperationComplete.InvokeAsync($"Procedure name cannot be empty");
+            await OnOperationComplete.InvokeAsync("Procedure name cannot be empty");
             return;
         }
 
-        if (string.IsNullOrEmpty(_newProcedure.Definition))
+        if (string.IsNullOrWhiteSpace(_newProcedure.Schema) || string.IsNullOrWhiteSpace(_newProcedure.Database))
         {
-            await OnOperationComplete.InvokeAsync($"Procedure body cannot be empty");
+            await OnOperationComplete.InvokeAsync("Schema and database must be selected");
             return;
         }
 
-        await OnOperationComplete.InvokeAsync($"Stored procedure '{_newProcedure.Name}' created successfully");
+        if (string.IsNullOrWhiteSpace(_newProcedure.Definition))
+        {
+            await OnOperationComplete.InvokeAsync("Procedure body cannot be empty");
+            return;
+        }
+
+        var result = await DatabaseManager.CreateStoredProcedure(_newProcedure.Database, _newProcedure.Schema, _newProcedure.Name, _newProcedure.Definition, _newProcedure.WithEncryption);
+        if (!result.Success)
+        {
+            await OnOperationComplete.InvokeAsync($"Error creating stored procedure: {result.Message}");
+            return;
+        }
+
+        await OnOperationComplete.InvokeAsync(result.Message);
         CancelCreateStoredProcedure();
         await LoadStoredProcedures();
     }

@@ -27,18 +27,18 @@ namespace BprDevKit.DatabaseManagement.Services
             builder.AppendLine("CREATE DATABASE " + QUOTENAME(config.DatabaseName))
                 .AppendLine("ON PRIMARY")
                 .AppendLine("(")
-                .AppendLine("    NAME = " + QUOTENAME(config.DatabaseName, "'"))
-                .AppendLine("    FILENAME = " + QUOTENAME(dataFilePath, "'"))
-                .AppendLine("    SIZE = " + config.InitialSizeMB + "MB")
-                .AppendLine("    MAXSIZE = " + maxSize)
+                .AppendLine("    NAME = " + QUOTENAME(config.DatabaseName, "'") + ",")
+                .AppendLine("    FILENAME = " + QUOTENAME(dataFilePath, "'") + ",")
+                .AppendLine("    SIZE = " + config.InitialSizeMB + "MB,")
+                .AppendLine("    MAXSIZE = " + maxSize + ",")
                 .AppendLine("    FILEGROWTH = " + config.FileGrowthMB + "MB")
                 .AppendLine(")")
                 .AppendLine("LOG ON")
                 .AppendLine("(")
-                .AppendLine("    NAME = " + QUOTENAME(config.DatabaseName + "_log", "'"))
-                .AppendLine("    FILENAME = " + QUOTENAME(logFilePath, "'"))
-                .AppendLine("    SIZE = " + config.LogInitialSizeMB + "MB")
-                .AppendLine("    MAXSIZE = " + logMaxSize)
+                .AppendLine("    NAME = " + QUOTENAME(config.DatabaseName + "_log", "'") + ",")
+                .AppendLine("    FILENAME = " + QUOTENAME(logFilePath, "'") + ",")
+                .AppendLine("    SIZE = " + config.LogInitialSizeMB + "MB,")
+                .AppendLine("    MAXSIZE = " + logMaxSize + ",")
                 .AppendLine("    FILEGROWTH = " + config.LogFileGrowthMB + "MB")
                 .AppendLine(")");
 
@@ -46,6 +46,9 @@ namespace BprDevKit.DatabaseManagement.Services
                 builder.AppendLine("COLLATE " + config.Collation + ";");
             else
                 builder.AppendLine(";");
+
+            // CREATE DATABASE must be isolated from subsequent ALTER DATABASE statements.
+            builder.AppendLine("GO");
 
             if (!string.IsNullOrWhiteSpace(config.FileGroup) && !string.Equals(config.FileGroup, "PRIMARY", StringComparison.OrdinalIgnoreCase))
                 builder.AppendLine($"ALTER DATABASE {QUOTENAME(config.DatabaseName)} ADD FILEGROUP {QUOTENAME(config.FileGroup)};");
@@ -116,13 +119,13 @@ namespace BprDevKit.DatabaseManagement.Services
     d.state_desc AS [State],
     d.create_date AS CreateDate,
     dataFile.physical_name AS DataFilePath,
-    dataFile.size * 8 / 1024 AS DataFileSizeMB,
-    CASE WHEN dataFile.max_size = -1 THEN 'UNLIMITED' ELSE CONVERT(varchar(20), dataFile.max_size * 8 / 1024) + ' MB' END AS DataFileMaxSize,
-    dataFile.growth * 8 / 1024 AS DataFileGrowthMB,
+    CAST(dataFile.size AS bigint) * 8 / 1024 AS DataFileSizeMB,
+    CASE WHEN dataFile.max_size = -1 THEN 'UNLIMITED' ELSE CONVERT(varchar(20), CAST(dataFile.max_size AS bigint) * 8 / 1024) + ' MB' END AS DataFileMaxSize,
+    CAST(dataFile.growth AS bigint) * 8 / 1024 AS DataFileGrowthMB,
     logFile.physical_name AS LogFilePath,
-    logFile.size * 8 / 1024 AS LogFileSizeMB,
-    CASE WHEN logFile.max_size = -1 THEN 'UNLIMITED' ELSE CONVERT(varchar(20), logFile.max_size * 8 / 1024) + ' MB' END AS LogFileMaxSize,
-    logFile.growth * 8 / 1024 AS LogFileGrowthMB
+    CAST(logFile.size AS bigint) * 8 / 1024 AS LogFileSizeMB,
+    CASE WHEN logFile.max_size = -1 THEN 'UNLIMITED' ELSE CONVERT(varchar(20), CAST(logFile.max_size AS bigint) * 8 / 1024) + ' MB' END AS LogFileMaxSize,
+    CAST(logFile.growth AS bigint) * 8 / 1024 AS LogFileGrowthMB
 FROM sys.databases AS d
 LEFT JOIN sys.master_files AS dataFile ON d.database_id = dataFile.database_id AND dataFile.type = 0 AND dataFile.file_id = 1
 LEFT JOIN sys.master_files AS logFile ON d.database_id = logFile.database_id AND logFile.type = 1 AND logFile.file_id = 2
@@ -186,7 +189,7 @@ WHERE d.name = {QUOTENAME(config.DatabaseName, "'")};";
                     .AppendLine("    N'" + config.TableName + "';");
             }
 
-            sb.AppendLine("PRINT N'[BprDevKit] Table [' + " + QUOTENAME(config.SchemaName) + " + N'.' + " + QUOTENAME(config.TableName) + " + N'] created successfully.';")
+            sb.AppendLine("PRINT N'[BprDevKit] Operation completed successfully.';")
                 .AppendLine("GO");
 
             return sb.ToString();
@@ -212,7 +215,7 @@ SELECT
     t.modify_date AS ModifyDate
 FROM sys.tables t
 INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
-WHERE s.name = '{config.SchemaName}' AND t.name = '{config.TableName}';";
+WHERE s.name = {SQLLiteral(config.SchemaName)} AND t.name = {SQLLiteral(config.TableName)};";
         }
 
         public string GenerateGetTablesScript(string databaseName, string schemaName)
@@ -221,7 +224,7 @@ WHERE s.name = '{config.SchemaName}' AND t.name = '{config.TableName}';";
 SELECT t.name AS TableName
 FROM sys.tables t
 INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
-WHERE s.name = '{schemaName}'
+WHERE s.name = {SQLLiteral(schemaName)}
 ORDER BY t.name;";
         }
         #endregion
@@ -262,7 +265,7 @@ ORDER BY t.name;";
                 sb.AppendLine("ALTER TABLE " + QUOTENAME(config.SchemaName) + "." + QUOTENAME(config.TableName) + " ADD CONSTRAINT DF_" + config.SchemaName + "_" + config.TableName + "_" + config.ColumnName + " DEFAULT (" + config.DefaultValue + ") FOR " + config.ColumnName + ";");
             }
 
-            sb.AppendLine("PRINT N'[BprDevKit] Column [' + " + QUOTENAME(config.ColumnName) + " + N'] created successfully in table [' + " + QUOTENAME(config.SchemaName) + " + N'.' + " + QUOTENAME(config.TableName) + " + N'].';");
+            sb.AppendLine("PRINT N'[BprDevKit] Operation completed successfully.';");
 
             return sb.ToString();
         }
@@ -271,7 +274,6 @@ ORDER BY t.name;";
         {
             var sb = new StringBuilder();
             sb.AppendLine("USE " + QUOTENAME(config.DatabaseName) + ";")
-                .AppendLine("USE " + QUOTENAME(config.DatabaseName) + ";")
                 .AppendLine("ALTER TABLE " + QUOTENAME(config.SchemaName) + "." + QUOTENAME(config.TableName) + " ALTER COLUMN ");
 
             // Build column definition
@@ -318,7 +320,7 @@ ORDER BY t.name;";
                 sb.AppendLine("    EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'" + config.Description + "', @level0type=N'SCHEMA', @level0name=N'" + config.SchemaName + "', @level1type=N'TABLE', @level1name=N'" + config.TableName + "', @level2type=N'COLUMN', @level2name=N'" + config.ColumnName + "';");
             }
 
-            sb.AppendLine("PRINT N'[BprDevKit] Column [' + " + QUOTENAME(config.ColumnName) + " + N'] altered successfully in table [' + " + QUOTENAME(config.SchemaName) + " + N'.' + " + QUOTENAME(config.TableName) + " + N'].';");
+            sb.AppendLine("PRINT N'[BprDevKit] Operation completed successfully.';");
 
             return sb.ToString();
         }
@@ -346,7 +348,7 @@ SELECT
 FROM sys.columns c
 INNER JOIN sys.tables t ON c.object_id = t.object_id
 INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
-WHERE s.name = '{config.SchemaName}' AND t.name = '{config.TableName}' AND c.name = '{config.ColumnName}';";
+WHERE s.name = {SQLLiteral(config.SchemaName)} AND t.name = {SQLLiteral(config.TableName)} AND c.name = {SQLLiteral(config.ColumnName)};";
         }
 
         public string GenerateGetDataTypesScript()
@@ -361,7 +363,7 @@ SELECT c.name AS ColumnName
 FROM sys.columns c
 INNER JOIN sys.tables t ON c.object_id = t.object_id
 INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
-WHERE s.name = '{schemaName}' AND t.name = '{tableName}'
+WHERE s.name = {SQLLiteral(schemaName)} AND t.name = {SQLLiteral(tableName)}
 ORDER BY c.column_id;";
         }
         #endregion
@@ -369,31 +371,31 @@ ORDER BY c.column_id;";
         #region Index Operations
         public string GenerateCreateIndexScript(IndexProcedure.Create config)
         {
+            if (string.IsNullOrWhiteSpace(config.Columns))
+                throw new ArgumentException("At least one index column is required.", nameof(config.Columns));
+
+            var indexName = string.IsNullOrWhiteSpace(config.IndexName)
+                ? $"IX_{config.TableName}_{config.Columns.Replace(" ", "").Replace(",", "_").Replace("ASC", "").Replace("DESC", "_desc")}"
+                : config.IndexName;
+
+            var indexType = (config.IndexType ?? "NONCLUSTERED").Trim();
+            if (config.IsUnique && !indexType.StartsWith("UNIQUE ", StringComparison.OrdinalIgnoreCase))
+                indexType = "UNIQUE " + indexType;
+
             var sb = new StringBuilder();
-            sb.AppendLine("USE " + QUOTENAME(config.DatabaseName) + ";")
-                .AppendLine("CREATE ");
-
-            if (config.IsUnique)
-                sb.AppendLine("UNIQUE ");
-
-            sb.AppendLine(config.IndexType + " INDEX ");
-
-            if (string.IsNullOrWhiteSpace(config.IndexName))
-                sb.AppendLine("IX_" + config.TableName + "_" + config.Columns.Replace(" ", "").Replace(",", "_").Replace("ASC", "").Replace("DESC", "_desc"));
-            else
-                sb.AppendLine(config.IndexName);
-
-            sb.AppendLine("ON " + QUOTENAME(config.SchemaName) + "." + QUOTENAME(config.TableName) + " (" + config.Columns + ");");
+            sb.AppendLine($"USE {QUOTENAME(config.DatabaseName)};");
+            sb.Append($"CREATE {indexType} INDEX {QUOTENAME(indexName)} ON {QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)} ({config.Columns})");
 
             if (!string.IsNullOrWhiteSpace(config.IncludeColumns))
-                sb.AppendLine("INCLUDE (" + config.IncludeColumns + ");");
+                sb.Append($" INCLUDE ({config.IncludeColumns})");
 
-            sb.AppendLine("WITH (FILLFACTOR = " + config.FillFactor + ");");
+            if (config.FillFactor > 0)
+                sb.Append($" WITH (FILLFACTOR = {config.FillFactor})");
 
-            sb.AppendLine("ON " + QUOTENAME(config.FileGroup) + ";");
+            if (!string.IsNullOrWhiteSpace(config.FileGroup))
+                sb.Append($" ON {QUOTENAME(config.FileGroup)}");
 
-            sb.AppendLine("PRINT N'[BprDevKit] Index [' + " + QUOTENAME(config.IndexName ?? "(auto-generated)") + " + N'] created successfully on table [' + " + QUOTENAME(config.SchemaName) + " + N'.' + " + QUOTENAME(config.TableName) + " + N'].';");
-
+            sb.AppendLine(";");
             return sb.ToString();
         }
 
@@ -423,7 +425,7 @@ INNER JOIN sys.tables t ON i.object_id = t.object_id
 INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
 LEFT JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
 LEFT JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
-WHERE s.name = '{config.SchemaName}' AND t.name = '{config.TableName}' AND i.name = '{config.IndexName}'
+WHERE s.name = {SQLLiteral(config.SchemaName)} AND t.name = {SQLLiteral(config.TableName)} AND i.name = {SQLLiteral(config.IndexName)}
 ORDER BY i.name;";
         }
 
@@ -434,7 +436,7 @@ SELECT i.name AS IndexName
 FROM sys.indexes i
 INNER JOIN sys.objects o ON i.object_id = o.object_id
 INNER JOIN sys.schemas s ON o.schema_id = s.schema_id
-WHERE o.type = 'U' AND s.name = '{schemaName}' AND o.name = '{tableName}' AND i.name IS NOT NULL AND i.is_primary_key = 0
+WHERE o.type = 'U' AND s.name = {SQLLiteral(schemaName)} AND o.name = {SQLLiteral(tableName)} AND i.name IS NOT NULL AND i.is_primary_key = 0
 ORDER BY i.name;";
         }
 
@@ -454,8 +456,7 @@ ORDER BY i.name;";
                    "ADD CONSTRAINT " + QUOTENAME(fkName) + "\n" +
                    "FOREIGN KEY (" + QUOTENAME(config.ColumnName) + ")\n" +
                    "REFERENCES " + QUOTENAME(config.RefSchemaName) + "." + QUOTENAME(config.RefTableName) + " (" + QUOTENAME(config.RefColumnName) + ")\n" +
-                   "ON DELETE " + config.OnDelete + "\n" +
-                   "ON UPDATE " + config.OnUpdate + ";";
+                   "ON DELETE " + config.OnDelete + ";";
         }
 
         public string GenerateAlterForeignKeyScript(ForeignKeyProcedure.Alter config)
@@ -470,9 +471,7 @@ ORDER BY i.name;";
                    "ADD CONSTRAINT " + QUOTENAME(fkName) + "\n" +
                    "FOREIGN KEY (" + QUOTENAME(config.ColumnName) + ")\n" +
                    "REFERENCES " + QUOTENAME(config.RefSchemaName) + "." + QUOTENAME(config.RefTableName) + " (" + QUOTENAME(config.RefColumnName) + ")\n" +
-                   "ON DELETE " + config.OnDelete + "\n" +
-                   "ON UPDATE " + config.OnUpdate + ";\n" +
-                   "PRINT N'[BprDevKit] Foreign key [' + " + QUOTENAME(fkName) + " + N'] altered successfully.';";
+                   "ON DELETE " + config.OnDelete + ";";
         }
 
         public string GenerateDropForeignKeyScript(ForeignKeyProcedure.Drop config)
@@ -503,7 +502,7 @@ INNER JOIN sys.columns c ON fkc.parent_object_id = c.object_id AND fkc.parent_co
 INNER JOIN sys.tables rt ON fk.referenced_object_id = rt.object_id
 INNER JOIN sys.schemas rs ON rt.schema_id = rs.schema_id
 INNER JOIN sys.columns rc ON fk.referenced_object_id = rc.object_id AND fkc.referenced_column_id = rc.column_id
-WHERE s.name = '{config.SchemaName}' AND t.name = '{config.TableName}' AND c.name = '{config.ColumnName}';";
+WHERE s.name = {SQLLiteral(config.SchemaName)} AND t.name = {SQLLiteral(config.TableName)} AND c.name = {SQLLiteral(config.ColumnName)};";
         }
 
         public string GenerateGetReferentialActionsScript()
@@ -519,7 +518,10 @@ WHERE s.name = '{config.SchemaName}' AND t.name = '{config.TableName}' AND c.nam
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
                 .AppendLine("GO")
                 .AppendLine()
-                .AppendLine("CREATE VIEW " + QUOTENAME(schemaName) + "." + QUOTENAME(viewName) + " AS");
+                .Append("CREATE VIEW " + QUOTENAME(schemaName) + "." + QUOTENAME(viewName));
+            if (withEncryption)
+                sb.Append(" WITH ENCRYPTION");
+            sb.AppendLine(" AS");
 
             // Add indentation to SELECT statement
             string indentSelect = "    ";
@@ -529,13 +531,10 @@ WHERE s.name = '{config.SchemaName}' AND t.name = '{config.TableName}' AND c.nam
                 sb.AppendLine(indentSelect + lines[i]);
             }
 
-            if (withEncryption)
-                sb.AppendLine("WITH ENCRYPTION");
-
             sb.AppendLine(";")
                 .AppendLine("GO")
                 .AppendLine()
-                .AppendLine("PRINT N'[BprDevKit] View [' + " + QUOTENAME(viewName) + " + N'] created successfully.';")
+                .AppendLine("PRINT N'[BprDevKit] Operation completed successfully.';")
                 .AppendLine("GO");
 
             return sb.ToString();
@@ -547,7 +546,10 @@ WHERE s.name = '{config.SchemaName}' AND t.name = '{config.TableName}' AND c.nam
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
                 .AppendLine("GO")
                 .AppendLine()
-                .AppendLine("ALTER VIEW " + QUOTENAME(schemaName) + "." + QUOTENAME(viewName) + " AS");
+                .Append("ALTER VIEW " + QUOTENAME(schemaName) + "." + QUOTENAME(viewName));
+            if (withEncryption)
+                sb.Append(" WITH ENCRYPTION");
+            sb.AppendLine(" AS");
 
             // Add indentation to SELECT statement
             string indentSelect = "    ";
@@ -557,13 +559,10 @@ WHERE s.name = '{config.SchemaName}' AND t.name = '{config.TableName}' AND c.nam
                 sb.AppendLine(indentSelect + lines[i]);
             }
 
-            if (withEncryption)
-                sb.AppendLine("WITH ENCRYPTION");
-
             sb.AppendLine(";")
                 .AppendLine("GO")
                 .AppendLine()
-                .AppendLine("PRINT N'[BprDevKit] View [' + " + QUOTENAME(viewName) + " + N'] altered successfully.';")
+                .AppendLine("PRINT N'[BprDevKit] Operation completed successfully.';")
                 .AppendLine("GO");
 
             return sb.ToString();
@@ -586,7 +585,7 @@ SELECT
 FROM sys.views v
 INNER JOIN sys.schemas s ON v.schema_id = s.schema_id
 LEFT JOIN sys.sql_modules m ON v.object_id = m.object_id
-WHERE s.name = '{schemaName}' AND v.name = '{viewName}';";
+WHERE s.name = {SQLLiteral(schemaName)} AND v.name = {SQLLiteral(viewName)};";
         }
 
         public string GenerateGetViewsScript(string databaseName)
@@ -607,7 +606,10 @@ WHERE s.name = '{schemaName}' AND v.name = '{viewName}';";
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
                 .AppendLine("GO")
                 .AppendLine()
-                .AppendLine("CREATE PROCEDURE " + QUOTENAME(schemaName) + "." + QUOTENAME(procName) + " AS");
+                .Append("CREATE PROCEDURE " + QUOTENAME(schemaName) + "." + QUOTENAME(procName));
+            if (withEncryption)
+                sb.Append(" WITH ENCRYPTION");
+            sb.AppendLine(" AS");
 
             // Add indentation to body
             string indentBody = "    ";
@@ -617,13 +619,10 @@ WHERE s.name = '{schemaName}' AND v.name = '{viewName}';";
                 sb.AppendLine(indentBody + lines[i]);
             }
 
-            if (withEncryption)
-                sb.AppendLine("WITH ENCRYPTION");
-
             sb.AppendLine(";")
                 .AppendLine("GO")
                 .AppendLine()
-                .AppendLine("PRINT N'[BprDevKit] Stored Procedure [' + " + QUOTENAME(procName) + " + N'] created successfully.';")
+                .AppendLine("PRINT N'[BprDevKit] Operation completed successfully.';")
                 .AppendLine("GO");
 
             return sb.ToString();
@@ -635,7 +634,10 @@ WHERE s.name = '{schemaName}' AND v.name = '{viewName}';";
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
                 .AppendLine("GO")
                 .AppendLine()
-                .AppendLine("ALTER PROCEDURE " + QUOTENAME(schemaName) + "." + QUOTENAME(procName) + " AS");
+                .Append("ALTER PROCEDURE " + QUOTENAME(schemaName) + "." + QUOTENAME(procName));
+            if (withEncryption)
+                sb.Append(" WITH ENCRYPTION");
+            sb.AppendLine(" AS");
 
             // Add indentation to body
             string indentBody = "    ";
@@ -645,13 +647,10 @@ WHERE s.name = '{schemaName}' AND v.name = '{viewName}';";
                 sb.AppendLine(indentBody + lines[i]);
             }
 
-            if (withEncryption)
-                sb.AppendLine("WITH ENCRYPTION");
-
             sb.AppendLine(";")
                 .AppendLine("GO")
                 .AppendLine()
-                .AppendLine("PRINT N'[BprDevKit] Stored Procedure [' + " + QUOTENAME(procName) + " + N'] altered successfully.';")
+                .AppendLine("PRINT N'[BprDevKit] Operation completed successfully.';")
                 .AppendLine("GO");
 
             return sb.ToString();
@@ -674,7 +673,7 @@ SELECT
 FROM sys.procedures p
 INNER JOIN sys.schemas s ON p.schema_id = s.schema_id
 LEFT JOIN sys.sql_modules m ON p.object_id = m.object_id
-WHERE s.name = '{schemaName}' AND p.name = '{procName}';";
+WHERE s.name = {SQLLiteral(schemaName)} AND p.name = {SQLLiteral(procName)};";
         }
 
         public string GenerateGetProceduresScript(string databaseName)
@@ -695,7 +694,10 @@ WHERE s.name = '{schemaName}' AND p.name = '{procName}';";
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
                 .AppendLine("GO")
                 .AppendLine()
-                .AppendLine("CREATE FUNCTION " + QUOTENAME(schemaName) + "." + QUOTENAME(funcName) + " AS");
+                .Append("CREATE FUNCTION " + QUOTENAME(schemaName) + "." + QUOTENAME(funcName));
+            if (withEncryption)
+                sb.Append(" WITH ENCRYPTION");
+            sb.AppendLine(" AS");
 
             // Add indentation to body
             string indentBody = "    ";
@@ -705,13 +707,10 @@ WHERE s.name = '{schemaName}' AND p.name = '{procName}';";
                 sb.AppendLine(indentBody + lines[i]);
             }
 
-            if (withEncryption)
-                sb.AppendLine("WITH ENCRYPTION");
-
             sb.AppendLine(";")
                 .AppendLine("GO")
                 .AppendLine()
-                .AppendLine("PRINT N'[BprDevKit] Function [' + " + QUOTENAME(funcName) + " + N'] created successfully.';")
+                .AppendLine("PRINT N'[BprDevKit] Operation completed successfully.';")
                 .AppendLine("GO");
 
             return sb.ToString();
@@ -723,7 +722,10 @@ WHERE s.name = '{schemaName}' AND p.name = '{procName}';";
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
                 .AppendLine("GO")
                 .AppendLine()
-                .AppendLine("ALTER FUNCTION " + QUOTENAME(schemaName) + "." + QUOTENAME(funcName) + " AS");
+                .Append("ALTER FUNCTION " + QUOTENAME(schemaName) + "." + QUOTENAME(funcName));
+            if (withEncryption)
+                sb.Append(" WITH ENCRYPTION");
+            sb.AppendLine(" AS");
 
             // Add indentation to body
             string indentBody = "    ";
@@ -733,13 +735,10 @@ WHERE s.name = '{schemaName}' AND p.name = '{procName}';";
                 sb.AppendLine(indentBody + lines[i]);
             }
 
-            if (withEncryption)
-                sb.AppendLine("WITH ENCRYPTION");
-
             sb.AppendLine(";")
                 .AppendLine("GO")
                 .AppendLine()
-                .AppendLine("PRINT N'[BprDevKit] Function [' + " + QUOTENAME(funcName) + " + N'] altered successfully.';")
+                .AppendLine("PRINT N'[BprDevKit] Operation completed successfully.';")
                 .AppendLine("GO");
 
             return sb.ToString();
@@ -762,7 +761,7 @@ SELECT
 FROM sys.objects f
 INNER JOIN sys.schemas s ON f.schema_id = s.schema_id
 LEFT JOIN sys.sql_modules m ON f.object_id = m.object_id
-WHERE s.name = '{schemaName}' AND f.name = '{funcName}' AND f.type = 'FN';";
+WHERE s.name = {SQLLiteral(schemaName)} AND f.name = {SQLLiteral(funcName)} AND f.type = 'FN';";
         }
 
         public string GenerateGetFunctionsScript(string databaseName)
@@ -779,12 +778,12 @@ WHERE s.name = '{schemaName}' AND f.name = '{funcName}' AND f.type = 'FN';";
         #region Backup/Restore
         public string GenerateBackupScript(BackupProcedure config)
         {
-            return $"BACKUP DATABASE {QUOTENAME(config.DatabaseName)} TO DISK = N'{config.BackupPath}' WITH FORMAT, INIT, STATS = 10; PRINT N'[BprDevKit] Database [{config.DatabaseName}] backed up successfully to [{config.BackupPath}].';";
+            return $"BACKUP DATABASE {QUOTENAME(config.DatabaseName)} TO DISK = {SQLLiteral(config.BackupPath)} WITH FORMAT, INIT, STATS = 10; PRINT N'[BprDevKit] Database [{config.DatabaseName}] backed up successfully to [{config.BackupPath}].';";
         }
 
         public string GenerateRestoreScript(RestoreProcedure config)
         {
-            return $"RESTORE DATABASE {QUOTENAME(config.DatabaseName)} FROM DISK = N'{config.RestorePath}' WITH REPLACE; PRINT N'[BprDevKit] Database [{config.DatabaseName}] restored successfully from [{config.RestorePath}].';";
+            return $"RESTORE DATABASE {QUOTENAME(config.DatabaseName)} FROM DISK = {SQLLiteral(config.RestorePath)} WITH REPLACE; PRINT N'[BprDevKit] Database [{config.DatabaseName}] restored successfully from [{config.RestorePath}].';";
         }
         #endregion
 
@@ -816,15 +815,15 @@ WHERE s.name = '{schemaName}' AND f.name = '{funcName}' AND f.type = 'FN';";
         #endregion
 
         #region Helper Methods
-         private static void AppendDatabaseSettings(
-            StringBuilder builder,
-            string databaseName,
-            string? recoveryModel,
-            short? compatibilityLevel,
-            bool? isReadOnly,
-            bool? autoShrink,
-            bool? autoClose,
-            string? pageVerify)
+        private static void AppendDatabaseSettings(
+           StringBuilder builder,
+           string databaseName,
+           string? recoveryModel,
+           short? compatibilityLevel,
+           bool? isReadOnly,
+           bool? autoShrink,
+           bool? autoClose,
+           string? pageVerify)
         {
             if (!string.IsNullOrWhiteSpace(recoveryModel))
                 builder.AppendLine($"ALTER DATABASE {QUOTENAME(databaseName)} SET RECOVERY {recoveryModel.ToUpperInvariant()} WITH NO_WAIT;");
@@ -912,12 +911,22 @@ WHERE s.name = '{schemaName}' AND f.name = '{funcName}' AND f.type = 'FN';";
         {
             return new[] { "master", "model", "msdb", "tempdb" }.Contains(databaseName, StringComparer.OrdinalIgnoreCase);
         }
-       private static string QUOTENAME(string name, string quoteChar = "'")
+        private static string QUOTENAME(string? name, string quoteChar = "[")
         {
             if (string.IsNullOrWhiteSpace(name))
-                return name;
-            return quoteChar + name.Replace(quoteChar, quoteChar + quoteChar) + quoteChar;
+                return string.Empty;
+
+            return quoteChar switch
+            {
+                "[" => "[" + name.Replace("]", "]]", StringComparison.Ordinal) + "]",
+                "'" => "'" + name.Replace("'", "''", StringComparison.Ordinal) + "'",
+                "\"" => "\"" + name.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"",
+                _ => quoteChar + name.Replace(quoteChar, quoteChar + quoteChar, StringComparison.Ordinal) + quoteChar
+            };
         }
+
+        private static string SQLLiteral(string value)
+            => "N'" + (value ?? string.Empty).Replace("'", "''", StringComparison.Ordinal) + "'";
         #endregion
     }
 }

@@ -301,11 +301,47 @@
         finally { _isSaving = false; }
     }
 
-    private void OpenEditDatabase(string databaseName)
+    private async Task OpenEditDatabase(string databaseName)
     {
-        _editConfiguration = new DatabaseProcedure.Alter { DatabaseName = databaseName };
-        _readOnlySelection = _autoShrinkSelection = _autoCloseSelection = string.Empty;
-        _showEditDialog = true;
+        if (_databaseManager is null) return;
+
+        _isSaving = true;
+        try
+        {
+            var result = await _databaseManager.GetDatabaseConfiguration(new DatabaseProcedure.Information { DatabaseName = databaseName });
+            if (result.operationResult.Success && result.configuration is not null)
+            {
+                _editConfiguration = result.configuration;
+                _readOnlySelection = _editConfiguration.IsReadOnly switch
+                {
+                    true => "true",
+                    false => "false",
+                    _ => string.Empty
+                };
+                _autoShrinkSelection = _editConfiguration.AutoShrink switch
+                {
+                    true => "true",
+                    false => "false",
+                    _ => string.Empty
+                };
+                _autoCloseSelection = _editConfiguration.AutoClose switch
+                {
+                    true => "true",
+                    false => "false",
+                    _ => string.Empty
+                };
+                _showEditDialog = true;
+            }
+            else
+            {
+                ShowMessage(result.operationResult.Message, "alert-danger", "bi-x-octagon-fill");
+            }
+        }
+        catch (Exception exception)
+        {
+            ShowMessage($"Unable to load database configuration: {exception.Message}", "alert-danger", "bi-x-octagon-fill");
+        }
+        finally { _isSaving = false; }
     }
 
     private async Task SaveDatabaseChanges()

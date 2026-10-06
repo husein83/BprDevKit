@@ -161,14 +161,28 @@ namespace BprDevKit.Config
         public string? Username { get; set; }
         public string? Password { get; set; }
         public int? Port { get; set; }
-        public bool TrustServerCertificate { get; set; } = true;
+        public bool TrustServerCertificate { get; set; } = false;
         public int ConnectionTimeoutSeconds { get; set; } = BprDevKit.Utility.Constants.DatabaseConnectionTimeoutSeconds;
         public int CommandTimeout { get; set; } = BprDevKit.Utility.Constants.DatabaseCommandTimeoutSeconds;
+        private string BuildDataSource()
+        {
+            var server = string.IsNullOrWhiteSpace(ServerName) ? "." : ServerName.Trim();
+            if (!Port.HasValue || Port.Value <= 0)
+                return server;
+
+            // SQL Server named instances use a backslash; only append a TCP port to a host.
+            if (server.Contains('\\', StringComparison.Ordinal))
+                return server;
+
+            return $"{server},{Port.Value}";
+        }
+
         public string BuildConnectionString()
         {
             var builder = new SqlConnectionStringBuilder
             {
-                DataSource = string.IsNullOrWhiteSpace(ServerName) ? "." : ServerName,
+                DataSource = BuildDataSource(),
+                InitialCatalog = string.IsNullOrWhiteSpace(DefaultDatabase) ? "master" : DefaultDatabase,
                 ConnectTimeout = ConnectionTimeoutSeconds,
                 MultipleActiveResultSets = true,
                 TrustServerCertificate = TrustServerCertificate,

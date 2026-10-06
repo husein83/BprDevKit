@@ -332,42 +332,64 @@
 
     private async Task TestView()
     {
-        if (string.IsNullOrEmpty(_newView.Definition))
+        if (string.IsNullOrWhiteSpace(_newView.Database))
         {
-            await OnOperationComplete.InvokeAsync($"View definition cannot be empty");
+            await OnOperationComplete.InvokeAsync("Database must be selected");
             return;
         }
 
-        ShowTestView = true;
-        await Task.Run(async () =>
+        if (string.IsNullOrWhiteSpace(_newView.Definition))
         {
-            await Task.Delay(1000);
-            ViewTestResult = new DataTable();
-            ViewTestResult.Columns.Add("Column1", typeof(string));
-            ViewTestResult.Columns.Add("Column2", typeof(int));
-            ViewTestResult.Rows.Add("TestValue1", 123);
-            ViewTestResult.Rows.Add("TestValue2", 456);
+            await OnOperationComplete.InvokeAsync("View definition cannot be empty");
+            return;
+        }
 
-            StateHasChanged();
-        });
+        var result = await DatabaseManager.TestView(_newView.Database, _newView.Definition);
+        if (!result.operationResult.Success)
+        {
+            await OnOperationComplete.InvokeAsync($"View test failed: {result.operationResult.Message}");
+            return;
+        }
+
+        ViewTestResult = result.viewTestResult;
+        ShowTestView = true;
     }
 
     private async Task SaveView()
     {
-        if (string.IsNullOrEmpty(_newView.Name))
+        if (string.IsNullOrWhiteSpace(_newView.Name))
         {
-            await OnOperationComplete.InvokeAsync($"View name cannot be empty");
+            await OnOperationComplete.InvokeAsync("View name cannot be empty");
             return;
         }
 
-        await OnOperationComplete.InvokeAsync($"View '{_newView.Name}' created successfully");
+        if (string.IsNullOrWhiteSpace(_newView.Schema) || string.IsNullOrWhiteSpace(_newView.Database))
+        {
+            await OnOperationComplete.InvokeAsync("Schema and database must be selected");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_newView.Definition))
+        {
+            await OnOperationComplete.InvokeAsync("View definition cannot be empty");
+            return;
+        }
+
+        var result = await DatabaseManager.CreateView(_newView.Database, _newView.Schema, _newView.Name, _newView.Definition, _newView.WithEncryption);
+        if (!result.Success)
+        {
+            await OnOperationComplete.InvokeAsync($"Error creating view: {result.Message}");
+            return;
+        }
+
+        await OnOperationComplete.InvokeAsync(result.Message);
         CancelCreateView();
         await LoadViews();
     }
 
     private void CreateOrAlterView()
     {
-        SaveView();
+        _ = SaveView();
     }
 
     private void EditView(ViewInfo view)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using BprDevKit.DatabaseManagement.Models;
@@ -97,6 +98,65 @@ namespace BprDevKit.DatabaseManagement.Services
             {
                 return (OperationResult.ErrorResult($"Error retrieving database information: {ex.Message}", ex), null);
             }
+        }
+
+        /// <summary>
+        /// Loads the current database options into an Alter configuration so the edit form can be pre-populated.
+        /// </summary>
+        public async Task<(OperationResult operationResult, DatabaseProcedure.Alter? configuration)> GetDatabaseConfiguration(DatabaseProcedure.Information config)
+        {
+            try
+            {
+                var sql = _sqlGenerator.GenerateGetDatabaseInfoScript(config);
+                var result = await ExecuteQuery(sql);
+
+                if (result.Rows.Count == 0)
+                    return (OperationResult.ErrorResult($"Database '{config.DatabaseName}' was not found."), null);
+
+                var row = result.Rows[0];
+                var alter = new DatabaseProcedure.Alter
+                {
+                    DatabaseName = config.DatabaseName,
+                    Collation = GetNullableString(row, "Collation"),
+                    RecoveryModel = GetNullableString(row, "RecoveryModel"),
+                    CompatibilityLevel = TryConvertToInt16(row["CompatibilityLevel"]),
+                    IsReadOnly = GetNullableBoolean(row, "IsReadOnly"),
+                    AutoShrink = GetNullableBoolean(row, "AutoShrink"),
+                    AutoClose = GetNullableBoolean(row, "AutoClose"),
+                    PageVerify = GetNullableString(row, "PageVerify")
+                };
+
+                return (OperationResult.SuccessResult($"Retrieved configuration for database '{config.DatabaseName}'."), alter);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving database configuration: {ex.Message}", ex), null);
+            }
+        }
+
+        private static string? GetNullableString(DataRow row, string columnName)
+        {
+            var value = row[columnName];
+            return value == null || value ==DBNull.Value ? null : value.ToString();
+        }
+
+        private static bool? GetNullableBoolean(DataRow row, string columnName)
+        {
+            var value = row[columnName];
+            if (value == null || value ==DBNull.Value) return null;
+            return Convert.ToInt32(value) == 1;
+        }
+
+        private static short? TryConvertToInt16(object? value)
+        {
+            if (value == null || value ==DBNull.Value) return null;
+            return value switch
+            {
+                short level => level,
+                byte byteLevel => (short)byteLevel,
+                int intLevel when intLevel >= short.MinValue && intLevel <= short.MaxValue => (short)intLevel,
+                _ => Convert.ToInt16(value)
+            };
         }
         #endregion
 
@@ -518,16 +578,12 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateBackupScript(config)
-                };
-
-                return await ExecuteInTransaction(scripts, "Database backed up successfully", $"Database '{config.DatabaseName}' backed up successfully to '{config.BackupPath}'");
+                var script = _sqlGenerator.GenerateBackupScript(config);
+                return await ExecuteDatabaseCommand(script, $"Database '{config.DatabaseName}' backed up successfully to '{config.BackupPath}'");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error: {ex.Message}");
+                return OperationResult.ErrorResult($"Error: {ex.Message}", ex);
             }
         }
 
@@ -535,16 +591,12 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateRestoreScript(config)
-                };
-
-                return await ExecuteInTransaction(scripts, "Database restored successfully", $"Database '{config.DatabaseName}' restored successfully from '{config.RestorePath}'");
+                var script = _sqlGenerator.GenerateRestoreScript(config);
+                return await ExecuteDatabaseCommand(script, $"Database '{config.DatabaseName}' restored successfully from '{config.RestorePath}'");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error: {ex.Message}");
+                return OperationResult.ErrorResult($"Error: {ex.Message}", ex);
             }
         }
         #endregion
@@ -1173,11 +1225,14 @@ namespace BprDevKit.DatabaseManagement.Services
             using var connection = new SqlConnection(_config.Server.BuildConnectionString());
             await connection.OpenAsync();
 
-            using var command = new SqlCommand(sql, connection)
+            foreach (var batch in SplitSqlBatches(sql))
             {
-                CommandTimeout = _config.Server.CommandTimeout
-            };
-            await command.ExecuteNonQueryAsync();
+                using var command = new SqlCommand(batch, connection)
+                {
+                    CommandTimeout = _config.Server.CommandTimeout
+                };
+                await command.ExecuteNonQueryAsync();
+            }
 
             return OperationResult.SuccessResult(successMessage);
         }
@@ -1192,12 +1247,15 @@ namespace BprDevKit.DatabaseManagement.Services
             {
                 foreach (var script in scripts)
                 {
-                    using var command = new SqlCommand(script, connection, transaction)
+                    foreach (var batch in SplitSqlBatches(script))
                     {
-                        CommandTimeout = _config.Server.CommandTimeout
-                    };
+                        using var command = new SqlCommand(batch, connection, transaction)
+                        {
+                            CommandTimeout = _config.Server.CommandTimeout
+                        };
 
-                    await command.ExecuteNonQueryAsync();
+                        await command.ExecuteNonQueryAsync();
+                    }
                 }
 
                 await transaction.CommitAsync();
@@ -1218,11 +1276,45 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        private static string QUOTENAME(string name, string quoteChar = "'")
+        private static string QUOTENAME(string name, string quoteChar = "[")
         {
             if (string.IsNullOrWhiteSpace(name))
                 return name;
-            return quoteChar + name.Replace(quoteChar, quoteChar + quoteChar) + quoteChar;
+
+            return quoteChar switch
+            {
+                "[" => "[" + name.Replace("]", "]]", StringComparison.Ordinal) + "]",
+                "'" => "'" + name.Replace("'", "''", StringComparison.Ordinal) + "'",
+                "\"" => "\"" + name.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"",
+                _ => quoteChar + name.Replace(quoteChar, quoteChar + quoteChar, StringComparison.Ordinal) + quoteChar
+            };
+        }
+
+        private static IEnumerable<string> SplitSqlBatches(string sql)
+        {
+            if (string.IsNullOrWhiteSpace(sql))
+                yield break;
+
+            var batch = new StringBuilder();
+            using var reader = new StringReader(sql);
+            string? line;
+            while ((line = reader.ReadLine()) is not null)
+            {
+                if (Regex.IsMatch(line, @"^\s*GO\s*;?\s*$", RegexOptions.IgnoreCase))
+                {
+                    var text = batch.ToString().Trim();
+                    if (text.Length > 0)
+                        yield return text;
+                    batch.Clear();
+                    continue;
+                }
+
+                batch.AppendLine(line);
+            }
+
+            var finalBatch = batch.ToString().Trim();
+            if (finalBatch.Length > 0)
+                yield return finalBatch;
         }
 
         private async Task<DataTable> ExecuteQuery(string sql)
