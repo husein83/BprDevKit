@@ -163,6 +163,52 @@ WHERE d.name = {QUOTENAME(config.DatabaseName, "'")};";
         {
             return $"USE {QUOTENAME(databaseName)}; SELECT name FROM sys.schemas WHERE principal_id = 1 ORDER BY name;";
         }
+
+        /// <summary>
+        /// Lists every object that lives under a schema, so the schema can be inspected or safely renamed.
+        /// </summary>
+        public string GenerateGetSchemaObjectsScript(string databaseName, string schemaName)
+        {
+            return $@"USE {QUOTENAME(databaseName)};
+SELECT
+    o.type_desc AS ObjectType,
+    o.name AS ObjectName,
+    CONVERT(varchar(24), o.create_date, 120) AS CreateDate
+FROM sys.objects o
+INNER JOIN sys.schemas s ON o.schema_id = s.schema_id
+WHERE s.name = {SQLLiteral(schemaName)}
+ORDER BY o.type_desc, o.name;";
+        }
+
+        /// <summary>
+        /// Renames a schema by transferring every object to the new name and dropping the old one.
+        /// </summary>
+        public string GenerateRenameSchemaScript(string databaseName, string oldSchemaName, string newSchemaName)
+        {
+            if (string.Equals(oldSchemaName, newSchemaName, StringComparison.Ordinal))
+                throw new InvalidOperationException("[BprDevKit] New schema name must be different from the current name.");
+
+            return $@"USE {QUOTENAME(databaseName)};
+DECLARE @objectName NVARCHAR(520), @sql NVARCHAR(1000);
+DECLARE @transfer CURSOR;
+SET @transfer = CURSOR FOR
+SELECT QUOTENAME(s.name) + '.' + QUOTENAME(o.name)
+FROM sys.objects o
+INNER JOIN sys.schemas s ON o.schema_id = s.schema_id
+WHERE s.name = {SQLLiteral(oldSchemaName)};
+OPEN @transfer;
+FETCH NEXT FROM @transfer INTO @objectName;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    SET @sql = N'ALTER SCHEMA {QUOTENAME(newSchemaName)} TRANSFER ' + @objectName + N';';
+    EXEC sp_executesql @sql;
+    FETCH NEXT FROM @transfer INTO @objectName;
+END
+CLOSE @transfer;
+DEALLOCATE @transfer;
+DROP SCHEMA {QUOTENAME(oldSchemaName)};
+PRINT N'[BprDevKit] Schema [{oldSchemaName}] renamed to [{newSchemaName}].';";
+        }
         #endregion
 
         #region Table Operations
@@ -911,6 +957,7 @@ WHERE s.name = {SQLLiteral(schemaName)} AND f.name = {SQLLiteral(funcName)} AND 
         {
             return new[] { "master", "model", "msdb", "tempdb" }.Contains(databaseName, StringComparer.OrdinalIgnoreCase);
         }
+
         private static string QUOTENAME(string? name, string quoteChar = "[")
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -925,8 +972,7 @@ WHERE s.name = {SQLLiteral(schemaName)} AND f.name = {SQLLiteral(funcName)} AND 
             };
         }
 
-        private static string SQLLiteral(string value)
-            => "N'" + (value ?? string.Empty).Replace("'", "''", StringComparison.Ordinal) + "'";
+        private static string SQLLiteral(string value) => "N'" + (value ?? string.Empty).Replace("'", "''", StringComparison.Ordinal) + "'";
         #endregion
     }
 }

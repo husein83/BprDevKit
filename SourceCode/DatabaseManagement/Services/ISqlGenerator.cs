@@ -23,6 +23,8 @@ namespace BprDevKit.DatabaseManagement.Services
         string GenerateCreateSchemaScript(string databaseName, string schemaName);
         string GenerateDropSchemaScript(string databaseName, string schemaName);
         string GenerateGetSchemasScript(string databaseName);
+        string GenerateGetSchemaObjectsScript(string databaseName, string schemaName);
+        string GenerateRenameSchemaScript(string databaseName, string oldSchemaName, string newSchemaName);
         #endregion
 
         #region Table Operations

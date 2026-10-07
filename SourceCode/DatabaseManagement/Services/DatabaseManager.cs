@@ -137,19 +137,19 @@ namespace BprDevKit.DatabaseManagement.Services
         private static string? GetNullableString(DataRow row, string columnName)
         {
             var value = row[columnName];
-            return value == null || value ==DBNull.Value ? null : value.ToString();
+            return value == null || value == DBNull.Value ? null : value.ToString();
         }
 
         private static bool? GetNullableBoolean(DataRow row, string columnName)
         {
             var value = row[columnName];
-            if (value == null || value ==DBNull.Value) return null;
+            if (value == null || value == DBNull.Value) return null;
             return Convert.ToInt32(value) == 1;
         }
 
         private static short? TryConvertToInt16(object? value)
         {
-            if (value == null || value ==DBNull.Value) return null;
+            if (value == null || value == DBNull.Value) return null;
             return value switch
             {
                 short level => level,
@@ -203,7 +203,77 @@ namespace BprDevKit.DatabaseManagement.Services
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error dropping schema: {ex.Message}");
+                return OperationResult.ErrorResult($"Error dropping schema: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Renames a schema by transferring every object to the new name and dropping the old one.
+        /// </summary>
+        public async Task<OperationResult> RenameSchema(string databaseName, string oldSchemaName, string newSchemaName)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(databaseName))
+                    return OperationResult.ErrorResult("Database name cannot be empty");
+
+                if (string.IsNullOrWhiteSpace(oldSchemaName))
+                    return OperationResult.ErrorResult("Current schema name cannot be empty");
+
+                if (string.IsNullOrWhiteSpace(newSchemaName))
+                    return OperationResult.ErrorResult("New schema name cannot be empty");
+
+                if (string.Equals(oldSchemaName, newSchemaName, StringComparison.Ordinal))
+                    return OperationResult.ErrorResult("[BprDevKit] New schema name must be different from the current name.");
+
+                if (newSchemaName.Length > 128)
+                    return OperationResult.ErrorResult("[BprDevKit] Schema name cannot exceed 128 characters.");
+
+                var scripts = new List<string>
+                {
+                    _sqlGenerator.GenerateRenameSchemaScript(databaseName, oldSchemaName, newSchemaName)
+                };
+
+                return await ExecuteInTransaction(scripts, "Schema renamed successfully", $"Schema '{oldSchemaName}' renamed to '{newSchemaName}' in database '{databaseName}'");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error renaming schema: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Lists every object that lives under a schema so it can be inspected before rename/drop.
+        /// </summary>
+        public async Task<(OperationResult operationResult, List<SchemaInfo> objects)> GetSchemaInfos(string databaseName, string schemaName)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(databaseName))
+                    return (OperationResult.ErrorResult("Database name cannot be empty"), new List<SchemaInfo>());
+
+                if (string.IsNullOrWhiteSpace(schemaName))
+                    return (OperationResult.ErrorResult("Schema name cannot be empty"), new List<SchemaInfo>());
+
+                var sql = _sqlGenerator.GenerateGetSchemaObjectsScript(databaseName, schemaName);
+                var result = await ExecuteQuery(sql);
+
+                var objects = new List<SchemaInfo>();
+                foreach (DataRow row in result.Rows)
+                {
+                    objects.Add(new SchemaInfo
+                    {
+                        SchemaType = row["ObjectType"]?.ToString() ?? string.Empty,
+                        SchemaName = row["ObjectName"]?.ToString() ?? string.Empty,
+                        CreateDate = row["CreateDate"] is DateTime created ? created : DateTime.MinValue
+                    });
+                }
+
+                return (OperationResult.SuccessResult($"Retrieved {objects.Count} object(s) for schema '{schemaName}'."), objects);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving schema objects: {ex.Message}", ex), new List<SchemaInfo>());
             }
         }
 
@@ -1236,6 +1306,7 @@ namespace BprDevKit.DatabaseManagement.Services
 
             return OperationResult.SuccessResult(successMessage);
         }
+
         private async Task<OperationResult> ExecuteInTransaction(List<string> scripts, string successMessage, string customMessage)
         {
             var connectionString = _config.Server.BuildConnectionString();
@@ -1274,20 +1345,6 @@ namespace BprDevKit.DatabaseManagement.Services
                 }
                 return OperationResult.ErrorResult($"Transaction failed and was rolled back: {ex.Message}", ex);
             }
-        }
-
-        private static string QUOTENAME(string name, string quoteChar = "[")
-        {
-            if (string.IsNullOrWhiteSpace(name))
-                return name;
-
-            return quoteChar switch
-            {
-                "[" => "[" + name.Replace("]", "]]", StringComparison.Ordinal) + "]",
-                "'" => "'" + name.Replace("'", "''", StringComparison.Ordinal) + "'",
-                "\"" => "\"" + name.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"",
-                _ => quoteChar + name.Replace(quoteChar, quoteChar + quoteChar, StringComparison.Ordinal) + quoteChar
-            };
         }
 
         private static IEnumerable<string> SplitSqlBatches(string sql)
