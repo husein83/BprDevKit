@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace BprDevKit.DatabaseManagement.Models
+namespace BprDevKit.DatabaseManagement.Models.Operations
 {
-    public class FunctionProcedure
+    public class FunctionOperation
     {
         public class Create
         {

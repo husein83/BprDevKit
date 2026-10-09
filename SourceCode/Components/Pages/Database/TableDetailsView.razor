@@ -1,0 +1,153 @@
+@using System.Globalization
+@using BprDevKit.DatabaseManagement.Models.Metadata
+
+<dl class="row small mb-3">
+    <dt class="col-sm-3 text-muted fw-normal">Created</dt>
+    <dd class="col-sm-9">@FormatDate(Table.CreateDate)</dd>
+    <dt class="col-sm-3 text-muted fw-normal">Last modified</dt>
+    <dd class="col-sm-9">@FormatDate(Table.ModifyDate)</dd>
+    <dt class="col-sm-3 text-muted fw-normal">File group</dt>
+    <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Table.FileGroup) ? "—" : Table.FileGroup)</dd>
+    <dt class="col-sm-3 text-muted fw-normal">Description</dt>
+    <dd class="col-sm-9 mb-0">@(string.IsNullOrWhiteSpace(Table.Description) ? "—" : Table.Description)</dd>
+</dl>
+
+<h3 class="h6 mt-4"><i class="bi bi-columns-gap me-1 text-primary"></i>Columns (@Table.Columns.Count)</h3>
+<div class="table-responsive mb-4">
+    <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+            <tr><th>#</th><th>Name</th><th>Type</th><th class="text-center">Null</th><th>Extras</th><th>Default / formula</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var column in Table.Columns)
+            {
+                <tr>
+                    <td class="text-muted small">@column.OrdinalPosition</td>
+                    <td class="font-monospace">
+                        @if (column.IsPrimaryKey)
+                        {
+                            <i class="bi bi-key-fill text-warning me-1" title="Primary key"></i>
+                        }
+                        @column.ColumnName
+                    </td>
+                    <td class="font-monospace small">@FormatType(column)</td>
+                    <td class="text-center">@(column.IsNullable ? "Yes" : "No")</td>
+                    <td>
+                        @if (column.IsIdentity)
+                        {
+                            <span class="badge text-bg-info">Identity(@column.IdentitySeed,@column.IdentityIncrement)</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(column.ComputedFormula))
+                        {
+                            <span class="badge text-bg-secondary">Computed@(column.IsPersisted ? " · persisted" : string.Empty)</span>
+                        }
+                    </td>
+                    <td class="font-monospace small">@(column.ComputedFormula ?? column.DefaultValue ?? "—")</td>
+                    <td class="small text-muted">@(column.Description ?? "—")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<h3 class="h6"><i class="bi bi-lightning-charge me-1 text-primary"></i>Indexes (@Table.Indexes.Count)</h3>
+@if (Table.Indexes.Count == 0)
+{
+    <p class="text-muted small mb-4">This table has no indexes (it is a heap).</p>
+}
+else
+{
+    <div class="table-responsive mb-4">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Name</th><th>Type</th><th>Key columns</th><th>Included</th><th>Filter</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var index in Table.Indexes)
+                {
+                    <tr>
+                        <td class="font-monospace">
+                            @index.IndexName
+                            @if (index.IsPrimaryKey)
+                            {
+                                <span class="badge text-bg-warning ms-1">PK</span>
+                            }
+                            else if (index.IsUnique)
+                            {
+                                <span class="badge text-bg-secondary ms-1">Unique</span>
+                            }
+                        </td>
+                        <td class="small">@index.IndexType</td>
+                        <td class="font-monospace small">@(string.IsNullOrWhiteSpace(index.Columns) ? "—" : index.Columns)</td>
+                        <td class="font-monospace small">@(index.IncludeColumns ?? "—")</td>
+                        <td class="font-monospace small">@(index.FilterPredicate ?? "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<h3 class="h6"><i class="bi bi-link-45deg me-1 text-primary"></i>Foreign keys</h3>
+@if (Table.ForeignKeys.Count == 0)
+{
+    <p class="text-muted small mb-0">No foreign keys reference this table or start from it.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Name</th><th>Direction</th><th>Relation</th><th>On delete</th><th>On update</th><th class="text-center">Enabled</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var foreignKey in Table.ForeignKeys)
+                {
+                    <tr>
+                        <td class="font-monospace small">@foreignKey.FKName</td>
+                        <td>
+                            @if (IsOutgoing(foreignKey))
+                            {
+                                <span class="badge text-bg-primary">Outgoing</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Incoming</span>
+                            }
+                        </td>
+                        <td class="font-monospace small">
+                            @($"{foreignKey.SchemaName}.{foreignKey.TableName}") (@foreignKey.ColumnName)
+                            <i class="bi bi-arrow-right mx-1"></i>
+                            @($"{foreignKey.RefSchemaName}.{foreignKey.RefTableName}") (@foreignKey.RefColumnName)
+                        </td>
+                        <td class="small">@foreignKey.OnDelete</td>
+                        <td class="small">@foreignKey.OnUpdate</td>
+                        <td class="text-center">@(foreignKey.Enabled ? "Yes" : "No")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public TableInfo Table { get; set; } = null!;
+
+    private bool IsOutgoing(ForeignKeyInfo foreignKey) =>
+        string.Equals(foreignKey.SchemaName, Table.SchemaName, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(foreignKey.TableName, Table.TableName, StringComparison.OrdinalIgnoreCase);
+
+    private static string FormatDate(DateTime value) => value.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+
+    private static string FormatType(ColumnInfo column)
+    {
+        var type = ColumnDataType.Find(column.DataType);
+        return type?.Kind switch
+        {
+            ColumnDataTypeKind.Length => $"{column.DataType}({(column.Length == -1 ? "MAX" : column.Length?.ToString(CultureInfo.InvariantCulture))})",
+            ColumnDataTypeKind.PrecisionScale => $"{column.DataType}({column.Precision},{column.Scale})",
+            ColumnDataTypeKind.FractionalSeconds => $"{column.DataType}({column.Scale})",
+            _ => column.DataType
+        };
+    }
+}

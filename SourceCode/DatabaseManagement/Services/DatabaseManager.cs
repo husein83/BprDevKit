@@ -1,12 +1,12 @@
 using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
-using BprDevKit.DatabaseManagement.Models;
-using BprDevKit.DatabaseManagement.Services;
+using BprDevKit.DatabaseManagement.Models.Metadata;
+using BprDevKit.DatabaseManagement.Models.Operations;
 using BprDevKit.Utility;
 using BprDevKit.Config;
 
@@ -27,7 +27,7 @@ namespace BprDevKit.DatabaseManagement.Services
         }
 
         #region Database Operations
-        public async Task<OperationResult> CreateDatabase(DatabaseProcedure.Create config)
+        public async Task<OperationResult> CreateDatabase(DatabaseOperation.Create config)
         {
             try
             {
@@ -43,7 +43,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<OperationResult> AlterDatabase(DatabaseProcedure.Alter config)
+        public async Task<OperationResult> AlterDatabase(DatabaseOperation.Alter config)
         {
             try
             {
@@ -62,7 +62,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<OperationResult> DropDatabase(DatabaseProcedure.Drop config)
+        public async Task<OperationResult> DropDatabase(DatabaseOperation.Drop config)
         {
             try
             {
@@ -82,7 +82,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<(OperationResult operationResult, DataTable? information)> GetDatabaseInformation(DatabaseProcedure.Information config)
+        public async Task<(OperationResult operationResult, DataTable? information)> GetDatabaseInformation(DatabaseOperation.Information config)
         {
             try
             {
@@ -103,7 +103,7 @@ namespace BprDevKit.DatabaseManagement.Services
         /// <summary>
         /// Loads the current database options into an Alter configuration so the edit form can be pre-populated.
         /// </summary>
-        public async Task<(OperationResult operationResult, DatabaseProcedure.Alter? configuration)> GetDatabaseConfiguration(DatabaseProcedure.Information config)
+        public async Task<(OperationResult operationResult, DatabaseOperation.Alter? configuration)> GetDatabaseConfiguration(DatabaseOperation.Information config)
         {
             try
             {
@@ -114,7 +114,7 @@ namespace BprDevKit.DatabaseManagement.Services
                     return (OperationResult.ErrorResult($"Database '{config.DatabaseName}' was not found."), null);
 
                 var row = result.Rows[0];
-                var alter = new DatabaseProcedure.Alter
+                var alter = new DatabaseOperation.Alter
                 {
                     DatabaseName = config.DatabaseName,
                     Collation = GetNullableString(row, "Collation"),
@@ -161,45 +161,62 @@ namespace BprDevKit.DatabaseManagement.Services
         #endregion
 
         #region Schema Operations
-        public async Task<OperationResult> CreateSchema(string databaseName, string schemaName)
+        public async Task<OperationResult> CreateSchema(SchemaOperation.Create config)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(databaseName))
-                    return OperationResult.ErrorResult("Database name cannot be empty");
+                var script = _sqlGenerator.GenerateCreateSchemaScript(config);
 
-                if (string.IsNullOrWhiteSpace(schemaName))
-                    return OperationResult.ErrorResult("Schema name cannot be empty");
+                if (await SchemaExistsAsync(config.DatabaseName, config.SchemaName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Schema [{config.SchemaName}] already exists in database [{config.DatabaseName}].");
 
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateCreateSchemaScript(databaseName, schemaName)
-                };
-
-                return await ExecuteInTransaction(scripts, "Schema created successfully", $"Schema '{schemaName}' created successfully in database '{databaseName}'");
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Schema created successfully",
+                    $"Schema '{config.SchemaName}' created successfully in database '{config.DatabaseName}'.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error creating schema: {ex.Message}");
+                return OperationResult.ErrorResult($"Error creating schema: {ex.Message}", ex);
             }
         }
 
-        public async Task<OperationResult> DropSchema(string databaseName, string schemaName)
+        public async Task<OperationResult> AlterSchema(SchemaOperation.Alter config)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(databaseName))
-                    return OperationResult.ErrorResult("Database name cannot be empty");
+                var script = _sqlGenerator.GenerateAlterSchemaScript(config);
 
-                if (string.IsNullOrWhiteSpace(schemaName))
-                    return OperationResult.ErrorResult("Schema name cannot be empty");
+                if (!await SchemaExistsAsync(config.DatabaseName, config.SchemaName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Schema [{config.SchemaName}] does not exist in database [{config.DatabaseName}].");
 
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateDropSchemaScript(databaseName, schemaName)
-                };
+                if (config.IsRename && await SchemaExistsAsync(config.DatabaseName, config.NewSchemaName!))
+                    return OperationResult.ErrorResult($"[BprDevKit] Schema [{config.NewSchemaName}] already exists in database [{config.DatabaseName}].");
 
-                return await ExecuteInTransaction(scripts, "Schema dropped successfully", $"Schema '{schemaName}' dropped successfully in database '{databaseName}'");
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Schema updated successfully",
+                    DescribeSchemaChange(config));
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error updating schema: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<OperationResult> DropSchema(SchemaOperation.Drop config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateDropSchemaScript(config);
+
+                if (!await SchemaExistsAsync(config.DatabaseName, config.SchemaName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Schema [{config.SchemaName}] does not exist in database [{config.DatabaseName}].");
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Schema dropped successfully",
+                    $"Schema '{config.SchemaName}' dropped successfully from database '{config.DatabaseName}'.");
             }
             catch (Exception ex)
             {
@@ -207,165 +224,233 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        /// <summary>
-        /// Renames a schema by transferring every object to the new name and dropping the old one.
-        /// </summary>
-        public async Task<OperationResult> RenameSchema(string databaseName, string oldSchemaName, string newSchemaName)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(databaseName))
-                    return OperationResult.ErrorResult("Database name cannot be empty");
-
-                if (string.IsNullOrWhiteSpace(oldSchemaName))
-                    return OperationResult.ErrorResult("Current schema name cannot be empty");
-
-                if (string.IsNullOrWhiteSpace(newSchemaName))
-                    return OperationResult.ErrorResult("New schema name cannot be empty");
-
-                if (string.Equals(oldSchemaName, newSchemaName, StringComparison.Ordinal))
-                    return OperationResult.ErrorResult("[BprDevKit] New schema name must be different from the current name.");
-
-                if (newSchemaName.Length > 128)
-                    return OperationResult.ErrorResult("[BprDevKit] Schema name cannot exceed 128 characters.");
-
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateRenameSchemaScript(databaseName, oldSchemaName, newSchemaName)
-                };
-
-                return await ExecuteInTransaction(scripts, "Schema renamed successfully", $"Schema '{oldSchemaName}' renamed to '{newSchemaName}' in database '{databaseName}'");
-            }
-            catch (Exception ex)
-            {
-                return OperationResult.ErrorResult($"Error renaming schema: {ex.Message}", ex);
-            }
-        }
-
-        /// <summary>
-        /// Lists every object that lives under a schema so it can be inspected before rename/drop.
-        /// </summary>
-        public async Task<(OperationResult operationResult, List<SchemaInfo> objects)> GetSchemaInfos(string databaseName, string schemaName)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(databaseName))
-                    return (OperationResult.ErrorResult("Database name cannot be empty"), new List<SchemaInfo>());
-
-                if (string.IsNullOrWhiteSpace(schemaName))
-                    return (OperationResult.ErrorResult("Schema name cannot be empty"), new List<SchemaInfo>());
-
-                var sql = _sqlGenerator.GenerateGetSchemaObjectsScript(databaseName, schemaName);
-                var result = await ExecuteQuery(sql);
-
-                var objects = new List<SchemaInfo>();
-                foreach (DataRow row in result.Rows)
-                {
-                    objects.Add(new SchemaInfo
-                    {
-                        SchemaType = row["ObjectType"]?.ToString() ?? string.Empty,
-                        SchemaName = row["ObjectName"]?.ToString() ?? string.Empty,
-                        CreateDate = row["CreateDate"] is DateTime created ? created : DateTime.MinValue
-                    });
-                }
-
-                return (OperationResult.SuccessResult($"Retrieved {objects.Count} object(s) for schema '{schemaName}'."), objects);
-            }
-            catch (Exception ex)
-            {
-                return (OperationResult.ErrorResult($"Error retrieving schema objects: {ex.Message}", ex), new List<SchemaInfo>());
-            }
-        }
-
         public async Task<(OperationResult operationResult, List<string> schemas)> GetSchemas(string databaseName)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(databaseName))
-                    return (OperationResult.ErrorResult("Database name cannot be empty"), new List<string>());
-
                 var sql = _sqlGenerator.GenerateGetSchemasScript(databaseName);
                 var results = await ExecuteListQuery(sql);
-
-                if (results == null)
-                    return (OperationResult.ErrorResult("No schemas found"), new List<string>());
 
                 return (OperationResult.SuccessResult($"Retrieved {results.Count} schema(s)"), results);
             }
             catch (Exception ex)
             {
-                return (OperationResult.ErrorResult($"Error retrieving schemas: {ex.Message}"), new List<string>());
+                return (OperationResult.ErrorResult($"Error retrieving schemas: {ex.Message}", ex), new List<string>());
+            }
+        }
+
+        public async Task<(OperationResult operationResult, List<SchemaSummary> schemas)> GetSchemaSummaries(string databaseName)
+        {
+            try
+            {
+                var sql = _sqlGenerator.GenerateGetSchemaSummariesScript(databaseName);
+                var table = await ExecuteQuery(sql);
+
+                var schemas = table.Rows.Cast<DataRow>()
+                    .Select(row => new SchemaSummary
+                    {
+                        SchemaName = Convert.ToString(row["SchemaName"]) ?? string.Empty,
+                        OwnerName = Convert.ToString(row["OwnerName"]) ?? string.Empty,
+                        ObjectCount = Convert.ToInt32(row["ObjectCount"])
+                    })
+                    .ToList();
+
+                return (OperationResult.SuccessResult($"Retrieved {schemas.Count} schema(s)"), schemas);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving schemas: {ex.Message}", ex), new List<SchemaSummary>());
+            }
+        }
+
+        /// <summary>
+        /// Lists every object that lives under a schema so it can be inspected before it is renamed or dropped.
+        /// </summary>
+        public async Task<(OperationResult operationResult, List<SchemaObjectInfo> objects)> GetSchemaObjects(SchemaOperation.Information config)
+        {
+            try
+            {
+                var sql = _sqlGenerator.GenerateGetSchemaObjectsScript(config);
+                var table = await ExecuteQuery(sql);
+
+                var objects = table.Rows.Cast<DataRow>()
+                    .Select(row => new SchemaObjectInfo
+                    {
+                        ObjectType = Convert.ToString(row["ObjectType"]) ?? string.Empty,
+                        ObjectName = Convert.ToString(row["ObjectName"]) ?? string.Empty,
+                        CreateDate = row["CreateDate"] is DateTime createDate ? createDate : null
+                    })
+                    .ToList();
+
+                return (OperationResult.SuccessResult($"Retrieved {objects.Count} object(s) for schema '{config.SchemaName}'."), objects);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving schema objects: {ex.Message}", ex), new List<SchemaObjectInfo>());
+            }
+        }
+
+        public async Task<(OperationResult operationResult, List<string> owners)> GetSchemaOwners(string databaseName)
+        {
+            try
+            {
+                var sql = _sqlGenerator.GenerateGetSchemaOwnersScript(databaseName);
+                var results = await ExecuteListQuery(sql);
+
+                return (OperationResult.SuccessResult($"Retrieved {results.Count} owner(s)"), results);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving schema owners: {ex.Message}", ex), new List<string>());
             }
         }
         #endregion
 
         #region Table Operations
-        public async Task<OperationResult> CreateTable(TableProcedure.Create config)
+        public async Task<OperationResult> CreateTable(TableOperation.Create config)
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateCreateTableScript(config)
-                };
+                var script = _sqlGenerator.GenerateCreateTableScript(config);
 
-                return await ExecuteInTransaction(scripts, "Table created successfully", $"Table '{config.SchemaName}.{config.TableName}' created successfully");
+                if (await TableExistsAsync(config.DatabaseName, config.SchemaName, config.TableName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Table [{config.SchemaName}].[{config.TableName}] already exists in database [{config.DatabaseName}].");
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Table created successfully",
+                    $"Table '{config.SchemaName}.{config.TableName}' created successfully in database '{config.DatabaseName}'.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error creating table: {ex.Message}");
+                return OperationResult.ErrorResult($"Error creating table: {ex.Message}", ex);
             }
         }
 
-        public async Task<OperationResult> AlterTable(TableProcedure.Alter config)
+        public async Task<OperationResult> AlterTable(TableOperation.Alter config)
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateAlterTableScript(config)
-                };
+                var script = _sqlGenerator.GenerateAlterTableScript(config);
 
-                return await ExecuteInTransaction(scripts, "Table altered successfully", $"Table '{config.SchemaName}.{config.TableName}' altered successfully");
+                if (!await TableExistsAsync(config.DatabaseName, config.SchemaName, config.TableName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Table [{config.SchemaName}].[{config.TableName}] does not exist in database [{config.DatabaseName}].");
+
+                if (config.IsRename && await TableExistsAsync(config.DatabaseName, config.SchemaName, config.NewTableName!))
+                    return OperationResult.ErrorResult($"[BprDevKit] Table [{config.SchemaName}].[{config.NewTableName}] already exists in database [{config.DatabaseName}].");
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Table updated successfully",
+                    $"Table '{config.SchemaName}.{config.TableName}' updated successfully in database '{config.DatabaseName}'.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error altering table: {ex.Message}");
+                return OperationResult.ErrorResult($"Error altering table: {ex.Message}", ex);
             }
         }
 
-        public async Task<OperationResult> DropTable(TableProcedure.Drop config)
+        public async Task<OperationResult> DropTable(TableOperation.Drop config)
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateDropTableScript(config)
-                };
+                var script = _sqlGenerator.GenerateDropTableScript(config);
 
-                return await ExecuteInTransaction(scripts, "Table dropped successfully", $"Table '{config.SchemaName}.{config.TableName}' dropped successfully");
+                if (!await TableExistsAsync(config.DatabaseName, config.SchemaName, config.TableName))
+                {
+                    return config.IgnoreIfNotExists
+                        ? OperationResult.SuccessResult($"Table '{config.SchemaName}.{config.TableName}' does not exist; nothing to drop.")
+                        : OperationResult.ErrorResult($"[BprDevKit] Table [{config.SchemaName}].[{config.TableName}] does not exist in database [{config.DatabaseName}].");
+                }
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Table dropped successfully",
+                    $"Table '{config.SchemaName}.{config.TableName}' dropped successfully from database '{config.DatabaseName}'.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error dropping table: {ex.Message}");
+                return OperationResult.ErrorResult($"Error dropping table: {ex.Message}", ex);
             }
         }
 
-        public async Task<(OperationResult operationResult, DataTable? information)> GetTableInformation(TableProcedure.Information config)
+        /// <summary>
+        /// Loads one table completely: header data, columns, indexes and the foreign keys it owns or is referenced by.
+        /// </summary>
+        public async Task<(OperationResult operationResult, TableInfo? table)> GetTableDetails(TableOperation.Information config)
         {
             try
             {
-                var sql = _sqlGenerator.GenerateGetTableInfoScript(config);
-                var results = await ExecuteQuery(sql);
+                var header = await ExecuteQuery(_sqlGenerator.GenerateGetTableInfoScript(config));
+                if (header.Rows.Count == 0)
+                    return (OperationResult.ErrorResult($"[BprDevKit] Table [{config.SchemaName}].[{config.TableName}] does not exist in database [{config.DatabaseName}]."), null);
 
-                if (results == null)
-                    return (OperationResult.ErrorResult("No table information found"), null);
+                var headerRow = header.Rows[0];
+                var table = new TableInfo
+                {
+                    DatabaseName = config.DatabaseName,
+                    SchemaName = config.SchemaName,
+                    TableName = config.TableName,
+                    FileGroup = GetNullableString(headerRow, "FileGroup") ?? string.Empty,
+                    Description = GetNullableString(headerRow, "Description"),
+                    CreateDate = Convert.ToDateTime(headerRow["CreateDate"]),
+                    ModifyDate = Convert.ToDateTime(headerRow["ModifyDate"])
+                };
 
-                return (OperationResult.SuccessResult($"Retrieved information for table '{config.SchemaName}.{config.TableName}'"), results);
+                var columns = await ExecuteQuery(_sqlGenerator.GenerateGetTableColumnsScript(config));
+                table.Columns = columns.Rows.Cast<DataRow>().Select(MapColumn).ToList();
+
+                var indexes = await ExecuteQuery(_sqlGenerator.GenerateGetTableIndexesScript(config));
+                table.Indexes = indexes.Rows.Cast<DataRow>().Select(MapIndex).ToList();
+
+                var foreignKeys = await ExecuteQuery(_sqlGenerator.GenerateGetTableForeignKeysScript(config));
+                table.ForeignKeys = foreignKeys.Rows.Cast<DataRow>().Select(MapForeignKey).ToList();
+
+                return (OperationResult.SuccessResult($"Retrieved information for table '{config.SchemaName}.{config.TableName}'."), table);
             }
             catch (Exception ex)
             {
-                return (OperationResult.ErrorResult($"Error retrieving table information: {ex.Message}"), null);
+                return (OperationResult.ErrorResult($"Error retrieving table information: {ex.Message}", ex), null);
+            }
+        }
+
+        public async Task<(OperationResult operationResult, List<TableSummary> tables)> GetTableSummaries(string databaseName)
+        {
+            try
+            {
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTableSummariesScript(databaseName));
+
+                var tables = table.Rows.Cast<DataRow>()
+                    .Select(row => new TableSummary
+                    {
+                        SchemaName = Convert.ToString(row["SchemaName"]) ?? string.Empty,
+                        TableName = Convert.ToString(row["TableName"]) ?? string.Empty,
+                        RowCount = Convert.ToInt64(row["RowCount"]),
+                        ColumnCount = Convert.ToInt32(row["ColumnCount"]),
+                        CreateDate = Convert.ToDateTime(row["CreateDate"]),
+                        ModifyDate = Convert.ToDateTime(row["ModifyDate"]),
+                        Description = GetNullableString(row, "Description")
+                    })
+                    .ToList();
+
+                return (OperationResult.SuccessResult($"Retrieved {tables.Count} table(s)"), tables);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving tables: {ex.Message}", ex), new List<TableSummary>());
+            }
+        }
+
+        public async Task<(OperationResult operationResult, List<string> fileGroups)> GetFileGroups(string databaseName)
+        {
+            try
+            {
+                var results = await ExecuteListQuery(_sqlGenerator.GenerateGetFileGroupsScript(databaseName));
+                return (OperationResult.SuccessResult($"Retrieved {results.Count} file group(s)"), results);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving file groups: {ex.Message}", ex), new List<string>());
             }
         }
 
@@ -382,14 +467,11 @@ namespace BprDevKit.DatabaseManagement.Services
                 var sql = _sqlGenerator.GenerateGetTablesScript(databaseName, schemaName);
                 var results = await ExecuteListQuery(sql);
 
-                if (results == null)
-                    return (OperationResult.ErrorResult("No tables found"), new List<string>());
-
                 return (OperationResult.SuccessResult($"Retrieved {results.Count} table(s)"), results);
             }
             catch (Exception ex)
             {
-                return (OperationResult.ErrorResult($"Error retrieving tables: {ex.Message}"), new List<string>());
+                return (OperationResult.ErrorResult($"Error retrieving tables: {ex.Message}", ex), new List<string>());
             }
         }
 
@@ -406,13 +488,13 @@ namespace BprDevKit.DatabaseManagement.Services
                 if (string.IsNullOrWhiteSpace(tableName))
                     return (OperationResult.ErrorResult("Table name cannot be empty"), new List<string>());
 
-                var sql = _sqlGenerator.GenerateGetColumnsScript(databaseName, schemaName, tableName);
-                var results = await ExecuteListQuery(sql);
+                //var sql = _sqlGenerator.GenerateGetColumnsScript(databaseName, schemaName, tableName);
+                //var results = await ExecuteListQuery(sql);
 
-                if (results == null)
-                    return (OperationResult.ErrorResult("No columns found"), new List<string>());
+                //if (results == null)
+                return (OperationResult.ErrorResult("No columns found"), new List<string>());
 
-                return (OperationResult.SuccessResult($"Retrieved {results.Count} column(s)"), results);
+                //return (OperationResult.SuccessResult($"Retrieved {results.Count} column(s)"), results);
             }
             catch (Exception ex)
             {
@@ -422,7 +504,7 @@ namespace BprDevKit.DatabaseManagement.Services
         #endregion
 
         #region Column Operations
-        public async Task<OperationResult> CreateColumn(ColumnProcedure.Create config)
+        public async Task<OperationResult> CreateColumn(ColumnOperation.Create config)
         {
             try
             {
@@ -439,7 +521,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<OperationResult> AlterColumn(ColumnProcedure.Alter config)
+        public async Task<OperationResult> AlterColumn(ColumnOperation.Alter config)
         {
             try
             {
@@ -456,7 +538,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<OperationResult> DropColumn(ColumnProcedure.Drop config)
+        public async Task<OperationResult> DropColumn(ColumnOperation.Drop config)
         {
             try
             {
@@ -473,7 +555,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<(OperationResult operationResult, DataTable? information)> GetColumnInformation(ColumnProcedure.Information config)
+        public async Task<(OperationResult operationResult, DataTable? information)> GetColumnInformation(ColumnOperation.Information config)
         {
             try
             {
@@ -493,7 +575,7 @@ namespace BprDevKit.DatabaseManagement.Services
         #endregion
 
         #region Index Operations
-        public async Task<OperationResult> CreateIndex(IndexProcedure.Create config)
+        public async Task<OperationResult> CreateIndex(IndexOperation.Create config)
         {
             try
             {
@@ -510,7 +592,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<OperationResult> AlterIndex(IndexProcedure.Alter config)
+        public async Task<OperationResult> AlterIndex(IndexOperation.Alter config)
         {
             try
             {
@@ -527,7 +609,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<OperationResult> DropIndex(IndexProcedure.Drop config)
+        public async Task<OperationResult> DropIndex(IndexOperation.Drop config)
         {
             try
             {
@@ -573,7 +655,7 @@ namespace BprDevKit.DatabaseManagement.Services
         #endregion
 
         #region Foreign Key Operations
-        public async Task<OperationResult> CreateForeignKey(ForeignKeyProcedure.Create config)
+        public async Task<OperationResult> CreateForeignKey(ForeignKeyOperation.Create config)
         {
             try
             {
@@ -590,7 +672,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<OperationResult> AlterForeignKey(ForeignKeyProcedure.Alter config)
+        public async Task<OperationResult> AlterForeignKey(ForeignKeyOperation.Alter config)
         {
             try
             {
@@ -607,7 +689,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<OperationResult> DropForeignKey(ForeignKeyProcedure.Drop config)
+        public async Task<OperationResult> DropForeignKey(ForeignKeyOperation.Drop config)
         {
             try
             {
@@ -624,7 +706,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<(OperationResult operationResult, DataTable? information)> GetForeignKeyInformation(ForeignKeyProcedure.Information config)
+        public async Task<(OperationResult operationResult, DataTable? information)> GetForeignKeyInformation(ForeignKeyOperation.Information config)
         {
             try
             {
@@ -644,7 +726,7 @@ namespace BprDevKit.DatabaseManagement.Services
         #endregion
 
         #region Backup/Restore
-        public async Task<OperationResult> BackupDatabase(BackupProcedure config)
+        public async Task<OperationResult> BackupDatabase(BackupOperation config)
         {
             try
             {
@@ -657,7 +739,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<OperationResult> RestoreDatabase(RestoreProcedure config)
+        public async Task<OperationResult> RestoreDatabase(RestoreOperation config)
         {
             try
             {
@@ -1262,6 +1344,131 @@ namespace BprDevKit.DatabaseManagement.Services
         #endregion
 
         #region Private Methods
+        private async Task<SqlConnection> OpenConnectionAsync(string databaseName)
+        {
+            var connectionString = new SqlConnectionStringBuilder(_config.Server.BuildConnectionString())
+            {
+                InitialCatalog = databaseName
+            }.ConnectionString;
+
+            var connection = new SqlConnection(connectionString);
+            try
+            {
+                await connection.OpenAsync();
+                return connection;
+            }
+            catch
+            {
+                connection.Dispose();
+                throw;
+            }
+        }
+
+        private async Task<bool> TableExistsAsync(string databaseName, string schemaName, string tableName)
+        {
+            using var connection = await OpenConnectionAsync(databaseName);
+            using var command = new SqlCommand(
+                @"SELECT 1 FROM sys.tables AS t
+INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+WHERE s.name = @schemaName AND t.name = @tableName;", connection)
+            {
+                CommandTimeout = _config.Server.CommandTimeout
+            };
+            command.Parameters.AddWithValue("@schemaName", schemaName);
+            command.Parameters.AddWithValue("@tableName", tableName);
+
+            return await command.ExecuteScalarAsync() is not null;
+        }
+
+        private static ColumnInfo MapColumn(DataRow row)
+        {
+            var dataType = Convert.ToString(row["DataType"]) ?? string.Empty;
+            var type = ColumnDataType.Find(dataType);
+            var maxLength = Convert.ToInt32(row["MaxLength"]);
+            var isUnicode = dataType.Equals("nchar", StringComparison.OrdinalIgnoreCase) || dataType.Equals("nvarchar", StringComparison.OrdinalIgnoreCase);
+
+            return new ColumnInfo
+            {
+                OrdinalPosition = Convert.ToInt32(row["OrdinalPosition"]),
+                ColumnName = Convert.ToString(row["ColumnName"]) ?? string.Empty,
+                DataType = dataType,
+                // max_length is in bytes; -1 means MAX.
+                Length = type?.Kind == ColumnDataTypeKind.Length ? (isUnicode && maxLength > 0 ? maxLength / 2 : maxLength) : null,
+                Precision = type?.Kind == ColumnDataTypeKind.PrecisionScale ? Convert.ToInt32(row["Precision"]) : null,
+                Scale = (type?.Kind is ColumnDataTypeKind.PrecisionScale or ColumnDataTypeKind.FractionalSeconds) ? Convert.ToInt32(row["Scale"]) : null,
+                IsNullable = Convert.ToBoolean(row["IsNullable"]),
+                IsIdentity = Convert.ToBoolean(row["IsIdentity"]),
+                IdentitySeed = row["IdentitySeed"] is DBNull ? 0 : Convert.ToInt32(row["IdentitySeed"]),
+                IdentityIncrement = row["IdentityIncrement"] is DBNull ? 0 : Convert.ToInt32(row["IdentityIncrement"]),
+                IsPrimaryKey = Convert.ToBoolean(row["IsPrimaryKey"]),
+                Collation = GetNullableString(row, "Collation"),
+                DefaultValue = GetNullableString(row, "DefaultValue"),
+                ComputedFormula = GetNullableString(row, "ComputedFormula"),
+                IsPersisted = Convert.ToBoolean(row["IsPersisted"]),
+                Description = GetNullableString(row, "Description")
+            };
+        }
+
+        private static IndexInfo MapIndex(DataRow row)
+        {
+            return new IndexInfo
+            {
+                IndexName = Convert.ToString(row["IndexName"]) ?? string.Empty,
+                IndexType = Convert.ToString(row["IndexType"]) ?? string.Empty,
+                Columns = GetNullableString(row, "KeyColumns") ?? string.Empty,
+                IncludeColumns = GetNullableString(row, "IncludeColumns"),
+                IsUnique = Convert.ToBoolean(row["IsUnique"]),
+                IsPrimaryKey = Convert.ToBoolean(row["IsPrimaryKey"]),
+                FillFactor = Convert.ToInt16(row["FillFactor"]),
+                PadIndex = Convert.ToBoolean(row["PadIndex"]),
+                AllowRowLocks = Convert.ToBoolean(row["AllowRowLocks"]),
+                AllowPageLocks = Convert.ToBoolean(row["AllowPageLocks"]),
+                FilterPredicate = GetNullableString(row, "FilterPredicate"),
+                FileGroup = GetNullableString(row, "FileGroup") ?? string.Empty
+            };
+        }
+
+        private static ForeignKeyInfo MapForeignKey(DataRow row)
+        {
+            return new ForeignKeyInfo
+            {
+                FKName = Convert.ToString(row["FKName"]) ?? string.Empty,
+                SchemaName = Convert.ToString(row["SchemaName"]) ?? string.Empty,
+                TableName = Convert.ToString(row["TableName"]) ?? string.Empty,
+                ColumnName = GetNullableString(row, "ColumnName") ?? string.Empty,
+                RefSchemaName = Convert.ToString(row["RefSchemaName"]) ?? string.Empty,
+                RefTableName = Convert.ToString(row["RefTableName"]) ?? string.Empty,
+                RefColumnName = GetNullableString(row, "RefColumnName") ?? string.Empty,
+                OnDelete = (Convert.ToString(row["OnDelete"]) ?? "NO_ACTION").Replace('_', ' '),
+                OnUpdate = (Convert.ToString(row["OnUpdate"]) ?? "NO_ACTION").Replace('_', ' '),
+                IsNotForReplication = Convert.ToBoolean(row["IsNotForReplication"]),
+                Enabled = Convert.ToBoolean(row["Enabled"])
+            };
+        }
+
+        private async Task<bool> SchemaExistsAsync(string databaseName, string schemaName)
+        {
+            using var connection = await OpenConnectionAsync(databaseName);
+            using var command = new SqlCommand("SELECT 1 FROM sys.schemas WHERE name = @schemaName;", connection)
+            {
+                CommandTimeout = _config.Server.CommandTimeout
+            };
+            command.Parameters.AddWithValue("@schemaName", schemaName);
+
+            return await command.ExecuteScalarAsync() is not null;
+        }
+
+        private static string DescribeSchemaChange(SchemaOperation.Alter config)
+        {
+            var changes = new List<string>();
+            if (config.IsRename)
+                changes.Add($"renamed to '{config.NewSchemaName}'");
+            if (config.ChangesOwner)
+                changes.Add($"owner changed to '{config.Owner}'");
+
+            return $"Schema '{config.SchemaName}' {string.Join(" and ", changes)} in database '{config.DatabaseName}'.";
+        }
+
         private async Task<bool> DatabaseExistsAsync(string databaseName)
         {
             if (string.IsNullOrWhiteSpace(databaseName))
@@ -1279,7 +1486,7 @@ namespace BprDevKit.DatabaseManagement.Services
             return await command.ExecuteScalarAsync() is not null;
         }
 
-        private static bool HasDatabaseChanges(DatabaseProcedure.Alter config)
+        private static bool HasDatabaseChanges(DatabaseOperation.Alter config)
         {
             return !string.IsNullOrWhiteSpace(config.Collation)
                 || !string.IsNullOrWhiteSpace(config.RecoveryModel)

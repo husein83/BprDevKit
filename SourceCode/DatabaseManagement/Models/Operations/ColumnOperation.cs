@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Data;
 using System.Text;
 
-namespace BprDevKit.DatabaseManagement.Models
+namespace BprDevKit.DatabaseManagement.Models.Operations
 {
-    public class ColumnProcedure
+    public class ColumnOperation
     {
         public class Create
         {

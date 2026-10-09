@@ -111,7 +111,7 @@ namespace BprDevKit.Utility
         #endregion
 
         #region Json
-        public static bool TryDevDeserialize<TValue>(this string jsonText, out TValue result) where TValue : class
+        public static bool TryDevDeserialize<TValue>(this string jsonText, out TValue? result) where TValue : class
         {
             TValue? output = default;
             try

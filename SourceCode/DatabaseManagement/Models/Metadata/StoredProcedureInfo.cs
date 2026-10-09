@@ -1,6 +1,6 @@
 using System;
 
-namespace BprDevKit.DatabaseManagement.Models
+namespace BprDevKit.DatabaseManagement.Models.Metadata
 {
     /// <summary>
     /// Information about a stored procedure

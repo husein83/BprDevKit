@@ -33,7 +33,7 @@ namespace BprDevKit.Config
         /// </summary>
         public static List<ServerConfiguration> LoadAllFromEncryptedFile(bool sendErrorIfConfigFileNotExists = true)
         {
-            List<ServerConfiguration> result = new();
+            List<ServerConfiguration>? result = null;
 
             string filePath = DevFunctions.GetConfigurationPath(BprDevConfig.ServerConfiguration, out bool isExistsFile);
 
@@ -50,7 +50,7 @@ namespace BprDevKit.Config
                 decryptedContent.TryDevDeserialize(out result);
             }
 
-            return result;
+            return result ?? new();
         }
 
         /// <summary>

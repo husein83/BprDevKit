@@ -1,6 +1,6 @@
 @using System.Data
 @using BprDevKit.Config
-@using BprDevKit.DatabaseManagement.Models
+@using BprDevKit.DatabaseManagement.Models.Operations;
 @using BprDevKit.DatabaseManagement.Services
 @inject DatabaseManagerFactory DatabaseManagerFactory
 
@@ -276,9 +276,9 @@
     private Guid? _loadedServerId;
     private List<string> _databases = new();
     private List<string> _collations = new();
-    private DatabaseProcedure.Create _createConfiguration = new();
-    private DatabaseProcedure.Alter _editConfiguration = new();
-    private DatabaseProcedure.Drop _deleteConfiguration = new();
+    private DatabaseOperation.Create _createConfiguration = new();
+    private DatabaseOperation.Alter _editConfiguration = new();
+    private DatabaseOperation.Drop _deleteConfiguration = new();
     private DataTable? _databaseInformation;
     private bool _showCreateForm;
     private bool _showEditDialog;
@@ -340,11 +340,11 @@
 
     private void OpenCreateDatabase()
     {
-        _createConfiguration = new DatabaseProcedure.Create { InitialSizeMB = 8, FileGrowthMB = 64, LogInitialSizeMB = 8, LogFileGrowthMB = 64, RecoveryModel = "SIMPLE", PageVerify = "CHECKSUM" };
+        _createConfiguration = new DatabaseOperation.Create { InitialSizeMB = 8, FileGrowthMB = 64, LogInitialSizeMB = 8, LogFileGrowthMB = 64, RecoveryModel = "SIMPLE", PageVerify = "CHECKSUM" };
         _showCreateForm = true;
     }
 
-    private void CloseCreateDatabase() { _showCreateForm = false; _createConfiguration = new DatabaseProcedure.Create(); }
+    private void CloseCreateDatabase() { _showCreateForm = false; _createConfiguration = new DatabaseOperation.Create(); }
 
     private async Task CreateDatabase()
     {
@@ -368,7 +368,7 @@
         _isSaving = true;
         try
         {
-            var result = await _databaseManager.GetDatabaseConfiguration(new DatabaseProcedure.Information { DatabaseName = databaseName });
+            var result = await _databaseManager.GetDatabaseConfiguration(new DatabaseOperation.Information { DatabaseName = databaseName });
             if (result.operationResult.Success && result.configuration is not null)
             {
                 _editConfiguration = result.configuration;
@@ -424,7 +424,7 @@
 
     private void OpenDeleteDatabase(string databaseName)
     {
-        _deleteConfiguration = new DatabaseProcedure.Drop { DatabaseName = databaseName, IgnoreIfNotExists = true, ForceDisconnect = true };
+        _deleteConfiguration = new DatabaseOperation.Drop { DatabaseName = databaseName, IgnoreIfNotExists = true, ForceDisconnect = true };
         _showDeleteDialog = true;
     }
 
@@ -448,7 +448,7 @@
         if (_databaseManager is null) return;
         try
         {
-            var result = await _databaseManager.GetDatabaseInformation(new DatabaseProcedure.Information { DatabaseName = databaseName });
+            var result = await _databaseManager.GetDatabaseInformation(new DatabaseOperation.Information { DatabaseName = databaseName });
             if (result.operationResult.Success && result.information is not null)
             {
                 _databaseInformation = result.information;

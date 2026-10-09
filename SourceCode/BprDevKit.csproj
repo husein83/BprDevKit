@@ -12,9 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="DatabaseManagement\Models\" />
-    <Folder Include="DatabaseManagement\Models\Procedures\" />
-    <Folder Include="DatabaseManagement\Models\Schemas\" />
+    <Folder Include="DatabaseManagement\Models\Metadata\" />
+    <Folder Include="DatabaseManagement\Models\Operations\" />
     <Folder Include="DatabaseManagement\Services\" />
   </ItemGroup>
 

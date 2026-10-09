@@ -28,9 +28,9 @@ namespace BprDevKit.Config
             {
                 string encryptedContent = File.ReadAllText(filePath);
                 string decryptedContent = encryptedContent.DecryptContent();
-                if (decryptedContent.TryDevDeserialize<ApplicationConfiguration>(out var result))
+                if (decryptedContent.TryDevDeserialize<ApplicationConfiguration>(out var result) && result.HasAny())
                 {
-                    Config = result;
+                    Config = result!;
                 }
             }
         }

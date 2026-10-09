@@ -105,6 +105,14 @@
             {
                 <DatabaseManagementTab ServerConfig="_selectedServer" OnOperationComplete="NotifyOperationCompleted" />
             }
+            else if (_activeTab == "schemas")
+            {
+                <SchemaManagementTab ServerConfig="_selectedServer" OnOperationComplete="NotifyOperationCompleted" />
+            }
+            else if (_activeTab == "tables")
+            {
+                <TableManagementTab ServerConfig="_selectedServer" OnOperationComplete="NotifyOperationCompleted" />
+            }
             else
             {
                 <div class="text-center text-muted py-5">

@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using BprDevKit.DatabaseManagement.Models;
+using BprDevKit.DatabaseManagement.Models.Operations;
 
 namespace BprDevKit.DatabaseManagement.Services
 {
@@ -10,54 +10,60 @@ namespace BprDevKit.DatabaseManagement.Services
     public interface ISqlGenerator
     {
         #region Database Operations
-        string GenerateCreateDatabaseScript(DatabaseProcedure.Create config);
-        string GenerateAlterDatabaseScript(DatabaseProcedure.Alter config);
-        string GenerateDropDatabaseScript(DatabaseProcedure.Drop config);
-        string GenerateGetDatabaseInfoScript(DatabaseProcedure.Information config);
+        string GenerateCreateDatabaseScript(DatabaseOperation.Create config);
+        string GenerateAlterDatabaseScript(DatabaseOperation.Alter config);
+        string GenerateDropDatabaseScript(DatabaseOperation.Drop config);
+        string GenerateGetDatabaseInfoScript(DatabaseOperation.Information config);
         string GenerateGetDatabasesScript();
         string GenerateGetCollationsScript();
         string GenerateGetFileGroupsScript();
         #endregion
 
         #region Schema Operations
-        string GenerateCreateSchemaScript(string databaseName, string schemaName);
-        string GenerateDropSchemaScript(string databaseName, string schemaName);
+        string GenerateCreateSchemaScript(SchemaOperation.Create config);
+        string GenerateAlterSchemaScript(SchemaOperation.Alter config);
+        string GenerateDropSchemaScript(SchemaOperation.Drop config);
         string GenerateGetSchemasScript(string databaseName);
-        string GenerateGetSchemaObjectsScript(string databaseName, string schemaName);
-        string GenerateRenameSchemaScript(string databaseName, string oldSchemaName, string newSchemaName);
+        string GenerateGetSchemaSummariesScript(string databaseName);
+        string GenerateGetSchemaObjectsScript(SchemaOperation.Information config);
+        string GenerateGetSchemaOwnersScript(string databaseName);
         #endregion
 
         #region Table Operations
-        string GenerateCreateTableScript(TableProcedure.Create config);
-        string GenerateAlterTableScript(TableProcedure.Alter config);
-        string GenerateDropTableScript(TableProcedure.Drop config);
-        string GenerateGetTableInfoScript(TableProcedure.Information config);
+        string GenerateCreateTableScript(TableOperation.Create config);
+        string GenerateAlterTableScript(TableOperation.Alter config);
+        string GenerateDropTableScript(TableOperation.Drop config);
+        string GenerateGetTableInfoScript(TableOperation.Information config);
         string GenerateGetTablesScript(string databaseName, string schemaName);
-        string GenerateGetColumnsScript(string databaseName, string schemaName, string tableName);
+        string GenerateGetTableSummariesScript(string databaseName);
+        string GenerateGetTableColumnsScript(TableOperation.Information config);
+        string GenerateGetTableIndexesScript(TableOperation.Information config);
+        string GenerateGetTableForeignKeysScript(TableOperation.Information config);
+        string GenerateGetFileGroupsScript(string databaseName);
         #endregion
 
         #region Column Operations
-        string GenerateCreateColumnScript(ColumnProcedure.Create config);
-        string GenerateAlterColumnScript(ColumnProcedure.Alter config);
-        string GenerateDropColumnScript(ColumnProcedure.Drop config);
-        string GenerateGetColumnInfoScript(ColumnProcedure.Information config);
+        string GenerateCreateColumnScript(ColumnOperation.Create config);
+        string GenerateAlterColumnScript(ColumnOperation.Alter config);
+        string GenerateDropColumnScript(ColumnOperation.Drop config);
+        string GenerateGetColumnInfoScript(ColumnOperation.Information config);
         string GenerateGetDataTypesScript();
         #endregion
 
         #region Index Operations
-        string GenerateCreateIndexScript(IndexProcedure.Create config);
-        string GenerateAlterIndexScript(IndexProcedure.Alter config);
-        string GenerateDropIndexScript(IndexProcedure.Drop config);
-        string GenerateGetIndexInfoScript(IndexProcedure.Information config);
+        string GenerateCreateIndexScript(IndexOperation.Create config);
+        string GenerateAlterIndexScript(IndexOperation.Alter config);
+        string GenerateDropIndexScript(IndexOperation.Drop config);
+        string GenerateGetIndexInfoScript(IndexOperation.Information config);
         string GenerateGetIndexNamesScript(string databaseName, string schemaName, string tableName);
         string GenerateGetIndexTypesScript();
         #endregion
 
         #region Foreign Key Operations
-        string GenerateCreateForeignKeyScript(ForeignKeyProcedure.Create config);
-        string GenerateAlterForeignKeyScript(ForeignKeyProcedure.Alter config);
-        string GenerateDropForeignKeyScript(ForeignKeyProcedure.Drop config);
-        string GenerateGetForeignKeyInfoScript(ForeignKeyProcedure.Information config);
+        string GenerateCreateForeignKeyScript(ForeignKeyOperation.Create config);
+        string GenerateAlterForeignKeyScript(ForeignKeyOperation.Alter config);
+        string GenerateDropForeignKeyScript(ForeignKeyOperation.Drop config);
+        string GenerateGetForeignKeyInfoScript(ForeignKeyOperation.Information config);
         string GenerateGetReferentialActionsScript();
         #endregion
 
@@ -89,8 +95,8 @@ namespace BprDevKit.DatabaseManagement.Services
         #endregion
 
         #region Backup/Restore
-        string GenerateBackupScript(BackupProcedure config);
-        string GenerateRestoreScript(RestoreProcedure config);
+        string GenerateBackupScript(BackupOperation config);
+        string GenerateRestoreScript(RestoreOperation config);
         #endregion
 
         #region Utility

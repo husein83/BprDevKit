@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace BprDevKit.DatabaseManagement.Models
+namespace BprDevKit.DatabaseManagement.Models.Operations
 {
-    public class IndexProcedure
+    public class IndexOperation
     {
         public class Create
         {

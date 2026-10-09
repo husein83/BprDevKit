@@ -1,6 +1,5 @@
 @using BprDevKit.DatabaseManagement.Services
-@using BprDevKit.DatabaseManagement.Models
-@using BprDevKit.Config
+@using BprDevKit.DatabaseManagement.Models.Metadata
 @using BprDevKit.Utility
 @using System.Data
 @inject DatabaseManager DatabaseManager
@@ -93,10 +92,14 @@
                                                 <div class="table-responsive">
                                                     <table class="table table-sm table-striped">
                                                         <thead>
-                                                            @foreach (var column in ViewTestResult.Columns.Cast<DataColumn>())
-                                                            {
-                                                                <th>@column.ColumnName</th>
-                                                            }
+                                                            <tr>
+                                                                @foreach (var column in ViewTestResult.Columns.Cast<DataColumn>())
+                                                                {
+                                                                    <th>
+                                                                        @column.ColumnName
+                                                                    </th>
+                                                                }
+                                                            </tr>
                                                         </thead>
                                                         <tbody>
                                                             @for (int i = 0; i < Math.Min(10, ViewTestResult.Rows.Count); i++)
@@ -245,7 +248,7 @@
     private ViewInfo _editView = new ViewInfo();
     private ViewInfo _viewToDelete = new ViewInfo();
 
-    private DataTable ViewTestResult = null;
+    private DataTable? ViewTestResult = null;
 
     private bool IsEditingView => ShowEditView || ShowCreateView;
 

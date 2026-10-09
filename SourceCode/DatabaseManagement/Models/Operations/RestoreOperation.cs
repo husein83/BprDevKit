@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace BprDevKit.DatabaseManagement.Models
+namespace BprDevKit.DatabaseManagement.Models.Operations
 {
-    public class RestoreProcedure
+    public class RestoreOperation
     {
         public string DatabaseName { get; set; } = null!;
         public string RestorePath { get; set; } = null!;

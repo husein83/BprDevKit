@@ -1,6 +1,6 @@
 using System;
 
-namespace BprDevKit.DatabaseManagement.Models
+namespace BprDevKit.DatabaseManagement.Models.Metadata
 {
     /// <summary>
     /// Information about a table index
@@ -11,6 +11,7 @@ namespace BprDevKit.DatabaseManagement.Models
         public string Columns { get; set; } = null!;
         public string? IncludeColumns { get; set; }
         public bool IsUnique { get; set; }
+        public bool IsPrimaryKey { get; set; }
         public string IndexType { get; set; } = null!;
         public short FillFactor { get; set; }
         public bool PadIndex { get; set; }
