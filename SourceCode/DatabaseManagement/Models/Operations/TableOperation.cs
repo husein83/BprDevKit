@@ -1,10 +1,11 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
 using BprDevKit.DatabaseManagement.Models.Metadata;
 
 namespace BprDevKit.DatabaseManagement.Models.Operations
 {
+    /// <summary>
+    /// Everything about tables: Create / Alter / Drop describe a change, Information describes a table
+    /// (it identifies the table in a request and carries the loaded data in a result).
+    /// </summary>
     public class TableOperation
     {
         public class Create
@@ -53,6 +54,20 @@ namespace BprDevKit.DatabaseManagement.Models.Operations
             public string DatabaseName { get; set; } = null!;
             public string SchemaName { get; set; } = null!;
             public string TableName { get; set; } = null!;
+
+            // ---- Loaded data (a table list fills only the first block, a single table fills everything) ----
+            public long RowCount { get; set; }
+            public int ColumnCount { get; set; }
+            public DateTime CreateDate { get; set; }
+            public DateTime ModifyDate { get; set; }
+            public string? Description { get; set; }
+            public string? FileGroup { get; set; }
+
+            public List<ColumnOperation.Information> Columns { get; set; } = new();
+            public List<IndexOperation.Information> Indexes { get; set; } = new();
+            public List<ForeignKeyOperation.Information> ForeignKeys { get; set; } = new();
+
+            public string FullName => $"{SchemaName}.{TableName}";
         }
     }
 }

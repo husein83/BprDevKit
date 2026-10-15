@@ -190,12 +190,12 @@
                         {
                             <div class="text-center py-3"><span class="spinner-border spinner-border-sm me-2"></span>Checking schema contents…</div>
                         }
-                        else if (_dialogObjects.Count > 0)
+                        else if (_dialogSchema is not null && _dialogSchema.Objects.Count > 0)
                         {
                             <div class="alert alert-warning small">
-                                <strong class="font-monospace">@_dialogSchemaName</strong> still contains @_dialogObjects.Count object(s). Move or drop them before deleting the schema.
+                                <strong class="font-monospace">@_dialogSchemaName</strong> still contains @_dialogSchema!.Objects.Count object(s). Move or drop them before deleting the schema.
                             </div>
-                            <SchemaObjectList Items="_dialogObjects" />
+                            <SchemaObjectList Schema="_dialogSchema" />
                         }
                         else
                         {
@@ -205,7 +205,7 @@
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-light" type="button" @onclick="CloseDialogs">Cancel</button>
-                        <button class="btn btn-danger" type="button" @onclick="DeleteSchema" disabled="@(_isSaving || _isLoadingObjects || _dialogObjects.Count > 0)">Delete schema</button>
+                        <button class="btn btn-danger" type="button" @onclick="DeleteSchema" disabled="@(_isSaving || _isLoadingObjects || _dialogSchema is null || _dialogSchema.Objects.Count > 0)">Delete schema</button>
                     </div>
                 </div>
             </div>
@@ -229,7 +229,7 @@
                         }
                         else
                         {
-                            <SchemaObjectList Items="_dialogObjects" />
+                            <SchemaObjectList Schema="_dialogSchema" />
                         }
                     </div>
                     <div class="modal-footer"><button class="btn btn-primary" type="button" @onclick="CloseDialogs">Close</button></div>
@@ -248,8 +248,8 @@
     private Guid? _loadedServerId;
     private List<string> _databases = new();
     private List<string> _owners = new();
-    private List<SchemaSummary> _schemas = new();
-    private List<SchemaObjectInfo> _dialogObjects = new();
+    private List<SchemaOperation.Information> _schemas = new();
+    private SchemaOperation.Information? _dialogSchema;
     private SchemaOperation.Create _createConfiguration = new();
     private string _selectedDatabase = string.Empty;
     private string _dialogSchemaName = string.Empty;
@@ -319,7 +319,7 @@
         _isLoadingSchemas = true;
         try
         {
-            var schemaResult = await _databaseManager.GetSchemaSummaries(databaseName);
+            var schemaResult = await _databaseManager.GetSchemaList(databaseName);
             var ownerResult = await _databaseManager.GetSchemaOwners(databaseName);
 
             // The user may have picked another database while the queries were running.
@@ -341,7 +341,7 @@
     {
         CloseCreateSchema();
         CloseDialogs();
-        _schemas = new List<SchemaSummary>();
+        _schemas = new List<SchemaOperation.Information>();
         _owners = new List<string>();
         await LoadSchemas();
     }
@@ -352,7 +352,7 @@
         if (HasDatabase && !_databases.Contains(_selectedDatabase))
         {
             _selectedDatabase = string.Empty;
-            _schemas = new List<SchemaSummary>();
+            _schemas = new List<SchemaOperation.Information>();
         }
 
         await LoadSchemas();
@@ -394,7 +394,7 @@
         finally { _isSaving = false; }
     }
 
-    private void OpenEditSchema(SchemaSummary schema)
+    private void OpenEditSchema(SchemaOperation.Information schema)
     {
         CloseDialogs();
         _dialogSchemaName = schema.SchemaName;
@@ -481,7 +481,7 @@
         _isLoadingObjects = true;
         try
         {
-            var result = await _databaseManager.GetSchemaObjects(new SchemaOperation.Information
+            var result = await _databaseManager.GetSchemaInformation(new SchemaOperation.Information
             {
                 DatabaseName = _selectedDatabase,
                 SchemaName = schemaName
@@ -490,7 +490,7 @@
             if (schemaName != _dialogSchemaName) return;
 
             if (result.operationResult.Success)
-                _dialogObjects = result.objects;
+                _dialogSchema = result.schema;
             else
             {
                 CloseDialogs();
@@ -509,7 +509,7 @@
     {
         _showEditDialog = _showDeleteDialog = _showViewDialog = false;
         _dialogSchemaName = string.Empty;
-        _dialogObjects = new List<SchemaObjectInfo>();
+        _dialogSchema = null;
     }
 
     /// <summary>The current owner may not be in the list (for example a fixed role), so it is always offered.</summary>

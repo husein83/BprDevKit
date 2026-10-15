@@ -1,7 +1,8 @@
 namespace BprDevKit.DatabaseManagement.Models.Operations
 {
     /// <summary>
-    /// Request models for schema operations. Every operation targets one schema inside one database.
+    /// Everything about schemas: Create / Alter / Drop describe a change, Information describes a schema
+    /// (it identifies the schema in a request and carries the loaded data in a result).
     /// </summary>
     public class SchemaOperation
     {
@@ -58,6 +59,17 @@ namespace BprDevKit.DatabaseManagement.Models.Operations
         {
             public string DatabaseName { get; set; } = null!;
             public string SchemaName { get; set; } = null!;
+
+            // ---- Loaded data ----
+            public string OwnerName { get; set; } = string.Empty;
+
+            /// <summary>Tables, views, routines, synonyms, sequences, user-defined types and XML schema collections.</summary>
+            public int ObjectCount { get; set; }
+
+            /// <summary>The objects that live in the schema (only filled when a single schema is loaded).</summary>
+            public List<(string ObjectType, string ObjectName, DateTime? CreateDate)> Objects { get; set; } = new();
+
+            public bool IsProtected => SchemaOperation.IsProtected(SchemaName);
         }
     }
 }

@@ -1,0 +1,320 @@
+@using BprDevKit.Utility
+@using BprDevKit.DatabaseManagement.Models.Metadata
+@using BprDevKit.DatabaseManagement.Models.Operations
+@using BprDevKit.DatabaseManagement.Services
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h3 class="h6 mb-0"><i class="bi bi-link-45deg me-1 text-primary"></i>Foreign keys (@Table.ForeignKeys.Count)</h3>
+    <button class="btn btn-sm btn-primary" type="button" @onclick="OpenCreate" disabled="@_isSaving"><i class="bi bi-plus-lg me-1"></i>Create foreign key</button>
+</div>
+
+<StatusAlert Message="_message" Success="_messageSuccess" OnDismiss="ClearMessage" />
+
+@if (_mode == PanelMode.Create)
+{
+    <div class="card border-primary mb-3">
+        <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">Create foreign key on <span class="font-monospace">@($"{Table.SchemaName}.{Table.TableName}")</span></span>
+            <button class="btn-close btn-close-white" type="button" @onclick="Close"></button>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold" for="fk-name">Name <span class="text-muted fw-normal">(optional)</span></label>
+                    <input id="fk-name" class="form-control form-control-sm font-monospace" maxlength="128" placeholder="generated when empty" @bind="_form.FKName" @bind:event="oninput" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold" for="fk-reference">Referenced table</label>
+                    <select id="fk-reference" class="form-select form-select-sm" value="@_referenceKey" @onchange="OnReferenceChanged">
+                        <option value="">-- Select a table --</option>
+                        @foreach (var table in Tables)
+                        {
+                            <option value="@table.FullName">@table.FullName</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label small fw-semibold">Column pairs</label>
+                    @foreach (var mapping in _form.Columns)
+                    {
+                        <div class="row g-2 mb-1 align-items-center">
+                            <div class="col-5">
+                                <select class="form-select form-select-sm" value="@mapping.ColumnName" @onchange="e => mapping.ColumnName = e.Value?.ToString() ?? string.Empty">
+                                    <option value="">-- column --</option>
+                                    @foreach (var column in Table.Columns)
+                                    {
+                                        <option value="@column.ColumnName">@column.ColumnName</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-auto"><i class="bi bi-arrow-right"></i></div>
+                            <div class="col-5">
+                                <select class="form-select form-select-sm" value="@mapping.RefColumnName" disabled="@(_referenceColumns.Count == 0)"
+                                        @onchange="e => mapping.RefColumnName = e.Value?.ToString() ?? string.Empty">
+                                    <option value="">-- referenced column --</option>
+                                    @foreach (var column in _referenceColumns)
+                                    {
+                                        <option value="@column">@column</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-sm btn-outline-danger" type="button" title="Remove" disabled="@(_form.Columns.Count == 1)" @onclick="() => _form.Columns.Remove(mapping)"><i class="bi bi-x-lg"></i></button>
+                            </div>
+                        </div>
+                    }
+                    <button class="btn btn-sm btn-outline-primary mt-1" type="button" @onclick="AddPair"><i class="bi bi-plus-lg me-1"></i>Add column pair</button>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold" for="fk-delete">On delete</label>
+                    <select id="fk-delete" class="form-select form-select-sm" @bind="_form.OnDelete">
+                        @foreach (var action in ForeignKeyOperation.ReferentialActions)
+                        {
+                            <option value="@action">@action</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold" for="fk-update">On update</label>
+                    <select id="fk-update" class="form-select form-select-sm" @bind="_form.OnUpdate">
+                        @foreach (var action in ForeignKeyOperation.ReferentialActions)
+                        {
+                            <option value="@action">@action</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="form-check">
+                        <input id="fk-disabled" class="form-check-input" type="checkbox" checked="@(!_form.Enabled)" @onchange="e => _form.Enabled = !(bool)e.Value!" />
+                        <label class="form-check-label small" for="fk-disabled">Create disabled (do not validate existing rows)</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-info small mt-3 mb-0">The referenced columns must be a primary key or have a unique constraint/index, and both sides need matching data types.</div>
+
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <button class="btn btn-sm btn-light" type="button" @onclick="Close">Cancel</button>
+                <button class="btn btn-sm btn-success" type="button" @onclick="CreateForeignKey" disabled="@(_isSaving || !CanCreate)">
+                    @if (_isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Create
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_mode == PanelMode.Drop && _selected is not null)
+{
+    <div class="card border-danger mb-3">
+        <div class="card-header bg-danger text-white py-2 fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Drop <span class="font-monospace">@_selected.FKName</span></div>
+        <div class="card-body">
+            <p class="small mb-3">
+                The constraint on <span class="font-monospace">@($"{_selected.SchemaName}.{_selected.TableName}")</span> is removed; the data stays, but SQL Server no longer enforces the relationship.
+            </p>
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-sm btn-light" type="button" @onclick="Close">Cancel</button>
+                <button class="btn btn-sm btn-danger" type="button" @onclick="DropForeignKey" disabled="@_isSaving">Drop</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (Table.ForeignKeys.Count == 0)
+{
+    <p class="text-muted small mb-0">No foreign keys reference this table or start from it.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Name</th><th>Direction</th><th>Relation</th><th>On delete</th><th>On update</th><th class="text-center">Enabled</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var foreignKey in Table.ForeignKeys)
+                {
+                    <tr>
+                        <td class="font-monospace small">@foreignKey.FKName</td>
+                        <td>
+                            @if (IsOutgoing(foreignKey))
+                            {
+                                <span class="badge text-bg-primary">Outgoing</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Incoming</span>
+                            }
+                        </td>
+                        <td class="font-monospace small">
+                            @($"{foreignKey.SchemaName}.{foreignKey.TableName}") (@foreignKey.ColumnName)
+                            <i class="bi bi-arrow-right mx-1"></i>
+                            @($"{foreignKey.RefSchemaName}.{foreignKey.RefTableName}") (@foreignKey.RefColumnName)
+                        </td>
+                        <td class="small">@foreignKey.OnDelete</td>
+                        <td class="small">@foreignKey.OnUpdate</td>
+                        <td class="text-center">@(foreignKey.Enabled ? "Yes" : "No")</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary" type="button" title="@(foreignKey.Enabled ? "Disable" : "Enable")" disabled="@_isSaving" @onclick="() => ToggleEnabled(foreignKey)">
+                                    <i class="bi @(foreignKey.Enabled ? "bi-toggle-on" : "bi-toggle-off")"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" type="button" title="Drop" disabled="@_isSaving" @onclick="() => OpenDrop(foreignKey)"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private enum PanelMode { None, Create, Drop }
+
+    [Parameter, EditorRequired] public DatabaseManager Manager { get; set; } = null!;
+    [Parameter, EditorRequired] public TableOperation.Information Table { get; set; } = null!;
+    [Parameter] public IReadOnlyList<TableOperation.Information> Tables { get; set; } = Array.Empty<TableOperation.Information>();
+    [Parameter] public EventCallback<OperationResult> OnChanged { get; set; }
+
+    private PanelMode _mode = PanelMode.None;
+    private ForeignKeyOperation.Create _form = new();
+    private ForeignKeyOperation.Information? _selected;
+    private List<string> _referenceColumns = new();
+    private string _referenceKey = string.Empty;
+    private bool _isSaving;
+    private string? _message;
+    private bool _messageSuccess;
+
+    private bool CanCreate =>
+        !string.IsNullOrWhiteSpace(_referenceKey)
+        && _form.Columns.Count > 0
+        && _form.Columns.All(mapping => !string.IsNullOrWhiteSpace(mapping.ColumnName) && !string.IsNullOrWhiteSpace(mapping.RefColumnName));
+
+    private bool IsOutgoing(ForeignKeyOperation.Information foreignKey) =>
+        string.Equals(foreignKey.SchemaName, Table.SchemaName, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(foreignKey.TableName, Table.TableName, StringComparison.OrdinalIgnoreCase);
+
+    private void OpenCreate()
+    {
+        Close();
+        _form = new ForeignKeyOperation.Create();
+        _form.Columns.Add(new ForeignKeyOperation.ColumnMapping());
+        _referenceKey = string.Empty;
+        _referenceColumns = new List<string>();
+        _mode = PanelMode.Create;
+    }
+
+    private void OpenDrop(ForeignKeyOperation.Information foreignKey)
+    {
+        Close();
+        _selected = foreignKey;
+        _mode = PanelMode.Drop;
+    }
+
+    private void Close() => _mode = PanelMode.None;
+
+    private void AddPair() => _form.Columns.Add(new ForeignKeyOperation.ColumnMapping());
+
+    private async Task OnReferenceChanged(ChangeEventArgs args)
+    {
+        _referenceKey = args.Value?.ToString() ?? string.Empty;
+        _referenceColumns = new List<string>();
+        foreach (var mapping in _form.Columns)
+            mapping.RefColumnName = string.Empty;
+
+        var reference = Tables.FirstOrDefault(table => table.FullName == _referenceKey);
+        if (reference is null) return;
+
+        try
+        {
+            var result = await Manager.GetColumns(Table.DatabaseName, reference.SchemaName, reference.TableName);
+            if (_referenceKey != reference.FullName) return;
+
+            if (result.operationResult.Success)
+                _referenceColumns = result.columns;
+            else
+                ShowResult(result.operationResult);
+        }
+        catch (Exception exception)
+        {
+            _message = $"Unable to load the columns of {reference.FullName}: {exception.Message}";
+            _messageSuccess = false;
+        }
+    }
+
+    private async Task CreateForeignKey()
+    {
+        var reference = Tables.FirstOrDefault(table => table.FullName == _referenceKey);
+        if (reference is null) return;
+
+        _form.DatabaseName = Table.DatabaseName;
+        _form.SchemaName = Table.SchemaName;
+        _form.TableName = Table.TableName;
+        _form.RefSchemaName = reference.SchemaName;
+        _form.RefTableName = reference.TableName;
+        _form.FKName = string.IsNullOrWhiteSpace(_form.FKName) ? null : _form.FKName.Trim();
+
+        await Run(() => Manager.CreateForeignKey(_form));
+    }
+
+    private async Task ToggleEnabled(ForeignKeyOperation.Information foreignKey)
+    {
+        await Run(() => Manager.AlterForeignKey(new ForeignKeyOperation.Alter
+        {
+            DatabaseName = Table.DatabaseName,
+            SchemaName = foreignKey.SchemaName,
+            TableName = foreignKey.TableName,
+            FKName = foreignKey.FKName,
+            Enabled = !foreignKey.Enabled
+        }));
+    }
+
+    private async Task DropForeignKey()
+    {
+        if (_selected is null) return;
+
+        await Run(() => Manager.DropForeignKey(new ForeignKeyOperation.Drop
+        {
+            DatabaseName = Table.DatabaseName,
+            SchemaName = _selected.SchemaName,
+            TableName = _selected.TableName,
+            FKName = _selected.FKName
+        }));
+    }
+
+    private async Task Run(Func<Task<OperationResult>> operation)
+    {
+        _isSaving = true;
+        try
+        {
+            var result = await operation();
+            ShowResult(result);
+
+            if (result.Success)
+            {
+                Close();
+                await OnChanged.InvokeAsync(result);
+            }
+        }
+        catch (Exception exception)
+        {
+            _message = $"Unable to complete the operation: {exception.Message}";
+            _messageSuccess = false;
+        }
+        finally { _isSaving = false; }
+    }
+
+    private void ShowResult(OperationResult result)
+    {
+        _message = result.Message;
+        _messageSuccess = result.Success;
+    }
+
+    private void ClearMessage() => _message = null;
+}

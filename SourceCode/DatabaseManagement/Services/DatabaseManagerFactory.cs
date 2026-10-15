@@ -1,20 +1,23 @@
+using System;
 using BprDevKit.Config;
+using BprDevKit.Utility;
 
 namespace BprDevKit.DatabaseManagement.Services
 {
     public sealed class DatabaseManagerFactory
     {
-        private readonly ISqlGenerator _sqlGenerator;
+        private readonly ISqlGeneratorFactory _sqlGeneratorFactory;
 
-        public DatabaseManagerFactory(ISqlGenerator sqlGenerator)
+        public DatabaseManagerFactory(ISqlGeneratorFactory sqlGeneratorFactory)
         {
-            _sqlGenerator = sqlGenerator;
+            _sqlGeneratorFactory = sqlGeneratorFactory ?? throw new ArgumentNullException(nameof(sqlGeneratorFactory));
         }
 
         public DatabaseManager Create(ServerConfiguration serverConfiguration)
         {
             ArgumentNullException.ThrowIfNull(serverConfiguration);
-            return new DatabaseManager(_sqlGenerator, serverConfiguration);
+            var sqlGenerator = _sqlGeneratorFactory.Create(serverConfiguration.Server.DatabaseServerType);
+            return new DatabaseManager(sqlGenerator, serverConfiguration);
         }
     }
 }

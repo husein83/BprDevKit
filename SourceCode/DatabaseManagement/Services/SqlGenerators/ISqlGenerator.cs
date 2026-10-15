@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BprDevKit.DatabaseManagement.Models.Metadata;
 using BprDevKit.DatabaseManagement.Models.Operations;
 
 namespace BprDevKit.DatabaseManagement.Services
@@ -24,8 +25,8 @@ namespace BprDevKit.DatabaseManagement.Services
         string GenerateAlterSchemaScript(SchemaOperation.Alter config);
         string GenerateDropSchemaScript(SchemaOperation.Drop config);
         string GenerateGetSchemasScript(string databaseName);
-        string GenerateGetSchemaSummariesScript(string databaseName);
-        string GenerateGetSchemaObjectsScript(SchemaOperation.Information config);
+        string GenerateGetSchemaListScript(string databaseName, string? schemaName = null);
+        string GenerateGetSchemaInformationScript(SchemaOperation.Information config);
         string GenerateGetSchemaOwnersScript(string databaseName);
         #endregion
 
@@ -35,7 +36,7 @@ namespace BprDevKit.DatabaseManagement.Services
         string GenerateDropTableScript(TableOperation.Drop config);
         string GenerateGetTableInfoScript(TableOperation.Information config);
         string GenerateGetTablesScript(string databaseName, string schemaName);
-        string GenerateGetTableSummariesScript(string databaseName);
+        string GenerateGetTableListScript(string databaseName);
         string GenerateGetTableColumnsScript(TableOperation.Information config);
         string GenerateGetTableIndexesScript(TableOperation.Information config);
         string GenerateGetTableForeignKeysScript(TableOperation.Information config);
@@ -47,6 +48,7 @@ namespace BprDevKit.DatabaseManagement.Services
         string GenerateAlterColumnScript(ColumnOperation.Alter config);
         string GenerateDropColumnScript(ColumnOperation.Drop config);
         string GenerateGetColumnInfoScript(ColumnOperation.Information config);
+        string GenerateGetColumnsScript(string databaseName, string schemaName, string tableName);
         string GenerateGetDataTypesScript();
         #endregion
 

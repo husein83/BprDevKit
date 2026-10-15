@@ -1,14 +1,14 @@
 @using System.Globalization
-@using BprDevKit.DatabaseManagement.Models.Metadata
+@using BprDevKit.DatabaseManagement.Models.Operations
 
-@if (Items.Count == 0)
+@if (Schema is null || Schema.Objects.Count == 0)
 {
     <p class="text-muted mb-0">This schema does not contain any objects.</p>
 }
 else
 {
     <div class="d-flex flex-wrap gap-2 mb-3">
-        @foreach (var group in Items.GroupBy(item => item.ObjectType).OrderBy(group => group.Key))
+        @foreach (var group in Schema.Objects.GroupBy(item => item.ObjectType).OrderBy(group => group.Key))
         {
             <span class="badge text-bg-light border">@FormatType(group.Key) <span class="text-primary">@group.Count()</span></span>
         }
@@ -19,7 +19,7 @@ else
                 <tr><th>Type</th><th>Name</th><th>Created</th></tr>
             </thead>
             <tbody>
-                @foreach (var item in Items)
+                @foreach (var item in Schema.Objects)
                 {
                     <tr>
                         <td class="text-muted small">@FormatType(item.ObjectType)</td>
@@ -33,7 +33,7 @@ else
 }
 
 @code {
-    [Parameter] public IReadOnlyList<SchemaObjectInfo> Items { get; set; } = Array.Empty<SchemaObjectInfo>();
+    [Parameter] public SchemaOperation.Information? Schema { get; set; }
 
     private static string FormatType(string objectType)
     {

@@ -1,0 +1,61 @@
+@using System.Globalization
+@using BprDevKit.DatabaseManagement.Models.Metadata
+@using BprDevKit.DatabaseManagement.Models.Operations
+
+@{
+    var type = ColumnDataType.Find(Column.DataType);
+}
+
+<div class="row g-2">
+    <div class="col-sm-6">
+        <label class="form-label small fw-semibold">Data type</label>
+        <select class="form-select form-select-sm" value="@Column.DataType" @onchange="e => Column.ApplyDataType(e.Value?.ToString())">
+            @foreach (var option in ColumnDataType.All)
+            {
+                <option value="@option.Name">@option.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col-sm-6">
+        <label class="form-label small fw-semibold">Size</label>
+        @if (type?.Kind == ColumnDataTypeKind.Length)
+        {
+            <div class="input-group input-group-sm">
+                <input type="number" class="form-control" min="1" max="@(type.MaxLength)" disabled="@(Column.Length == -1)"
+                       value="@(Column.Length is > 0 ? Column.Length.Value.ToString(CultureInfo.InvariantCulture) : string.Empty)"
+                       @onchange="e => Column.Length = ParseInt(e.Value)" />
+                @if (type.SupportsMax)
+                {
+                    <div class="input-group-text">
+                        <input class="form-check-input mt-0 me-1" type="checkbox" checked="@(Column.Length == -1)" @onchange="e => Column.Length = (bool)e.Value! ? -1 : Math.Min(50, type.MaxLength)" />MAX
+                    </div>
+                }
+            </div>
+        }
+        else if (type?.Kind == ColumnDataTypeKind.PrecisionScale)
+        {
+            <div class="input-group input-group-sm">
+                <input type="number" class="form-control" min="1" max="38" title="Precision" placeholder="precision"
+                       value="@(Column.Precision?.ToString(CultureInfo.InvariantCulture))" @onchange="e => Column.Precision = ParseInt(e.Value)" />
+                <input type="number" class="form-control" min="0" max="38" title="Scale" placeholder="scale"
+                       value="@(Column.Scale?.ToString(CultureInfo.InvariantCulture))" @onchange="e => Column.Scale = ParseInt(e.Value)" />
+            </div>
+        }
+        else if (type?.Kind == ColumnDataTypeKind.FractionalSeconds)
+        {
+            <input type="number" class="form-control form-control-sm" min="0" max="7" title="Fractional seconds precision" placeholder="default"
+                   value="@(Column.Scale?.ToString(CultureInfo.InvariantCulture))" @onchange="e => Column.Scale = ParseInt(e.Value)" />
+        }
+        else
+        {
+            <div class="form-control-plaintext form-control-sm text-muted">—</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ColumnDefinition Column { get; set; } = null!;
+
+    private static int? ParseInt(object? value) =>
+        int.TryParse(value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) ? number : null;
+}

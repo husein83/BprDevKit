@@ -1,0 +1,368 @@
+@using BprDevKit.Utility
+@using BprDevKit.DatabaseManagement.Models.Metadata
+@using BprDevKit.DatabaseManagement.Models.Operations
+@using BprDevKit.DatabaseManagement.Services
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h3 class="h6 mb-0"><i class="bi bi-lightning-charge me-1 text-primary"></i>Indexes (@Table.Indexes.Count)</h3>
+    <button class="btn btn-sm btn-primary" type="button" @onclick="OpenCreate" disabled="@_isSaving"><i class="bi bi-plus-lg me-1"></i>Create index</button>
+</div>
+
+<StatusAlert Message="_message" Success="_messageSuccess" OnDismiss="ClearMessage" />
+
+@if (_mode == PanelMode.Create)
+{
+    <div class="card border-primary mb-3">
+        <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">Create index</span>
+            <button class="btn-close btn-close-white" type="button" @onclick="Close"></button>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label small fw-semibold" for="index-name">Name <span class="text-muted fw-normal">(optional)</span></label>
+                    <input id="index-name" class="form-control form-control-sm font-monospace" maxlength="128" placeholder="generated when empty" @bind="_form.IndexName" @bind:event="oninput" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold" for="index-kind">Kind</label>
+                    <select id="index-kind" class="form-select form-select-sm" value="@(_form.IsPrimaryKey ? "pk" : "index")" @onchange="e => SetKind(e.Value?.ToString())">
+                        <option value="index">Index</option>
+                        @if (!HasPrimaryKey)
+                        {
+                            <option value="pk">Primary key</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end flex-wrap gap-3">
+                    @if (!_form.IsPrimaryKey)
+                    {
+                        <div class="form-check">
+                            <input id="index-unique" class="form-check-input" type="checkbox" checked="@_form.IsUnique" @onchange="e => _form.IsUnique = (bool)e.Value!" />
+                            <label class="form-check-label small" for="index-unique">Unique</label>
+                        </div>
+                    }
+                    <div class="form-check">
+                        <input id="index-clustered" class="form-check-input" type="checkbox" checked="@_form.IsClustered" disabled="@HasClusteredIndex"
+                               @onchange="e => _form.IsClustered = (bool)e.Value!" />
+                        <label class="form-check-label small" for="index-clustered">Clustered</label>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label small fw-semibold">Key columns</label>
+                    @foreach (var key in _form.Columns)
+                    {
+                        <div class="row g-2 mb-1 align-items-center">
+                            <div class="col-6 col-md-5">
+                                <select class="form-select form-select-sm" value="@key.ColumnName" @onchange="e => key.ColumnName = e.Value?.ToString() ?? string.Empty">
+                                    @foreach (var column in Table.Columns)
+                                    {
+                                        <option value="@column.ColumnName">@column.ColumnName</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-4 col-md-2">
+                                <select class="form-select form-select-sm" value="@(key.IsDescending ? "desc" : "asc")" @onchange='e => key.IsDescending = e.Value?.ToString() == "desc"'>
+                                    <option value="asc">ASC</option>
+                                    <option value="desc">DESC</option>
+                                </select>
+                            </div>
+                            <div class="col-2">
+                                <button class="btn btn-sm btn-outline-danger" type="button" title="Remove" disabled="@(_form.Columns.Count == 1)" @onclick="() => _form.Columns.Remove(key)"><i class="bi bi-x-lg"></i></button>
+                            </div>
+                        </div>
+                    }
+                    <button class="btn btn-sm btn-outline-primary mt-1" type="button" @onclick="AddKeyColumn" disabled="@(UnusedColumns.Count == 0)"><i class="bi bi-plus-lg me-1"></i>Add key column</button>
+                </div>
+
+                @if (!_form.IsPrimaryKey && !_form.IsClustered)
+                {
+                    <div class="col-12">
+                        <label class="form-label small fw-semibold">Included columns <span class="text-muted fw-normal">(optional)</span></label>
+                        <div class="d-flex flex-wrap gap-3">
+                            @foreach (var column in UnusedColumns)
+                            {
+                                <div class="form-check">
+                                    <input id="@($"include-{column}")" class="form-check-input" type="checkbox" checked="@_form.IncludeColumns.Contains(column)" @onchange="e => ToggleInclude(column, (bool)e.Value!)" />
+                                    <label class="form-check-label small font-monospace" for="@($"include-{column}")">@column</label>
+                                </div>
+                            }
+                            @if (UnusedColumns.Count == 0)
+                            {
+                                <span class="text-muted small">All columns are key columns.</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold" for="index-filter">Filter <span class="text-muted fw-normal">(optional)</span></label>
+                        <input id="index-filter" class="form-control form-control-sm font-monospace" placeholder="[IsActive] = 1" @bind="_form.FilterPredicate" @bind:event="oninput" />
+                    </div>
+                }
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold" for="index-fillfactor">Fill factor</label>
+                    <input id="index-fillfactor" type="number" class="form-control form-control-sm" min="0" max="100" placeholder="default" @bind="_form.FillFactor" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold" for="index-filegroup">File group</label>
+                    <select id="index-filegroup" class="form-select form-select-sm" @bind="_form.FileGroup">
+                        <option value="">Table's file group</option>
+                        @foreach (var fileGroup in FileGroups)
+                        {
+                            <option value="@fileGroup">@fileGroup</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            @if (_form.IsPrimaryKey)
+            {
+                <div class="alert alert-warning small mt-3 mb-0">Primary key columns must not allow NULL, and the table must not contain duplicate values in them.</div>
+            }
+
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <button class="btn btn-sm btn-light" type="button" @onclick="Close">Cancel</button>
+                <button class="btn btn-sm btn-success" type="button" @onclick="CreateIndex" disabled="@(_isSaving || _form.Columns.Count == 0)">
+                    @if (_isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Create
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_mode == PanelMode.Rename && _selected is not null)
+{
+    <div class="card border-secondary mb-3">
+        <div class="card-header py-2 fw-semibold">Rename <span class="font-monospace">@_selected.IndexName</span></div>
+        <div class="card-body">
+            <input class="form-control form-control-sm font-monospace mb-3" maxlength="128" aria-label="New index name" @bind="_newName" @bind:event="oninput" />
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-sm btn-light" type="button" @onclick="Close">Cancel</button>
+                <button class="btn btn-sm btn-primary" type="button" @onclick="RenameIndex"
+                        disabled="@(_isSaving || string.IsNullOrWhiteSpace(_newName) || string.Equals(_newName.Trim(), _selected.IndexName, StringComparison.Ordinal))">
+                    Rename
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_mode == PanelMode.Drop && _selected is not null)
+{
+    <div class="card border-danger mb-3">
+        <div class="card-header bg-danger text-white py-2 fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Drop <span class="font-monospace">@_selected.IndexName</span></div>
+        <div class="card-body">
+            <p class="small mb-3">
+                @if (_selected.IsPrimaryKey || _selected.IsUniqueConstraint)
+                {
+                    <span>This is a key constraint; it is dropped as a constraint. SQL Server refuses to drop a primary key that foreign keys still reference.</span>
+                }
+                else
+                {
+                    <span>The index is removed. Queries that relied on it may become slower.</span>
+                }
+            </p>
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-sm btn-light" type="button" @onclick="Close">Cancel</button>
+                <button class="btn btn-sm btn-danger" type="button" @onclick="DropIndex" disabled="@_isSaving">Drop</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (Table.Indexes.Count == 0)
+{
+    <p class="text-muted small mb-0">This table has no indexes (it is a heap).</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Name</th><th>Type</th><th>Key columns</th><th>Included</th><th>Filter</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var index in Table.Indexes)
+                {
+                    <tr>
+                        <td class="font-monospace">
+                            @index.IndexName
+                            @if (index.IsPrimaryKey)
+                            {
+                                <span class="badge text-bg-warning ms-1">PK</span>
+                            }
+                            else if (index.IsUniqueConstraint)
+                            {
+                                <span class="badge text-bg-secondary ms-1">Unique constraint</span>
+                            }
+                            else if (index.IsUnique)
+                            {
+                                <span class="badge text-bg-secondary ms-1">Unique</span>
+                            }
+                        </td>
+                        <td class="small">@index.IndexType</td>
+                        <td class="font-monospace small">@(string.IsNullOrWhiteSpace(index.Columns) ? "—" : index.Columns)</td>
+                        <td class="font-monospace small">@(index.IncludeColumns ?? "—")</td>
+                        <td class="font-monospace small">@(index.FilterPredicate ?? "—")</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary" type="button" title="Rename" disabled="@_isSaving" @onclick="() => OpenRename(index)"><i class="bi bi-pencil-square"></i></button>
+                                <button class="btn btn-outline-danger" type="button" title="Drop" disabled="@_isSaving" @onclick="() => OpenDrop(index)"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private enum PanelMode { None, Create, Rename, Drop }
+
+    [Parameter, EditorRequired] public DatabaseManager Manager { get; set; } = null!;
+    [Parameter, EditorRequired] public TableOperation.Information Table { get; set; } = null!;
+    [Parameter] public IReadOnlyList<string> FileGroups { get; set; } = Array.Empty<string>();
+    [Parameter] public EventCallback<OperationResult> OnChanged { get; set; }
+
+    private PanelMode _mode = PanelMode.None;
+    private IndexOperation.Create _form = new();
+    private IndexOperation.Information? _selected;
+    private string _newName = string.Empty;
+    private bool _isSaving;
+    private string? _message;
+    private bool _messageSuccess;
+
+    private bool HasPrimaryKey => Table.Indexes.Any(index => index.IsPrimaryKey);
+    private bool HasClusteredIndex => Table.Indexes.Any(index => string.Equals(index.IndexType, "CLUSTERED", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Columns that are not (yet) key columns, i.e. the candidates for included columns and further keys.</summary>
+    private List<string> UnusedColumns => Table.Columns
+        .Select(column => column.ColumnName)
+        .Where(name => !_form.Columns.Any(key => string.Equals(key.ColumnName, name, StringComparison.OrdinalIgnoreCase)))
+        .ToList();
+
+    private void OpenCreate()
+    {
+        Close();
+        _form = new IndexOperation.Create { FileGroup = string.Empty };
+        if (Table.Columns.Count > 0)
+            _form.Columns.Add(new IndexOperation.KeyColumn { ColumnName = Table.Columns[0].ColumnName });
+        _mode = PanelMode.Create;
+    }
+
+    private void OpenRename(IndexOperation.Information index)
+    {
+        Close();
+        _selected = index;
+        _newName = index.IndexName;
+        _mode = PanelMode.Rename;
+    }
+
+    private void OpenDrop(IndexOperation.Information index)
+    {
+        Close();
+        _selected = index;
+        _mode = PanelMode.Drop;
+    }
+
+    private void Close() => _mode = PanelMode.None;
+
+    private void SetKind(string? kind)
+    {
+        _form.IsPrimaryKey = kind == "pk";
+        if (_form.IsPrimaryKey)
+        {
+            _form.IsUnique = false;
+            _form.IncludeColumns.Clear();
+            _form.FilterPredicate = null;
+        }
+    }
+
+    private void AddKeyColumn()
+    {
+        var next = UnusedColumns.FirstOrDefault();
+        if (next is null) return;
+
+        _form.IncludeColumns.Remove(next);
+        _form.Columns.Add(new IndexOperation.KeyColumn { ColumnName = next });
+    }
+
+    private void ToggleInclude(string column, bool include)
+    {
+        if (include && !_form.IncludeColumns.Contains(column))
+            _form.IncludeColumns.Add(column);
+        else if (!include)
+            _form.IncludeColumns.Remove(column);
+    }
+
+    private async Task CreateIndex()
+    {
+        _form.DatabaseName = Table.DatabaseName;
+        _form.SchemaName = Table.SchemaName;
+        _form.TableName = Table.TableName;
+        _form.IndexName = string.IsNullOrWhiteSpace(_form.IndexName) ? null : _form.IndexName.Trim();
+        _form.FilterPredicate = string.IsNullOrWhiteSpace(_form.FilterPredicate) ? null : _form.FilterPredicate.Trim();
+
+        // A column chosen as key afterwards must not stay in the include list.
+        _form.IncludeColumns.RemoveAll(include => _form.Columns.Any(key => string.Equals(key.ColumnName, include, StringComparison.OrdinalIgnoreCase)));
+
+        await Run(() => Manager.CreateIndex(_form));
+    }
+
+    private async Task RenameIndex()
+    {
+        if (_selected is null) return;
+
+        await Run(() => Manager.AlterIndex(new IndexOperation.Alter
+        {
+            DatabaseName = Table.DatabaseName,
+            SchemaName = Table.SchemaName,
+            TableName = Table.TableName,
+            IndexName = _selected.IndexName,
+            NewIndexName = _newName.Trim()
+        }));
+    }
+
+    private async Task DropIndex()
+    {
+        if (_selected is null) return;
+
+        await Run(() => Manager.DropIndex(new IndexOperation.Drop
+        {
+            DatabaseName = Table.DatabaseName,
+            SchemaName = Table.SchemaName,
+            TableName = Table.TableName,
+            IndexName = _selected.IndexName
+        }));
+    }
+
+    private async Task Run(Func<Task<OperationResult>> operation)
+    {
+        _isSaving = true;
+        try
+        {
+            var result = await operation();
+            _message = result.Message;
+            _messageSuccess = result.Success;
+
+            if (result.Success)
+            {
+                Close();
+                await OnChanged.InvokeAsync(result);
+            }
+        }
+        catch (Exception exception)
+        {
+            _message = $"Unable to complete the operation: {exception.Message}";
+            _messageSuccess = false;
+        }
+        finally { _isSaving = false; }
+    }
+
+    private void ClearMessage() => _message = null;
+}

@@ -12,7 +12,9 @@ builder.Services.AddRazorComponents()
 
 // Register configuration and services
 builder.Services.AddSingleton<ServerConfiguration>();
-builder.Services.AddSingleton<ISqlGenerator, SqlGenerator>();
+builder.Services.AddSingleton<ISqlGeneratorFactory, SqlGeneratorFactory>();
+builder.Services.AddSingleton<SqlServerGenerator>();
+builder.Services.AddSingleton<ISqlGenerator, SqlServerGenerator>();
 builder.Services.AddScoped<DatabaseManager>();
 builder.Services.AddSingleton<DatabaseManagerFactory>();
 

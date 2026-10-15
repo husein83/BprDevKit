@@ -1,5 +1,5 @@
 @using BprDevKit.DatabaseManagement.Services
-@using BprDevKit.DatabaseManagement.Models.Metadata
+@using BprDevKit.DatabaseManagement.Models.Operations
 @using BprDevKit.Utility
 @using System.Data
 @inject DatabaseManager DatabaseManager
@@ -27,12 +27,12 @@
                         {
                             <div class="form-group">
                                 <label for="functionName">Function Name:</label>
-                                <input type="text" id="functionName" class="form-control" @bind="_newFunction.Name" placeholder="Enter function name" />
+                                <input type="text" id="functionName" class="form-control" @bind="_newFunction.FunctionName" placeholder="Enter function name" />
                             </div>
 
                             <div class="form-group mt-3">
                                 <label for="functionSchema">Schema:</label>
-                                <select id="functionSchema" class="form-control" @bind="_newFunction.Schema">
+                                <select id="functionSchema" class="form-control" @bind="_newFunction.SchemaName">
                                     <option value="">-- Select Schema --</option>
                                     @foreach (var schema in AvailableSchemas)
                                     {
@@ -43,7 +43,7 @@
 
                             <div class="form-group mt-3">
                                 <label for="functionDatabase">Database:</label>
-                                <select id="functionDatabase" class="form-control" @bind="_newFunction.Database">
+                                <select id="functionDatabase" class="form-control" @bind="_newFunction.DatabaseName">
                                     <option value="">-- Select Database --</option>
                                     @foreach (var db in AvailableDatabases)
                                     {
@@ -158,9 +158,9 @@
                             @foreach (var function in Functions)
                             {
                                 <tr>
-                                    <td>@function.Name</td>
-                                    <td>@function.Schema</td>
-                                    <td>@function.Database</td>
+                                    <td>@function.FunctionName</td>
+                                    <td>@function.SchemaName</td>
+                                    <td>@function.DatabaseName</td>
                                     <td>@function.CreateDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
                                     <td>@function.ModifyDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
                                     <td>
@@ -193,7 +193,7 @@
                                     <h6>Edit Function Properties</h6>
                                     <div class="form-group">
                                         <label>New Function Name:</label>
-                                        <input type="text" class="form-control" @bind="_editFunction.Name" />
+                                        <input type="text" class="form-control" @bind="_editFunction.FunctionName" />
                                     </div>
                                 </div>
                             }
@@ -201,7 +201,7 @@
                             {
                                 <div>
                                     <h6>Delete Function Confirmation</h6>
-                                    <p>Are you sure you want to delete function <strong>@_functionToDelete.Name</strong> in schema <strong>@_functionToDelete.Schema</strong> of database <strong>@_functionToDelete.Database</strong>?</p>
+                                    <p>Are you sure you want to delete function <strong>@_functionToDelete.FunctionName</strong> in schema <strong>@_functionToDelete.SchemaName</strong> of database <strong>@_functionToDelete.DatabaseName</strong>?</p>
                                     <p class="text-danger">This action cannot be undone.</p>
                                 </div>
                             }
@@ -229,7 +229,7 @@
     [Parameter]
     public EventCallback<string> OnOperationComplete { get; set; }
 
-    private List<FunctionInfo> Functions = new();
+    private List<FunctionOperation.Information> Functions = new();
     private List<string> AvailableSchemas = new();
     private List<string> AvailableDatabases = new();
 
@@ -238,9 +238,9 @@
     private bool ShowEditFunction = false;
     private bool ShowDeleteFunction = false;
 
-    private FunctionInfo _newFunction = new FunctionInfo();
-    private FunctionInfo _editFunction = new FunctionInfo();
-    private FunctionInfo _functionToDelete = new FunctionInfo();
+    private FunctionOperation.Information _newFunction = new FunctionOperation.Information();
+    private FunctionOperation.Information _editFunction = new FunctionOperation.Information();
+    private FunctionOperation.Information _functionToDelete = new FunctionOperation.Information();
 
     private DataTable? FunctionTestResult = null;
 
@@ -261,8 +261,8 @@
                 AvailableSchemas = result.schemas;
                 if (AvailableSchemas.Count > 0)
                 {
-                    _newFunction.Schema = AvailableSchemas[0];
-                    _editFunction.Schema = AvailableSchemas[0];
+                    _newFunction.SchemaName = AvailableSchemas[0];
+                    _editFunction.SchemaName = AvailableSchemas[0];
                 }
             }
         }
@@ -276,8 +276,8 @@
             AvailableDatabases = result.databases;
             if (AvailableDatabases.Count > 0)
             {
-                _newFunction.Database = AvailableDatabases[0];
-                _editFunction.Database = AvailableDatabases[0];
+                _newFunction.DatabaseName = AvailableDatabases[0];
+                _editFunction.DatabaseName = AvailableDatabases[0];
             }
         }
     }
@@ -289,14 +289,14 @@
             var result = await DatabaseManager.GetFunctions(_selectedDatabase);
             if (result.operationResult.Success)
             {
-                Functions = new List<FunctionInfo>();
+                Functions = new List<FunctionOperation.Information>();
                 foreach (var functionName in result.functions)
                 {
-                    Functions.Add(new FunctionInfo
+                    Functions.Add(new FunctionOperation.Information
                     {
-                        Name = functionName,
-                        Schema = "dbo",
-                        Database = _selectedDatabase,
+                        FunctionName = functionName,
+                        SchemaName = "dbo",
+                        DatabaseName = _selectedDatabase,
                         CreateDate = DateTime.Now,
                         ModifyDate = DateTime.Now,
                         Definition = "-- Function body"
@@ -308,10 +308,10 @@
 
     private void OpenCreateFunction()
     {
-        _newFunction = new FunctionInfo
+        _newFunction = new FunctionOperation.Information
         {
-            Schema = _selectedSchema,
-            Database = _selectedDatabase,
+            SchemaName = _selectedSchema,
+            DatabaseName = _selectedDatabase,
             WithEncryption = true
         };
         ShowCreateFunction = true;
@@ -320,26 +320,26 @@
     private void CancelCreateFunction()
     {
         ShowCreateFunction = false;
-        _newFunction = new FunctionInfo();
+        _newFunction = new FunctionOperation.Information();
         ShowTestFunction = false;
         FunctionTestResult = null;
     }
 
     private async Task TestFunction()
     {
-        if (string.IsNullOrWhiteSpace(_newFunction.Database))
+        if (string.IsNullOrWhiteSpace(_newFunction.DatabaseName))
         {
             await OnOperationComplete.InvokeAsync("Database must be selected");
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_newFunction.Name) || string.IsNullOrWhiteSpace(_newFunction.Definition))
+        if (string.IsNullOrWhiteSpace(_newFunction.FunctionName) || string.IsNullOrWhiteSpace(_newFunction.Definition))
         {
             await OnOperationComplete.InvokeAsync("Function name and body cannot be empty");
             return;
         }
 
-        var result = await DatabaseManager.TestFunction(_newFunction.Database, _newFunction.Name, _newFunction.Definition);
+        var result = await DatabaseManager.TestFunction(_newFunction.DatabaseName, _newFunction.FunctionName, _newFunction.Definition);
         if (!result.operationResult.Success)
         {
             await OnOperationComplete.InvokeAsync($"Function test failed: {result.operationResult.Message}");
@@ -352,13 +352,13 @@
 
     private async Task SaveFunction()
     {
-        if (string.IsNullOrWhiteSpace(_newFunction.Name))
+        if (string.IsNullOrWhiteSpace(_newFunction.FunctionName))
         {
             await OnOperationComplete.InvokeAsync("Function name cannot be empty");
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_newFunction.Schema) || string.IsNullOrWhiteSpace(_newFunction.Database))
+        if (string.IsNullOrWhiteSpace(_newFunction.SchemaName) || string.IsNullOrWhiteSpace(_newFunction.DatabaseName))
         {
             await OnOperationComplete.InvokeAsync("Schema and database must be selected");
             return;
@@ -370,7 +370,7 @@
             return;
         }
 
-        var result = await DatabaseManager.CreateFunction(_newFunction.Database, _newFunction.Schema, _newFunction.Name, _newFunction.Definition, _newFunction.WithEncryption);
+        var result = await DatabaseManager.CreateFunction(_newFunction.DatabaseName, _newFunction.SchemaName, _newFunction.FunctionName, _newFunction.Definition, _newFunction.WithEncryption);
         if (!result.Success)
         {
             await OnOperationComplete.InvokeAsync($"Error creating function: {result.Message}");
@@ -382,19 +382,19 @@
         await LoadFunctions();
     }
 
-    private void EditFunction(FunctionInfo function)
+    private void EditFunction(FunctionOperation.Information function)
     {
-        _editFunction = new FunctionInfo
+        _editFunction = new FunctionOperation.Information
         {
-            Name = function.Name,
-            Schema = function.Schema,
-            Database = function.Database,
+            FunctionName = function.FunctionName,
+            SchemaName = function.SchemaName,
+            DatabaseName = function.DatabaseName,
             WithEncryption = function.Definition.Contains("WITH ENCRYPTION")
         };
         ShowEditFunction = true;
     }
 
-    private void DeleteFunction(FunctionInfo function)
+    private void DeleteFunction(FunctionOperation.Information function)
     {
         _functionToDelete = function;
         ShowDeleteFunction = true;
@@ -410,7 +410,7 @@
     {
         try
         {
-            var result = await DatabaseManager.DropFunction(_functionToDelete.Database, _functionToDelete.Schema, _functionToDelete.Name);
+            var result = await DatabaseManager.DropFunction(_functionToDelete.DatabaseName, _functionToDelete.SchemaName, _functionToDelete.FunctionName);
             if (result.Success)
             {
                 await OnOperationComplete.InvokeAsync(result.Message);
@@ -432,8 +432,8 @@
     {
         ShowEditFunction = false;
         ShowDeleteFunction = false;
-        _editFunction = new FunctionInfo();
-        _functionToDelete = new FunctionInfo();
+        _editFunction = new FunctionOperation.Information();
+        _functionToDelete = new FunctionOperation.Information();
     }
 
     private void CancelTestFunction()

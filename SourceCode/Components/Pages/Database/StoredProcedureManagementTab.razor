@@ -1,5 +1,5 @@
 @using BprDevKit.DatabaseManagement.Services
-@using BprDevKit.DatabaseManagement.Models.Metadata
+@using BprDevKit.DatabaseManagement.Models.Operations
 @using BprDevKit.Config
 @using BprDevKit.Utility
 @using System.Data
@@ -28,12 +28,12 @@
                         {
                             <div class="form-group">
                                 <label for="procedureName">Stored Procedure Name:</label>
-                                <input type="text" id="procedureName" class="form-control" @bind="_newProcedure.Name" placeholder="Enter procedure name" />
+                                <input type="text" id="procedureName" class="form-control" @bind="_newProcedure.ProcedureName" placeholder="Enter procedure name" />
                             </div>
 
                             <div class="form-group mt-3">
                                 <label for="procedureSchema">Schema:</label>
-                                <select id="procedureSchema" class="form-control" @bind="_newProcedure.Schema">
+                                <select id="procedureSchema" class="form-control" @bind="_newProcedure.SchemaName">
                                     <option value="">-- Select Schema --</option>
                                     @foreach (var schema in AvailableSchemas)
                                     {
@@ -44,7 +44,7 @@
 
                             <div class="form-group mt-3">
                                 <label for="procedureDatabase">Database:</label>
-                                <select id="procedureDatabase" class="form-control" @bind="_newProcedure.Database">
+                                <select id="procedureDatabase" class="form-control" @bind="_newProcedure.DatabaseName">
                                     <option value="">-- Select Database --</option>
                                     @foreach (var db in AvailableDatabases)
                                     {
@@ -159,9 +159,9 @@
                             @foreach (var procedure in StoredProcedures)
                             {
                                 <tr>
-                                    <td>@procedure.Name</td>
-                                    <td>@procedure.Schema</td>
-                                    <td>@procedure.Database</td>
+                                    <td>@procedure.ProcedureName</td>
+                                    <td>@procedure.SchemaName</td>
+                                    <td>@procedure.DatabaseName</td>
                                     <td>@procedure.CreateDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
                                     <td>@procedure.ModifyDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
                                     <td>
@@ -194,7 +194,7 @@
                                     <h6>Edit Stored Procedure Properties</h6>
                                     <div class="form-group">
                                         <label>New Procedure Name:</label>
-                                        <input type="text" class="form-control" @bind="_editProcedure.Name" />
+                                        <input type="text" class="form-control" @bind="_editProcedure.ProcedureName" />
                                     </div>
                                 </div>
                             }
@@ -202,7 +202,7 @@
                             {
                                 <div>
                                     <h6>Delete Stored Procedure Confirmation</h6>
-                                    <p>Are you sure you want to delete stored procedure <strong>@_procedureToDelete.Name</strong> in schema <strong>@_procedureToDelete.Schema</strong> of database <strong>@_procedureToDelete.Database</strong>?</p>
+                                    <p>Are you sure you want to delete stored procedure <strong>@_procedureToDelete.ProcedureName</strong> in schema <strong>@_procedureToDelete.SchemaName</strong> of database <strong>@_procedureToDelete.DatabaseName</strong>?</p>
                                     <p class="text-danger">This action cannot be undone.</p>
                                 </div>
                             }
@@ -230,7 +230,7 @@
     [Parameter]
     public EventCallback<string> OnOperationComplete { get; set; }
 
-    private List<StoredProcedureInfo> StoredProcedures = new();
+    private List<StoredProcedureOperation.Information> StoredProcedures = new();
     private List<string> AvailableSchemas = new();
     private List<string> AvailableDatabases = new();
 
@@ -239,9 +239,9 @@
     private bool ShowEditProcedure = false;
     private bool ShowDeleteProcedure = false;
 
-    private StoredProcedureInfo _newProcedure = new StoredProcedureInfo();
-    private StoredProcedureInfo _editProcedure = new StoredProcedureInfo();
-    private StoredProcedureInfo _procedureToDelete = new StoredProcedureInfo();
+    private StoredProcedureOperation.Information _newProcedure = new StoredProcedureOperation.Information();
+    private StoredProcedureOperation.Information _editProcedure = new StoredProcedureOperation.Information();
+    private StoredProcedureOperation.Information _procedureToDelete = new StoredProcedureOperation.Information();
 
     private DataTable? ProcedureTestResult = null;
 
@@ -262,8 +262,8 @@
                 AvailableSchemas = result.schemas;
                 if (AvailableSchemas.Count > 0)
                 {
-                    _newProcedure.Schema = AvailableSchemas[0];
-                    _editProcedure.Schema = AvailableSchemas[0];
+                    _newProcedure.SchemaName = AvailableSchemas[0];
+                    _editProcedure.SchemaName = AvailableSchemas[0];
                 }
             }
         }
@@ -277,8 +277,8 @@
             AvailableDatabases = result.databases;
             if (AvailableDatabases.Count > 0)
             {
-                _newProcedure.Database = AvailableDatabases[0];
-                _editProcedure.Database = AvailableDatabases[0];
+                _newProcedure.DatabaseName = AvailableDatabases[0];
+                _editProcedure.DatabaseName = AvailableDatabases[0];
             }
         }
     }
@@ -290,14 +290,14 @@
             var result = await DatabaseManager.GetStoredProcedures(_selectedDatabase);
             if (result.operationResult.Success)
             {
-                StoredProcedures = new List<StoredProcedureInfo>();
+                StoredProcedures = new List<StoredProcedureOperation.Information>();
                 foreach (var procedureName in result.procedures)
                 {
-                    StoredProcedures.Add(new StoredProcedureInfo
+                    StoredProcedures.Add(new StoredProcedureOperation.Information
                     {
-                        Name = procedureName,
-                        Schema = "dbo",
-                        Database = _selectedDatabase,
+                        ProcedureName = procedureName,
+                        SchemaName = "dbo",
+                        DatabaseName = _selectedDatabase,
                         CreateDate = DateTime.Now,
                         ModifyDate = DateTime.Now,
                         Definition = "-- Procedure body"
@@ -309,10 +309,10 @@
 
     private void OpenCreateStoredProcedure()
     {
-        _newProcedure = new StoredProcedureInfo
+        _newProcedure = new StoredProcedureOperation.Information
         {
-            Schema = _selectedSchema,
-            Database = _selectedDatabase,
+            SchemaName = _selectedSchema,
+            DatabaseName = _selectedDatabase,
             WithEncryption = true
         };
         ShowCreateProcedure = true;
@@ -321,26 +321,26 @@
     private void CancelCreateStoredProcedure()
     {
         ShowCreateProcedure = false;
-        _newProcedure = new StoredProcedureInfo();
+        _newProcedure = new StoredProcedureOperation.Information();
         ShowTestProcedure = false;
         ProcedureTestResult = null;
     }
 
     private async Task TestProcedure()
     {
-        if (string.IsNullOrWhiteSpace(_newProcedure.Database))
+        if (string.IsNullOrWhiteSpace(_newProcedure.DatabaseName))
         {
             await OnOperationComplete.InvokeAsync("Database must be selected");
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_newProcedure.Name) || string.IsNullOrWhiteSpace(_newProcedure.Definition))
+        if (string.IsNullOrWhiteSpace(_newProcedure.ProcedureName) || string.IsNullOrWhiteSpace(_newProcedure.Definition))
         {
             await OnOperationComplete.InvokeAsync("Procedure name and body cannot be empty");
             return;
         }
 
-        var result = await DatabaseManager.TestStoredProcedure(_newProcedure.Database, _newProcedure.Name, _newProcedure.Definition);
+        var result = await DatabaseManager.TestStoredProcedure(_newProcedure.DatabaseName, _newProcedure.ProcedureName, _newProcedure.Definition);
         if (!result.operationResult.Success)
         {
             await OnOperationComplete.InvokeAsync($"Procedure test failed: {result.operationResult.Message}");
@@ -353,13 +353,13 @@
 
     private async Task SaveStoredProcedure()
     {
-        if (string.IsNullOrWhiteSpace(_newProcedure.Name))
+        if (string.IsNullOrWhiteSpace(_newProcedure.ProcedureName))
         {
             await OnOperationComplete.InvokeAsync("Procedure name cannot be empty");
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_newProcedure.Schema) || string.IsNullOrWhiteSpace(_newProcedure.Database))
+        if (string.IsNullOrWhiteSpace(_newProcedure.SchemaName) || string.IsNullOrWhiteSpace(_newProcedure.DatabaseName))
         {
             await OnOperationComplete.InvokeAsync("Schema and database must be selected");
             return;
@@ -371,7 +371,7 @@
             return;
         }
 
-        var result = await DatabaseManager.CreateStoredProcedure(_newProcedure.Database, _newProcedure.Schema, _newProcedure.Name, _newProcedure.Definition, _newProcedure.WithEncryption);
+        var result = await DatabaseManager.CreateStoredProcedure(_newProcedure.DatabaseName, _newProcedure.SchemaName, _newProcedure.ProcedureName, _newProcedure.Definition, _newProcedure.WithEncryption);
         if (!result.Success)
         {
             await OnOperationComplete.InvokeAsync($"Error creating stored procedure: {result.Message}");
@@ -383,19 +383,19 @@
         await LoadStoredProcedures();
     }
 
-    private void EditStoredProcedure(StoredProcedureInfo procedure)
+    private void EditStoredProcedure(StoredProcedureOperation.Information procedure)
     {
-        _editProcedure = new StoredProcedureInfo
+        _editProcedure = new StoredProcedureOperation.Information
         {
-            Name = procedure.Name,
-            Schema = procedure.Schema,
-            Database = procedure.Database,
+            ProcedureName = procedure.ProcedureName,
+            SchemaName = procedure.SchemaName,
+            DatabaseName = procedure.DatabaseName,
             WithEncryption = procedure.Definition.Contains("WITH ENCRYPTION")
         };
         ShowEditProcedure = true;
     }
 
-    private void DeleteStoredProcedure(StoredProcedureInfo procedure)
+    private void DeleteStoredProcedure(StoredProcedureOperation.Information procedure)
     {
         _procedureToDelete = procedure;
         ShowDeleteProcedure = true;
@@ -411,7 +411,7 @@
     {
         try
         {
-            var result = await DatabaseManager.DropStoredProcedure(_procedureToDelete.Database, _procedureToDelete.Schema, _procedureToDelete.Name);
+            var result = await DatabaseManager.DropStoredProcedure(_procedureToDelete.DatabaseName, _procedureToDelete.SchemaName, _procedureToDelete.ProcedureName);
             if (result.Success)
             {
                 await OnOperationComplete.InvokeAsync(result.Message);
@@ -433,8 +433,8 @@
     {
         ShowEditProcedure = false;
         ShowDeleteProcedure = false;
-        _editProcedure = new StoredProcedureInfo();
-        _procedureToDelete = new StoredProcedureInfo();
+        _editProcedure = new StoredProcedureOperation.Information();
+        _procedureToDelete = new StoredProcedureOperation.Information();
     }
 
     private void CancelTestProcedure()

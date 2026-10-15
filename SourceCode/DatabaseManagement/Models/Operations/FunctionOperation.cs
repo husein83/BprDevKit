@@ -36,6 +36,12 @@ namespace BprDevKit.DatabaseManagement.Models.Operations
             public string DatabaseName { get; set; } = null!;
             public string SchemaName { get; set; } = null!;
             public string FunctionName { get; set; } = null!;
+
+            // ---- Loaded data ----
+            public string Definition { get; set; } = string.Empty;
+            public DateTime CreateDate { get; set; }
+            public DateTime ModifyDate { get; set; }
+            public bool WithEncryption { get; set; } = true;
         }
     }
 }

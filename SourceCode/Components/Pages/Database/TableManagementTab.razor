@@ -121,7 +121,7 @@
                                 <tr>
                                     <td><input class="form-control form-control-sm font-monospace" maxlength="128" @bind="column.ColumnName" @bind:event="oninput" /></td>
                                     <td>
-                                        <select class="form-select form-select-sm" value="@column.DataType" @onchange="e => OnTypeChanged(column, e.Value?.ToString())">
+                                        <select class="form-select form-select-sm" value="@column.DataType" @onchange="e => column.ApplyDataType(e.Value?.ToString())">
                                             @foreach (var option in ColumnDataType.All)
                                             {
                                                 <option value="@option.Name">@option.Name</option>
@@ -167,12 +167,12 @@
                                                disabled="@(column.IsPrimaryKey || column.IsIdentity)" @onchange="e => column.IsNullable = (bool)e.Value!" />
                                     </td>
                                     <td class="text-center">
-                                        <input class="form-check-input" type="checkbox" checked="@column.IsPrimaryKey" @onchange="e => SetPrimaryKey(column, (bool)e.Value!)" />
+                                        <input class="form-check-input" type="checkbox" checked="@column.IsPrimaryKey" @onchange="e => column.SetPrimaryKey((bool)e.Value!)" />
                                     </td>
                                     <td class="text-center">
                                         <input class="form-check-input" type="checkbox" checked="@column.IsIdentity"
                                                disabled="@(type?.SupportsIdentity != true || (!column.IsIdentity && HasIdentityColumn))"
-                                               @onchange="e => SetIdentity(column, (bool)e.Value!)" />
+                                               @onchange="e => column.SetIdentity((bool)e.Value!)" />
                                     </td>
                                     <td>
                                         <input class="form-control form-control-sm font-monospace" placeholder="0, 'N/A', SYSUTCDATETIME()" disabled="@column.IsIdentity"
@@ -271,7 +271,7 @@
                         }
                         else if (_details is not null)
                         {
-                            <TableDetailsView Table="_details" />
+                            <TableDetailsView Manager="_databaseManager!" Table="_details" Tables="_tables" FileGroups="_fileGroups" OnChanged="OnTableStructureChanged" />
                         }
                     </div>
                     <div class="modal-footer"><button class="btn btn-primary" type="button" @onclick="CloseDialogs">Close</button></div>
@@ -379,10 +379,10 @@
     private List<string> _databases = new();
     private List<string> _schemas = new();
     private List<string> _fileGroups = new();
-    private List<TableSummary> _tables = new();
+    private List<TableOperation.Information> _tables = new();
     private TableOperation.Create _createConfiguration = NewCreateConfiguration();
-    private TableSummary? _dialogTable;
-    private TableInfo? _details;
+    private TableOperation.Information? _dialogTable;
+    private TableOperation.Information? _details;
     private string _selectedDatabase = string.Empty;
     private string _schemaFilter = string.Empty;
     private string _nameFilter = string.Empty;
@@ -405,7 +405,7 @@
     private bool HasDatabase => !string.IsNullOrWhiteSpace(_selectedDatabase);
     private bool HasIdentityColumn => _createConfiguration.Columns.Any(column => column.IsIdentity);
 
-    private IEnumerable<TableSummary> VisibleTables => _tables.Where(table =>
+    private IEnumerable<TableOperation.Information> VisibleTables => _tables.Where(table =>
         (string.IsNullOrEmpty(_schemaFilter) || table.SchemaName == _schemaFilter)
         && (string.IsNullOrWhiteSpace(_nameFilter) || table.TableName.Contains(_nameFilter.Trim(), StringComparison.OrdinalIgnoreCase)));
 
@@ -419,8 +419,8 @@
     private bool HasEditChanges => IsRenameRequested || DescriptionChanged;
 
     /// <summary>Foreign keys of other tables that point to the table in the drop dialog.</summary>
-    private List<ForeignKeyInfo> IncomingForeignKeys => _details is null || _dialogTable is null
-        ? new List<ForeignKeyInfo>()
+    private List<ForeignKeyOperation.Information> IncomingForeignKeys => _details is null || _dialogTable is null
+        ? new List<ForeignKeyOperation.Information>()
         : _details.ForeignKeys.Where(foreignKey =>
             string.Equals(foreignKey.RefSchemaName, _dialogTable.SchemaName, StringComparison.OrdinalIgnoreCase)
             && string.Equals(foreignKey.RefTableName, _dialogTable.TableName, StringComparison.OrdinalIgnoreCase)
@@ -482,7 +482,7 @@
         _isLoadingTables = true;
         try
         {
-            var tableResult = await _databaseManager.GetTableSummaries(databaseName);
+            var tableResult = await _databaseManager.GetTableList(databaseName);
             var schemaResult = await _databaseManager.GetSchemas(databaseName);
             var fileGroupResult = await _databaseManager.GetFileGroups(databaseName);
 
@@ -511,7 +511,7 @@
     {
         CloseCreateTable();
         CloseDialogs();
-        _tables = new List<TableSummary>();
+        _tables = new List<TableOperation.Information>();
         _schemas = new List<string>();
         _fileGroups = new List<string>();
         _schemaFilter = string.Empty;
@@ -524,7 +524,7 @@
         if (HasDatabase && !_databases.Contains(_selectedDatabase))
         {
             _selectedDatabase = string.Empty;
-            _tables = new List<TableSummary>();
+            _tables = new List<TableOperation.Information>();
         }
 
         await LoadTables();
@@ -568,41 +568,9 @@
     private static int? ParseInt(object? value) =>
         int.TryParse(value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) ? number : null;
 
-    /// <summary>Switching the type resets the size arguments to sensible defaults for the new type.</summary>
-    private static void OnTypeChanged(ColumnDefinition column, string? dataType)
-    {
-        var type = ColumnDataType.Find(dataType);
-        if (type is null) return;
-
-        column.DataType = type.Name;
-        column.Length = type.Kind == ColumnDataTypeKind.Length ? Math.Min(50, type.MaxLength) : null;
-        column.Precision = type.Kind == ColumnDataTypeKind.PrecisionScale ? 18 : null;
-        column.Scale = type.Kind == ColumnDataTypeKind.PrecisionScale ? 0 : null;
-
-        if (!type.SupportsIdentity)
-            column.IsIdentity = false;
-    }
-
     private static void ToggleMax(ColumnDefinition column, ColumnDataType type, bool useMax)
     {
         column.Length = useMax ? -1 : Math.Min(50, type.MaxLength);
-    }
-
-    private static void SetPrimaryKey(ColumnDefinition column, bool isPrimaryKey)
-    {
-        column.IsPrimaryKey = isPrimaryKey;
-        if (isPrimaryKey)
-            column.IsNullable = false;
-    }
-
-    private static void SetIdentity(ColumnDefinition column, bool isIdentity)
-    {
-        column.IsIdentity = isIdentity;
-        if (isIdentity)
-        {
-            column.IsNullable = false;
-            column.DefaultValue = null;
-        }
     }
 
     private async Task CreateTable()
@@ -637,7 +605,7 @@
 
     // ---- View ----
 
-    private async Task OpenViewTable(TableSummary table)
+    private async Task OpenViewTable(TableOperation.Information table)
     {
         CloseDialogs();
         _dialogTable = table;
@@ -645,14 +613,14 @@
         await LoadDetails(table);
     }
 
-    private async Task LoadDetails(TableSummary table)
+    private async Task LoadDetails(TableOperation.Information table)
     {
         if (_databaseManager is null || !HasDatabase) return;
 
         _isLoadingDetails = true;
         try
         {
-            var result = await _databaseManager.GetTableDetails(new TableOperation.Information
+            var result = await _databaseManager.GetTableInformation(new TableOperation.Information
             {
                 DatabaseName = _selectedDatabase,
                 SchemaName = table.SchemaName,
@@ -677,9 +645,49 @@
         finally { _isLoadingDetails = false; }
     }
 
+    /// <summary>A column, index or foreign key was changed in the details dialog: reload it and the table list.</summary>
+    private async Task OnTableStructureChanged(OperationResult result)
+    {
+        await OnOperationComplete.InvokeAsync(result.Message);
+        await RefreshDetails();
+        await LoadTables();
+    }
+
+    /// <summary>Reloads the open table without showing the loading spinner, so the dialog keeps its state.</summary>
+    private async Task RefreshDetails()
+    {
+        if (_databaseManager is null || !HasDatabase || _dialogTable is null) return;
+
+        var table = _dialogTable;
+        try
+        {
+            var result = await _databaseManager.GetTableInformation(new TableOperation.Information
+            {
+                DatabaseName = _selectedDatabase,
+                SchemaName = table.SchemaName,
+                TableName = table.TableName
+            });
+
+            if (!ReferenceEquals(table, _dialogTable)) return;
+
+            if (result.operationResult.Success)
+                _details = result.table;
+            else
+            {
+                CloseDialogs();
+                ShowError(result.operationResult.Message);
+            }
+        }
+        catch (Exception exception)
+        {
+            CloseDialogs();
+            ShowError($"Unable to reload the table: {exception.Message}");
+        }
+    }
+
     // ---- Edit ----
 
-    private void OpenEditTable(TableSummary table)
+    private void OpenEditTable(TableOperation.Information table)
     {
         CloseDialogs();
         _dialogTable = table;
@@ -720,7 +728,7 @@
 
     // ---- Delete ----
 
-    private async Task OpenDeleteTable(TableSummary table)
+    private async Task OpenDeleteTable(TableOperation.Information table)
     {
         CloseDialogs();
         _dialogTable = table;

@@ -1,19 +1,20 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using BprDevKit.DatabaseManagement.Models.Metadata;
 using BprDevKit.DatabaseManagement.Models.Operations;
+using BprDevKit.DatabaseManagement.Services;
 using BprDevKit.Utility;
 using BprDevKit.Config;
 
 namespace BprDevKit.DatabaseManagement.Services
 {
     /// <summary>
-    /// Main database operations service that handles transactions and uses SqlGenerator for dynamic SQL generation
+    /// Main database operations service that handles transactions and uses ISqlGenerator for dynamic SQL generation
     /// </summary>
     public class DatabaseManager
     {
@@ -239,54 +240,50 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<(OperationResult operationResult, List<SchemaSummary> schemas)> GetSchemaSummaries(string databaseName)
+        /// <summary>
+        /// Lists the schemas of a database with their owner and object count.
+        /// </summary>
+        public async Task<(OperationResult operationResult, List<SchemaOperation.Information> schemas)> GetSchemaList(string databaseName)
         {
             try
             {
-                var sql = _sqlGenerator.GenerateGetSchemaSummariesScript(databaseName);
-                var table = await ExecuteQuery(sql);
-
-                var schemas = table.Rows.Cast<DataRow>()
-                    .Select(row => new SchemaSummary
-                    {
-                        SchemaName = Convert.ToString(row["SchemaName"]) ?? string.Empty,
-                        OwnerName = Convert.ToString(row["OwnerName"]) ?? string.Empty,
-                        ObjectCount = Convert.ToInt32(row["ObjectCount"])
-                    })
-                    .ToList();
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetSchemaListScript(databaseName));
+                var schemas = table.Rows.Cast<DataRow>().Select(row => MapSchema(databaseName, row)).ToList();
 
                 return (OperationResult.SuccessResult($"Retrieved {schemas.Count} schema(s)"), schemas);
             }
             catch (Exception ex)
             {
-                return (OperationResult.ErrorResult($"Error retrieving schemas: {ex.Message}", ex), new List<SchemaSummary>());
+                return (OperationResult.ErrorResult($"Error retrieving schemas: {ex.Message}", ex), new List<SchemaOperation.Information>());
             }
         }
 
         /// <summary>
-        /// Lists every object that lives under a schema so it can be inspected before it is renamed or dropped.
+        /// Loads one schema completely: owner, object count and the objects that live in it.
         /// </summary>
-        public async Task<(OperationResult operationResult, List<SchemaObjectInfo> objects)> GetSchemaObjects(SchemaOperation.Information config)
+        public async Task<(OperationResult operationResult, SchemaOperation.Information? schema)> GetSchemaInformation(SchemaOperation.Information config)
         {
             try
             {
-                var sql = _sqlGenerator.GenerateGetSchemaObjectsScript(config);
-                var table = await ExecuteQuery(sql);
+                var header = await ExecuteQuery(_sqlGenerator.GenerateGetSchemaListScript(config.DatabaseName, config.SchemaName));
+                if (header.Rows.Count == 0)
+                    return (OperationResult.ErrorResult($"[BprDevKit] Schema [{config.SchemaName}] does not exist in database [{config.DatabaseName}]."), null);
 
-                var objects = table.Rows.Cast<DataRow>()
-                    .Select(row => new SchemaObjectInfo
-                    {
-                        ObjectType = Convert.ToString(row["ObjectType"]) ?? string.Empty,
-                        ObjectName = Convert.ToString(row["ObjectName"]) ?? string.Empty,
-                        CreateDate = row["CreateDate"] is DateTime createDate ? createDate : null
-                    })
+                var schema = MapSchema(config.DatabaseName, header.Rows[0]);
+
+                var objects = await ExecuteQuery(_sqlGenerator.GenerateGetSchemaInformationScript(config));
+                schema.Objects = objects.Rows.Cast<DataRow>()
+                    .Select(row => (
+                        ObjectType: Convert.ToString(row["ObjectType"]) ?? string.Empty,
+                        ObjectName: Convert.ToString(row["ObjectName"]) ?? string.Empty,
+                        CreateDate: row["CreateDate"] is DateTime createDate ? createDate : (DateTime?)null))
                     .ToList();
 
-                return (OperationResult.SuccessResult($"Retrieved {objects.Count} object(s) for schema '{config.SchemaName}'."), objects);
+                return (OperationResult.SuccessResult($"Retrieved schema '{config.SchemaName}' with {schema.Objects.Count} object(s)."), schema);
             }
             catch (Exception ex)
             {
-                return (OperationResult.ErrorResult($"Error retrieving schema objects: {ex.Message}", ex), new List<SchemaObjectInfo>());
+                return (OperationResult.ErrorResult($"Error retrieving schema information: {ex.Message}", ex), null);
             }
         }
 
@@ -377,7 +374,7 @@ namespace BprDevKit.DatabaseManagement.Services
         /// <summary>
         /// Loads one table completely: header data, columns, indexes and the foreign keys it owns or is referenced by.
         /// </summary>
-        public async Task<(OperationResult operationResult, TableInfo? table)> GetTableDetails(TableOperation.Information config)
+        public async Task<(OperationResult operationResult, TableOperation.Information? table)> GetTableInformation(TableOperation.Information config)
         {
             try
             {
@@ -386,25 +383,26 @@ namespace BprDevKit.DatabaseManagement.Services
                     return (OperationResult.ErrorResult($"[BprDevKit] Table [{config.SchemaName}].[{config.TableName}] does not exist in database [{config.DatabaseName}]."), null);
 
                 var headerRow = header.Rows[0];
-                var table = new TableInfo
+                var table = new TableOperation.Information
                 {
                     DatabaseName = config.DatabaseName,
                     SchemaName = config.SchemaName,
                     TableName = config.TableName,
-                    FileGroup = GetNullableString(headerRow, "FileGroup") ?? string.Empty,
+                    FileGroup = GetNullableString(headerRow, "FileGroup"),
                     Description = GetNullableString(headerRow, "Description"),
                     CreateDate = Convert.ToDateTime(headerRow["CreateDate"]),
                     ModifyDate = Convert.ToDateTime(headerRow["ModifyDate"])
                 };
 
                 var columns = await ExecuteQuery(_sqlGenerator.GenerateGetTableColumnsScript(config));
-                table.Columns = columns.Rows.Cast<DataRow>().Select(MapColumn).ToList();
+                table.Columns = columns.Rows.Cast<DataRow>().Select(row => MapColumn(config, row)).ToList();
+                table.ColumnCount = table.Columns.Count;
 
                 var indexes = await ExecuteQuery(_sqlGenerator.GenerateGetTableIndexesScript(config));
-                table.Indexes = indexes.Rows.Cast<DataRow>().Select(MapIndex).ToList();
+                table.Indexes = indexes.Rows.Cast<DataRow>().Select(row => MapIndex(config, row)).ToList();
 
                 var foreignKeys = await ExecuteQuery(_sqlGenerator.GenerateGetTableForeignKeysScript(config));
-                table.ForeignKeys = foreignKeys.Rows.Cast<DataRow>().Select(MapForeignKey).ToList();
+                table.ForeignKeys = foreignKeys.Rows.Cast<DataRow>().Select(row => MapForeignKey(config.DatabaseName, row)).ToList();
 
                 return (OperationResult.SuccessResult($"Retrieved information for table '{config.SchemaName}.{config.TableName}'."), table);
             }
@@ -414,15 +412,19 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<(OperationResult operationResult, List<TableSummary> tables)> GetTableSummaries(string databaseName)
+        /// <summary>
+        /// Lists the user tables of a database (row count, column count, dates, description; no columns/indexes/keys).
+        /// </summary>
+        public async Task<(OperationResult operationResult, List<TableOperation.Information> tables)> GetTableList(string databaseName)
         {
             try
             {
-                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTableSummariesScript(databaseName));
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTableListScript(databaseName));
 
                 var tables = table.Rows.Cast<DataRow>()
-                    .Select(row => new TableSummary
+                    .Select(row => new TableOperation.Information
                     {
+                        DatabaseName = databaseName,
                         SchemaName = Convert.ToString(row["SchemaName"]) ?? string.Empty,
                         TableName = Convert.ToString(row["TableName"]) ?? string.Empty,
                         RowCount = Convert.ToInt64(row["RowCount"]),
@@ -437,7 +439,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
             catch (Exception ex)
             {
-                return (OperationResult.ErrorResult($"Error retrieving tables: {ex.Message}", ex), new List<TableSummary>());
+                return (OperationResult.ErrorResult($"Error retrieving tables: {ex.Message}", ex), new List<TableOperation.Information>());
             }
         }
 
@@ -488,13 +490,13 @@ namespace BprDevKit.DatabaseManagement.Services
                 if (string.IsNullOrWhiteSpace(tableName))
                     return (OperationResult.ErrorResult("Table name cannot be empty"), new List<string>());
 
-                //var sql = _sqlGenerator.GenerateGetColumnsScript(databaseName, schemaName, tableName);
-                //var results = await ExecuteListQuery(sql);
+                var sql = _sqlGenerator.GenerateGetColumnsScript(databaseName, schemaName, tableName);
+                var results = await ExecuteListQuery(sql);
 
-                //if (results == null)
-                return (OperationResult.ErrorResult("No columns found"), new List<string>());
+                if (results == null)
+                    return (OperationResult.ErrorResult("No columns found"), new List<string>());
 
-                //return (OperationResult.SuccessResult($"Retrieved {results.Count} column(s)"), results);
+                return (OperationResult.SuccessResult($"Retrieved {results.Count} column(s)"), results);
             }
             catch (Exception ex)
             {
@@ -508,16 +510,19 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateCreateColumnScript(config)
-                };
+                var script = _sqlGenerator.GenerateCreateColumnScript(config);
 
-                return await ExecuteInTransaction(scripts, "Column created successfully", $"Column '{config.ColumnName}' created successfully in table '{config.SchemaName}.{config.TableName}'");
+                if (await ColumnExistsAsync(config.DatabaseName, config.SchemaName, config.TableName, config.Column.ColumnName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Column [{config.Column.ColumnName}] already exists in table [{config.SchemaName}].[{config.TableName}].");
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Column created successfully",
+                    $"Column '{config.Column.ColumnName}' added to table '{config.SchemaName}.{config.TableName}'.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error creating column: {ex.Message}");
+                return OperationResult.ErrorResult($"Error creating column: {ex.Message}", ex);
             }
         }
 
@@ -525,16 +530,22 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateAlterColumnScript(config)
-                };
+                var script = _sqlGenerator.GenerateAlterColumnScript(config);
 
-                return await ExecuteInTransaction(scripts, "Column altered successfully", $"Column '{config.ColumnName}' altered successfully in table '{config.SchemaName}.{config.TableName}'");
+                if (!await ColumnExistsAsync(config.DatabaseName, config.SchemaName, config.TableName, config.ColumnName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Column [{config.ColumnName}] does not exist in table [{config.SchemaName}].[{config.TableName}].");
+
+                if (config.IsRename && await ColumnExistsAsync(config.DatabaseName, config.SchemaName, config.TableName, config.NewColumnName!))
+                    return OperationResult.ErrorResult($"[BprDevKit] Column [{config.NewColumnName}] already exists in table [{config.SchemaName}].[{config.TableName}].");
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Column updated successfully",
+                    $"Column '{config.ColumnName}' of table '{config.SchemaName}.{config.TableName}' updated successfully.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error altering column: {ex.Message}");
+                return OperationResult.ErrorResult($"Error altering column: {ex.Message}", ex);
             }
         }
 
@@ -542,16 +553,19 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateDropColumnScript(config)
-                };
+                var script = _sqlGenerator.GenerateDropColumnScript(config);
 
-                return await ExecuteInTransaction(scripts, "Column dropped successfully", $"Column '{config.ColumnName}' dropped successfully from table '{config.SchemaName}.{config.TableName}'");
+                if (!await ColumnExistsAsync(config.DatabaseName, config.SchemaName, config.TableName, config.ColumnName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Column [{config.ColumnName}] does not exist in table [{config.SchemaName}].[{config.TableName}].");
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Column dropped successfully",
+                    $"Column '{config.ColumnName}' dropped from table '{config.SchemaName}.{config.TableName}'.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error dropping column: {ex.Message}");
+                return OperationResult.ErrorResult($"Error dropping column: {ex.Message}", ex);
             }
         }
 
@@ -579,16 +593,18 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateCreateIndexScript(config)
-                };
+                var script = _sqlGenerator.GenerateCreateIndexScript(config);
 
-                return await ExecuteInTransaction(scripts, "Index created successfully", $"Index '{config.IndexName ?? "(auto-generated)"}' created successfully on table '{config.SchemaName}.{config.TableName}'");
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    config.IsPrimaryKey ? "Primary key created successfully" : "Index created successfully",
+                    config.IsPrimaryKey
+                        ? $"Primary key created on table '{config.SchemaName}.{config.TableName}'."
+                        : $"Index created on table '{config.SchemaName}.{config.TableName}'.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error creating index: {ex.Message}");
+                return OperationResult.ErrorResult($"Error creating index: {ex.Message}", ex);
             }
         }
 
@@ -596,16 +612,22 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateAlterIndexScript(config)
-                };
+                var script = _sqlGenerator.GenerateAlterIndexScript(config);
 
-                return await ExecuteInTransaction(scripts, "Index altered successfully", $"Index '{config.IndexName}' altered successfully on table '{config.SchemaName}.{config.TableName}'");
+                if (!await IndexExistsAsync(config.DatabaseName, config.SchemaName, config.TableName, config.IndexName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Index [{config.IndexName}] does not exist on table [{config.SchemaName}].[{config.TableName}].");
+
+                if (await IndexExistsAsync(config.DatabaseName, config.SchemaName, config.TableName, config.NewIndexName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Index [{config.NewIndexName}] already exists on table [{config.SchemaName}].[{config.TableName}].");
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Index renamed successfully",
+                    $"Index '{config.IndexName}' renamed to '{config.NewIndexName}'.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error altering index: {ex.Message}");
+                return OperationResult.ErrorResult($"Error renaming index: {ex.Message}", ex);
             }
         }
 
@@ -613,16 +635,19 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateDropIndexScript(config)
-                };
+                var script = _sqlGenerator.GenerateDropIndexScript(config);
 
-                return await ExecuteInTransaction(scripts, "Index dropped successfully", $"Index '{config.IndexName}' dropped successfully from table '{config.SchemaName}.{config.TableName}'");
+                if (!await IndexExistsAsync(config.DatabaseName, config.SchemaName, config.TableName, config.IndexName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Index [{config.IndexName}] does not exist on table [{config.SchemaName}].[{config.TableName}].");
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Index dropped successfully",
+                    $"Index '{config.IndexName}' dropped from table '{config.SchemaName}.{config.TableName}'.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error dropping index: {ex.Message}");
+                return OperationResult.ErrorResult($"Error dropping index: {ex.Message}", ex);
             }
         }
 
@@ -659,16 +684,16 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateCreateForeignKeyScript(config)
-                };
+                var script = _sqlGenerator.GenerateCreateForeignKeyScript(config);
 
-                return await ExecuteInTransaction(scripts, "Foreign key created successfully", $"Foreign key created successfully on table '{config.SchemaName}.{config.TableName}'");
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Foreign key created successfully",
+                    $"Foreign key created on table '{config.SchemaName}.{config.TableName}'.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error creating foreign key: {ex.Message}");
+                return OperationResult.ErrorResult($"Error creating foreign key: {ex.Message}", ex);
             }
         }
 
@@ -676,16 +701,19 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateAlterForeignKeyScript(config)
-                };
+                var script = _sqlGenerator.GenerateAlterForeignKeyScript(config);
 
-                return await ExecuteInTransaction(scripts, "Foreign key altered successfully", $"Foreign key altered successfully on table '{config.SchemaName}.{config.TableName}'");
+                if (!await ForeignKeyExistsAsync(config.DatabaseName, config.SchemaName, config.TableName, config.FKName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Foreign key [{config.FKName}] does not exist on table [{config.SchemaName}].[{config.TableName}].");
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    config.Enabled ? "Foreign key enabled successfully" : "Foreign key disabled successfully",
+                    $"Foreign key '{config.FKName}' {(config.Enabled ? "enabled" : "disabled")}.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error altering foreign key: {ex.Message}");
+                return OperationResult.ErrorResult($"Error updating foreign key: {ex.Message}", ex);
             }
         }
 
@@ -693,16 +721,19 @@ namespace BprDevKit.DatabaseManagement.Services
         {
             try
             {
-                var scripts = new List<string>
-                {
-                    _sqlGenerator.GenerateDropForeignKeyScript(config)
-                };
+                var script = _sqlGenerator.GenerateDropForeignKeyScript(config);
 
-                return await ExecuteInTransaction(scripts, "Foreign key dropped successfully", $"Foreign key dropped successfully from table '{config.SchemaName}.{config.TableName}'");
+                if (!await ForeignKeyExistsAsync(config.DatabaseName, config.SchemaName, config.TableName, config.FKName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Foreign key [{config.FKName}] does not exist on table [{config.SchemaName}].[{config.TableName}].");
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Foreign key dropped successfully",
+                    $"Foreign key '{config.FKName}' dropped from table '{config.SchemaName}.{config.TableName}'.");
             }
             catch (Exception ex)
             {
-                return OperationResult.ErrorResult($"Error dropping foreign key: {ex.Message}");
+                return OperationResult.ErrorResult($"Error dropping foreign key: {ex.Message}", ex);
             }
         }
 
@@ -1364,33 +1395,79 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        private async Task<bool> TableExistsAsync(string databaseName, string schemaName, string tableName)
+        private async Task<bool> ExistsAsync(string databaseName, string sql, params (string Name, string Value)[] parameters)
         {
             using var connection = await OpenConnectionAsync(databaseName);
-            using var command = new SqlCommand(
-                @"SELECT 1 FROM sys.tables AS t
-INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
-WHERE s.name = @schemaName AND t.name = @tableName;", connection)
+            using var command = new SqlCommand(sql, connection)
             {
                 CommandTimeout = _config.Server.CommandTimeout
             };
-            command.Parameters.AddWithValue("@schemaName", schemaName);
-            command.Parameters.AddWithValue("@tableName", tableName);
+
+            foreach (var (name, value) in parameters)
+                command.Parameters.AddWithValue(name, value);
 
             return await command.ExecuteScalarAsync() is not null;
         }
 
-        private static ColumnInfo MapColumn(DataRow row)
+        private Task<bool> SchemaExistsAsync(string databaseName, string schemaName) =>
+            ExistsAsync(databaseName, "SELECT 1 FROM sys.schemas WHERE name = @schemaName;", ("@schemaName", schemaName));
+
+        private Task<bool> TableExistsAsync(string databaseName, string schemaName, string tableName) =>
+            ExistsAsync(databaseName,
+                @"SELECT 1 FROM sys.tables AS t
+INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+WHERE s.name = @schemaName AND t.name = @tableName;",
+                ("@schemaName", schemaName), ("@tableName", tableName));
+
+        private Task<bool> ColumnExistsAsync(string databaseName, string schemaName, string tableName, string columnName) =>
+            ExistsAsync(databaseName,
+                @"SELECT 1 FROM sys.columns AS c
+INNER JOIN sys.tables AS t ON t.object_id = c.object_id
+INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+WHERE s.name = @schemaName AND t.name = @tableName AND c.name = @columnName;",
+                ("@schemaName", schemaName), ("@tableName", tableName), ("@columnName", columnName));
+
+        private Task<bool> IndexExistsAsync(string databaseName, string schemaName, string tableName, string indexName) =>
+            ExistsAsync(databaseName,
+                @"SELECT 1 FROM sys.indexes AS i
+INNER JOIN sys.tables AS t ON t.object_id = i.object_id
+INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+WHERE s.name = @schemaName AND t.name = @tableName AND i.index_id > 0 AND i.name = @indexName;",
+                ("@schemaName", schemaName), ("@tableName", tableName), ("@indexName", indexName));
+
+        private Task<bool> ForeignKeyExistsAsync(string databaseName, string schemaName, string tableName, string foreignKeyName) =>
+            ExistsAsync(databaseName,
+                @"SELECT 1 FROM sys.foreign_keys AS fk
+INNER JOIN sys.tables AS t ON t.object_id = fk.parent_object_id
+INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+WHERE s.name = @schemaName AND t.name = @tableName AND fk.name = @foreignKeyName;",
+                ("@schemaName", schemaName), ("@tableName", tableName), ("@foreignKeyName", foreignKeyName));
+
+        private static SchemaOperation.Information MapSchema(string databaseName, DataRow row)
+        {
+            return new SchemaOperation.Information
+            {
+                DatabaseName = databaseName,
+                SchemaName = Convert.ToString(row["SchemaName"]) ?? string.Empty,
+                OwnerName = Convert.ToString(row["OwnerName"]) ?? string.Empty,
+                ObjectCount = Convert.ToInt32(row["ObjectCount"])
+            };
+        }
+
+        private static ColumnOperation.Information MapColumn(TableOperation.Information table, DataRow row)
         {
             var dataType = Convert.ToString(row["DataType"]) ?? string.Empty;
             var type = ColumnDataType.Find(dataType);
             var maxLength = Convert.ToInt32(row["MaxLength"]);
             var isUnicode = dataType.Equals("nchar", StringComparison.OrdinalIgnoreCase) || dataType.Equals("nvarchar", StringComparison.OrdinalIgnoreCase);
 
-            return new ColumnInfo
+            return new ColumnOperation.Information
             {
-                OrdinalPosition = Convert.ToInt32(row["OrdinalPosition"]),
+                DatabaseName = table.DatabaseName,
+                SchemaName = table.SchemaName,
+                TableName = table.TableName,
                 ColumnName = Convert.ToString(row["ColumnName"]) ?? string.Empty,
+                OrdinalPosition = Convert.ToInt32(row["OrdinalPosition"]),
                 DataType = dataType,
                 // max_length is in bytes; -1 means MAX.
                 Length = type?.Kind == ColumnDataTypeKind.Length ? (isUnicode && maxLength > 0 ? maxLength / 2 : maxLength) : null,
@@ -1409,16 +1486,20 @@ WHERE s.name = @schemaName AND t.name = @tableName;", connection)
             };
         }
 
-        private static IndexInfo MapIndex(DataRow row)
+        private static IndexOperation.Information MapIndex(TableOperation.Information table, DataRow row)
         {
-            return new IndexInfo
+            return new IndexOperation.Information
             {
+                DatabaseName = table.DatabaseName,
+                SchemaName = table.SchemaName,
+                TableName = table.TableName,
                 IndexName = Convert.ToString(row["IndexName"]) ?? string.Empty,
                 IndexType = Convert.ToString(row["IndexType"]) ?? string.Empty,
                 Columns = GetNullableString(row, "KeyColumns") ?? string.Empty,
                 IncludeColumns = GetNullableString(row, "IncludeColumns"),
                 IsUnique = Convert.ToBoolean(row["IsUnique"]),
                 IsPrimaryKey = Convert.ToBoolean(row["IsPrimaryKey"]),
+                IsUniqueConstraint = Convert.ToBoolean(row["IsUniqueConstraint"]),
                 FillFactor = Convert.ToInt16(row["FillFactor"]),
                 PadIndex = Convert.ToBoolean(row["PadIndex"]),
                 AllowRowLocks = Convert.ToBoolean(row["AllowRowLocks"]),
@@ -1428,10 +1509,11 @@ WHERE s.name = @schemaName AND t.name = @tableName;", connection)
             };
         }
 
-        private static ForeignKeyInfo MapForeignKey(DataRow row)
+        private static ForeignKeyOperation.Information MapForeignKey(string databaseName, DataRow row)
         {
-            return new ForeignKeyInfo
+            return new ForeignKeyOperation.Information
             {
+                DatabaseName = databaseName,
                 FKName = Convert.ToString(row["FKName"]) ?? string.Empty,
                 SchemaName = Convert.ToString(row["SchemaName"]) ?? string.Empty,
                 TableName = Convert.ToString(row["TableName"]) ?? string.Empty,
@@ -1444,18 +1526,6 @@ WHERE s.name = @schemaName AND t.name = @tableName;", connection)
                 IsNotForReplication = Convert.ToBoolean(row["IsNotForReplication"]),
                 Enabled = Convert.ToBoolean(row["Enabled"])
             };
-        }
-
-        private async Task<bool> SchemaExistsAsync(string databaseName, string schemaName)
-        {
-            using var connection = await OpenConnectionAsync(databaseName);
-            using var command = new SqlCommand("SELECT 1 FROM sys.schemas WHERE name = @schemaName;", connection)
-            {
-                CommandTimeout = _config.Server.CommandTimeout
-            };
-            command.Parameters.AddWithValue("@schemaName", schemaName);
-
-            return await command.ExecuteScalarAsync() is not null;
         }
 
         private static string DescribeSchemaChange(SchemaOperation.Alter config)

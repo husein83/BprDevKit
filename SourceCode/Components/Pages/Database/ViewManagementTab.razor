@@ -1,5 +1,5 @@
 @using BprDevKit.DatabaseManagement.Services
-@using BprDevKit.DatabaseManagement.Models.Metadata
+@using BprDevKit.DatabaseManagement.Models.Operations
 @using BprDevKit.Utility
 @using System.Data
 @inject DatabaseManager DatabaseManager
@@ -30,12 +30,12 @@
                         {
                             <div class="form-group">
                                 <label for="viewName">View Name:</label>
-                                <input type="text" id="viewName" class="form-control" @bind="_newView.Name" placeholder="Enter view name" />
+                                <input type="text" id="viewName" class="form-control" @bind="_newView.ViewName" placeholder="Enter view name" />
                             </div>
 
                             <div class="form-group mt-3">
                                 <label for="schemaSelect">Schema:</label>
-                                <select id="schemaSelect" class="form-control" @bind="_newView.Schema">
+                                <select id="schemaSelect" class="form-control" @bind="_newView.SchemaName">
                                     <option value="">-- Select Schema --</option>
                                     @foreach (var schema in AvailableSchemas)
                                     {
@@ -46,7 +46,7 @@
 
                             <div class="form-group mt-3">
                                 <label for="databaseSelect">Database:</label>
-                                <select id="databaseSelect" class="form-control" @bind="_newView.Database">
+                                <select id="databaseSelect" class="form-control" @bind="_newView.DatabaseName">
                                     <option value="">-- Select Database --</option>
                                     @foreach (var db in AvailableDatabases)
                                     {
@@ -164,9 +164,9 @@
                             @foreach (var view in Views)
                             {
                                 <tr>
-                                    <td>@view.Name</td>
-                                    <td>@view.Schema</td>
-                                    <td>@view.Database</td>
+                                    <td>@view.ViewName</td>
+                                    <td>@view.SchemaName</td>
+                                    <td>@view.DatabaseName</td>
                                     <td>@view.CreateDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
                                     <td>@view.ModifyDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
                                     <td>
@@ -199,7 +199,7 @@
                                     <h6>Edit View Properties</h6>
                                     <div class="form-group">
                                         <label>New View Name:</label>
-                                        <input type="text" class="form-control" @bind="_editView.Name" />
+                                        <input type="text" class="form-control" @bind="_editView.ViewName" />
                                     </div>
                                 </div>
                             }
@@ -207,7 +207,7 @@
                             {
                                 <div>
                                     <h6>Delete View Confirmation</h6>
-                                    <p>Are you sure you want to delete view <strong>@_viewToDelete.Name</strong> in schema <strong>@_viewToDelete.Schema</strong> of database <strong>@_viewToDelete.Database</strong>?</p>
+                                    <p>Are you sure you want to delete view <strong>@_viewToDelete.ViewName</strong> in schema <strong>@_viewToDelete.SchemaName</strong> of database <strong>@_viewToDelete.DatabaseName</strong>?</p>
                                     <p class="text-danger">This action cannot be undone.</p>
                                 </div>
                             }
@@ -235,7 +235,7 @@
     [Parameter]
     public EventCallback<string> OnOperationComplete { get; set; }
 
-    private List<ViewInfo> Views = new();
+    private List<ViewOperation.Information> Views = new();
     private List<string> AvailableSchemas = new();
     private List<string> AvailableDatabases = new();
 
@@ -244,9 +244,9 @@
     private bool ShowEditView = false;
     private bool ShowDeleteView = false;
 
-    private ViewInfo _newView = new ViewInfo();
-    private ViewInfo _editView = new ViewInfo();
-    private ViewInfo _viewToDelete = new ViewInfo();
+    private ViewOperation.Information _newView = new ViewOperation.Information();
+    private ViewOperation.Information _editView = new ViewOperation.Information();
+    private ViewOperation.Information _viewToDelete = new ViewOperation.Information();
 
     private DataTable? ViewTestResult = null;
 
@@ -269,8 +269,8 @@
                 AvailableSchemas = result.schemas;
                 if (AvailableSchemas.Count > 0)
                 {
-                    _newView.Schema = AvailableSchemas[0];
-                    _editView.Schema = AvailableSchemas[0];
+                    _newView.SchemaName = AvailableSchemas[0];
+                    _editView.SchemaName = AvailableSchemas[0];
                 }
             }
         }
@@ -284,8 +284,8 @@
             AvailableDatabases = result.databases;
             if (AvailableDatabases.Count > 0)
             {
-                _newView.Database = AvailableDatabases[0];
-                _editView.Database = AvailableDatabases[0];
+                _newView.DatabaseName = AvailableDatabases[0];
+                _editView.DatabaseName = AvailableDatabases[0];
             }
         }
     }
@@ -297,14 +297,14 @@
             var result = await DatabaseManager.GetViews(_selectedDatabase);
             if (result.operationResult.Success)
             {
-                Views = new List<ViewInfo>();
+                Views = new List<ViewOperation.Information>();
                 foreach (var viewName in result.views)
                 {
-                    Views.Add(new ViewInfo
+                    Views.Add(new ViewOperation.Information
                     {
-                        Name = viewName,
-                        Schema = "dbo",
-                        Database = _selectedDatabase,
+                        ViewName = viewName,
+                        SchemaName = "dbo",
+                        DatabaseName = _selectedDatabase,
                         CreateDate = DateTime.Now,
                         ModifyDate = DateTime.Now,
                         Definition = "SELECT ..."
@@ -316,10 +316,10 @@
 
     private void OpenCreateView()
     {
-        _newView = new ViewInfo
+        _newView = new ViewOperation.Information
         {
-            Schema = _selectedSchema,
-            Database = _selectedDatabase,
+            SchemaName = _selectedSchema,
+            DatabaseName = _selectedDatabase,
             WithEncryption = true
         };
         ShowCreateView = true;
@@ -328,14 +328,14 @@
     private void CancelCreateView()
     {
         ShowCreateView = false;
-        _newView = new ViewInfo();
+        _newView = new ViewOperation.Information();
         ShowTestView = false;
         ViewTestResult = null;
     }
 
     private async Task TestView()
     {
-        if (string.IsNullOrWhiteSpace(_newView.Database))
+        if (string.IsNullOrWhiteSpace(_newView.DatabaseName))
         {
             await OnOperationComplete.InvokeAsync("Database must be selected");
             return;
@@ -347,7 +347,7 @@
             return;
         }
 
-        var result = await DatabaseManager.TestView(_newView.Database, _newView.Definition);
+        var result = await DatabaseManager.TestView(_newView.DatabaseName, _newView.Definition);
         if (!result.operationResult.Success)
         {
             await OnOperationComplete.InvokeAsync($"View test failed: {result.operationResult.Message}");
@@ -360,13 +360,13 @@
 
     private async Task SaveView()
     {
-        if (string.IsNullOrWhiteSpace(_newView.Name))
+        if (string.IsNullOrWhiteSpace(_newView.ViewName))
         {
             await OnOperationComplete.InvokeAsync("View name cannot be empty");
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_newView.Schema) || string.IsNullOrWhiteSpace(_newView.Database))
+        if (string.IsNullOrWhiteSpace(_newView.SchemaName) || string.IsNullOrWhiteSpace(_newView.DatabaseName))
         {
             await OnOperationComplete.InvokeAsync("Schema and database must be selected");
             return;
@@ -378,7 +378,7 @@
             return;
         }
 
-        var result = await DatabaseManager.CreateView(_newView.Database, _newView.Schema, _newView.Name, _newView.Definition, _newView.WithEncryption);
+        var result = await DatabaseManager.CreateView(_newView.DatabaseName, _newView.SchemaName, _newView.ViewName, _newView.Definition, _newView.WithEncryption);
         if (!result.Success)
         {
             await OnOperationComplete.InvokeAsync($"Error creating view: {result.Message}");
@@ -395,19 +395,19 @@
         _ = SaveView();
     }
 
-    private void EditView(ViewInfo view)
+    private void EditView(ViewOperation.Information view)
     {
-        _editView = new ViewInfo
+        _editView = new ViewOperation.Information
         {
-            Name = view.Name,
-            Schema = view.Schema,
-            Database = view.Database,
+            ViewName = view.ViewName,
+            SchemaName = view.SchemaName,
+            DatabaseName = view.DatabaseName,
             WithEncryption = view.Definition.Contains("WITH ENCRYPTION")
         };
         ShowEditView = true;
     }
 
-    private void DeleteView(ViewInfo view)
+    private void DeleteView(ViewOperation.Information view)
     {
         _viewToDelete = view;
         ShowDeleteView = true;
@@ -423,7 +423,7 @@
     {
         try
         {
-            var result = await DatabaseManager.DropView(_viewToDelete.Database, _viewToDelete.Schema, _viewToDelete.Name);
+            var result = await DatabaseManager.DropView(_viewToDelete.DatabaseName, _viewToDelete.SchemaName, _viewToDelete.ViewName);
             if (result.Success)
             {
                 await OnOperationComplete.InvokeAsync(result.Message);
@@ -445,8 +445,8 @@
     {
         ShowEditView = false;
         ShowDeleteView = false;
-        _editView = new ViewInfo();
-        _viewToDelete = new ViewInfo();
+        _editView = new ViewOperation.Information();
+        _viewToDelete = new ViewOperation.Information();
     }
 
     private void CancelTestView()

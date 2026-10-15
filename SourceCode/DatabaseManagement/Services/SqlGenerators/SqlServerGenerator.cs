@@ -1,8 +1,8 @@
 using System;
-using System.Text;
 using System.Collections.Generic;
-using BprDevKit.DatabaseManagement.Models.Operations;
+using System.Text;
 using BprDevKit.DatabaseManagement.Models.Metadata;
+using BprDevKit.DatabaseManagement.Models.Operations;
 using BprDevKit.Utility;
 
 namespace BprDevKit.DatabaseManagement.Services
@@ -10,10 +10,10 @@ namespace BprDevKit.DatabaseManagement.Services
     /// <summary>
     /// Main SQL script generator that dynamically generates SQL scripts based on configuration objects
     /// </summary>
-    public class SqlGenerator : ISqlGenerator
+    public class SqlServerGenerator : SqlGeneratorBase
     {
         #region Database Operations
-        public string GenerateCreateDatabaseScript(DatabaseOperation.Create config)
+        public override string GenerateCreateDatabaseScript(DatabaseOperation.Create config)
         {
             ValidateCreateConfiguration(config);
 
@@ -66,7 +66,7 @@ namespace BprDevKit.DatabaseManagement.Services
             return builder.ToString();
         }
 
-        public string GenerateAlterDatabaseScript(DatabaseOperation.Alter config)
+        public override string GenerateAlterDatabaseScript(DatabaseOperation.Alter config)
         {
             ValidateAlterConfiguration(config);
 
@@ -87,7 +87,7 @@ namespace BprDevKit.DatabaseManagement.Services
             return builder.ToString();
         }
 
-        public string GenerateDropDatabaseScript(DatabaseOperation.Drop config)
+        public override string GenerateDropDatabaseScript(DatabaseOperation.Drop config)
         {
             ValidateDatabaseName(config.DatabaseName);
 
@@ -102,7 +102,7 @@ namespace BprDevKit.DatabaseManagement.Services
             return builder.ToString();
         }
 
-        public string GenerateGetDatabaseInfoScript(DatabaseOperation.Information config)
+        public override string GenerateGetDatabaseInfoScript(DatabaseOperation.Information config)
         {
             ValidateDatabaseName(config.DatabaseName);
 
@@ -132,24 +132,24 @@ LEFT JOIN sys.master_files AS logFile ON d.database_id = logFile.database_id AND
 WHERE d.name = {QUOTENAME(config.DatabaseName, "'")};";
         }
 
-        public string GenerateGetDatabasesScript()
+        public override string GenerateGetDatabasesScript()
         {
             return "SELECT name FROM sys.databases WHERE database_id > 4 ORDER BY name;";
         }
 
-        public string GenerateGetCollationsScript()
+        public override string GenerateGetCollationsScript()
         {
             return "SELECT name FROM sys.fn_helpcollations() ORDER BY name;";
         }
 
-        public string GenerateGetFileGroupsScript()
+        public override string GenerateGetFileGroupsScript()
         {
             return "SELECT name FROM sys.filegroups ORDER BY name;";
         }
         #endregion
 
         #region Schema Operations
-        public string GenerateCreateSchemaScript(SchemaOperation.Create config)
+        public override string GenerateCreateSchemaScript(SchemaOperation.Create config)
         {
             ArgumentNullException.ThrowIfNull(config);
             ValidateDatabaseName(config.DatabaseName);
@@ -175,7 +175,7 @@ WHERE d.name = {QUOTENAME(config.DatabaseName, "'")};";
         /// Renames a schema and/or changes its owner. SQL Server has no RENAME for schemas, so a rename
         /// creates the new schema (same owner), transfers every object into it and drops the old schema.
         /// </summary>
-        public string GenerateAlterSchemaScript(SchemaOperation.Alter config)
+        public override string GenerateAlterSchemaScript(SchemaOperation.Alter config)
         {
             ArgumentNullException.ThrowIfNull(config);
             ValidateDatabaseName(config.DatabaseName);
@@ -213,7 +213,7 @@ WHERE d.name = {QUOTENAME(config.DatabaseName, "'")};";
         /// <summary>
         /// Drops an empty schema. SQL Server rejects the statement while the schema still contains objects.
         /// </summary>
-        public string GenerateDropSchemaScript(SchemaOperation.Drop config)
+        public override string GenerateDropSchemaScript(SchemaOperation.Drop config)
         {
             ArgumentNullException.ThrowIfNull(config);
             ValidateDatabaseName(config.DatabaseName);
@@ -227,7 +227,7 @@ WHERE d.name = {QUOTENAME(config.DatabaseName, "'")};";
         /// Names of the schemas a user can work with: dbo plus every user-created schema.
         /// System schemas (sys, INFORMATION_SCHEMA, guest) and the fixed-role schemas are left out.
         /// </summary>
-        public string GenerateGetSchemasScript(string databaseName)
+        public override string GenerateGetSchemasScript(string databaseName)
         {
             ValidateDatabaseName(databaseName);
 
@@ -239,12 +239,19 @@ ORDER BY s.name;";
 
         /// <summary>
         /// Schema list with owner and object count (tables, views, routines, synonyms, sequences,
-        /// user-defined types and XML schema collections).
+        /// user-defined types and XML schema collections). Pass a schema name to get just that schema.
         /// </summary>
-        public string GenerateGetSchemaSummariesScript(string databaseName)
+        public override string GenerateGetSchemaListScript(string databaseName, string? schemaName = null)
         {
             ValidateDatabaseName(databaseName);
             var database = QUOTENAME(databaseName);
+
+            var schemaFilter = string.Empty;
+            if (schemaName is not null)
+            {
+                ValidateObjectName(schemaName, "Schema name");
+                schemaFilter = $" AND s.name = {SQLLiteral(schemaName)}";
+            }
 
             return $@"SELECT
     s.name AS SchemaName,
@@ -257,14 +264,14 @@ ORDER BY s.name;";
         WHERE x.schema_id = s.schema_id) AS ObjectCount
 FROM {database}.sys.schemas AS s
 INNER JOIN {database}.sys.database_principals AS dp ON dp.principal_id = s.principal_id
-WHERE {UserSchemaFilter}
+WHERE {UserSchemaFilter}{schemaFilter}
 ORDER BY s.name;";
         }
 
         /// <summary>
         /// Everything that lives inside one schema (the same set that must be empty before the schema can be dropped).
         /// </summary>
-        public string GenerateGetSchemaObjectsScript(SchemaOperation.Information config)
+        public override string GenerateGetSchemaInformationScript(SchemaOperation.Information config)
         {
             ArgumentNullException.ThrowIfNull(config);
             ValidateDatabaseName(config.DatabaseName);
@@ -296,7 +303,7 @@ ORDER BY ObjectType, ObjectName;";
         /// <summary>
         /// Database principals that can own a schema.
         /// </summary>
-        public string GenerateGetSchemaOwnersScript(string databaseName)
+        public override string GenerateGetSchemaOwnersScript(string databaseName)
         {
             ValidateDatabaseName(databaseName);
 
@@ -311,7 +318,7 @@ ORDER BY dp.name;";
         #endregion
 
         #region Table Operations
-        public string GenerateCreateTableScript(TableOperation.Create config)
+        public override string GenerateCreateTableScript(TableOperation.Create config)
         {
             ArgumentNullException.ThrowIfNull(config);
             ValidateDatabaseName(config.DatabaseName);
@@ -323,19 +330,19 @@ ORDER BY dp.name;";
             var columns = ValidateColumnDefinitions(config.Columns);
             var keyColumns = columns.Where(column => column.IsPrimaryKey).ToList();
 
-            const string primaryKeyPrefix = "PK_";
-            if (keyColumns.Count > 0 && primaryKeyPrefix.Length + config.TableName.Length > 128)
-                throw new InvalidOperationException("[BprDevKit] The table name is too long to derive a primary key constraint name from it.");
-
             var builder = new StringBuilder();
             builder.AppendLine($"USE {QUOTENAME(config.DatabaseName)};")
                 .AppendLine("GO");
 
-            var definitions = columns.Select(BuildColumnDefinition).ToList();
+            var definitions = columns.Select(column => BuildColumnDefinition(column, config.SchemaName, config.TableName)).ToList();
             if (keyColumns.Count > 0)
             {
                 var keyList = string.Join(", ", keyColumns.Select(column => QUOTENAME(column.ColumnName)));
-                definitions.Add($"CONSTRAINT {QUOTENAME(primaryKeyPrefix + config.TableName)} PRIMARY KEY CLUSTERED ({keyList})");
+                var pkColNames = string.Join("_", keyColumns.Select(column => column.ColumnName));
+                var pkName = $"PK_{config.SchemaName}_{config.TableName}_{pkColNames}";
+                if (pkName.Length > 128)
+                    throw new InvalidOperationException("[BprDevKit] The generated primary key constraint name is longer than 128 characters; use a shorter schema/table/column name.");
+                definitions.Add($"CONSTRAINT {QUOTENAME(pkName)} PRIMARY KEY CLUSTERED ({keyList})");
             }
 
             builder.AppendLine($"CREATE TABLE {QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)} (");
@@ -357,7 +364,7 @@ ORDER BY dp.name;";
         /// <summary>
         /// Renames a table (sp_rename) and/or sets, replaces or removes its description.
         /// </summary>
-        public string GenerateAlterTableScript(TableOperation.Alter config)
+        public override string GenerateAlterTableScript(TableOperation.Alter config)
         {
             ArgumentNullException.ThrowIfNull(config);
             ValidateDatabaseName(config.DatabaseName);
@@ -383,26 +390,7 @@ EXEC sys.sp_rename @objname = @renameTarget, @newname = {SQLLiteral(config.NewTa
             }
 
             if (config.ChangesDescription)
-            {
-                var schema = SQLLiteral(config.SchemaName);
-                var table = SQLLiteral(currentTableName);
-                var levels = $"@level0type = N'SCHEMA', @level0name = {schema}, @level1type = N'TABLE', @level1name = {table}";
-                var exists = $"EXISTS (SELECT 1 FROM sys.extended_properties WHERE class = 1 AND minor_id = 0 AND name = N'MS_Description' AND major_id = OBJECT_ID(QUOTENAME({schema}) + N'.' + QUOTENAME({table})))";
-
-                if (string.IsNullOrWhiteSpace(config.Description))
-                {
-                    builder.AppendLine($@"IF {exists}
-    EXEC sys.sp_dropextendedproperty @name = N'MS_Description', {levels};");
-                }
-                else
-                {
-                    var value = SQLLiteral(config.Description);
-                    builder.AppendLine($@"IF {exists}
-    EXEC sys.sp_updateextendedproperty @name = N'MS_Description', @value = {value}, {levels};
-ELSE
-    EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = {value}, {levels};");
-                }
-            }
+                AppendDescriptionUpsert(builder, config.SchemaName, currentTableName, null, config.Description);
 
             return builder.ToString();
         }
@@ -410,7 +398,7 @@ ELSE
         /// <summary>
         /// Drops a table. ForceDropDependent first drops the foreign keys of other tables that reference it.
         /// </summary>
-        public string GenerateDropTableScript(TableOperation.Drop config)
+        public override string GenerateDropTableScript(TableOperation.Drop config)
         {
             ArgumentNullException.ThrowIfNull(config);
             ValidateDatabaseName(config.DatabaseName);
@@ -445,7 +433,7 @@ IF LEN(@dropForeignKeys) > 0
         /// <summary>
         /// Header information of one table: dates, file group and description.
         /// </summary>
-        public string GenerateGetTableInfoScript(TableOperation.Information config)
+        public override string GenerateGetTableInfoScript(TableOperation.Information config)
         {
             ArgumentNullException.ThrowIfNull(config);
             ValidateDatabaseName(config.DatabaseName);
@@ -470,7 +458,7 @@ INNER JOIN {database}.sys.schemas AS s ON s.schema_id = t.schema_id
 WHERE s.name = {SQLLiteral(config.SchemaName)} AND t.name = {SQLLiteral(config.TableName)};";
         }
 
-        public string GenerateGetTablesScript(string databaseName, string schemaName)
+        public override string GenerateGetTablesScript(string databaseName, string schemaName)
         {
             ValidateDatabaseName(databaseName);
             ValidateObjectName(schemaName, "Schema name");
@@ -486,7 +474,7 @@ ORDER BY t.name;";
         /// <summary>
         /// Every user table of the database with an approximate row count, column count and description.
         /// </summary>
-        public string GenerateGetTableSummariesScript(string databaseName)
+        public override string GenerateGetTableListScript(string databaseName)
         {
             ValidateDatabaseName(databaseName);
             var database = QUOTENAME(databaseName);
@@ -507,7 +495,7 @@ WHERE t.is_ms_shipped = 0
 ORDER BY s.name, t.name;";
         }
 
-        public string GenerateGetTableColumnsScript(TableOperation.Information config)
+        public override string GenerateGetTableColumnsScript(TableOperation.Information config)
         {
             ArgumentNullException.ThrowIfNull(config);
             ValidateDatabaseName(config.DatabaseName);
@@ -548,7 +536,7 @@ WHERE s.name = {SQLLiteral(config.SchemaName)} AND t.name = {SQLLiteral(config.T
 ORDER BY c.column_id;";
         }
 
-        public string GenerateGetTableIndexesScript(TableOperation.Information config)
+        public override string GenerateGetTableIndexesScript(TableOperation.Information config)
         {
             ArgumentNullException.ThrowIfNull(config);
             ValidateDatabaseName(config.DatabaseName);
@@ -561,6 +549,7 @@ ORDER BY c.column_id;";
     i.type_desc AS IndexType,
     i.is_unique AS IsUnique,
     i.is_primary_key AS IsPrimaryKey,
+    i.is_unique_constraint AS IsUniqueConstraint,
     i.fill_factor AS [FillFactor],
     i.is_padded AS PadIndex,
     i.allow_row_locks AS AllowRowLocks,
@@ -591,7 +580,7 @@ ORDER BY i.is_primary_key DESC, i.name;";
         /// <summary>
         /// Foreign keys the table owns (outgoing) and foreign keys of other tables that point to it (incoming).
         /// </summary>
-        public string GenerateGetTableForeignKeysScript(TableOperation.Information config)
+        public override string GenerateGetTableForeignKeysScript(TableOperation.Information config)
         {
             ArgumentNullException.ThrowIfNull(config);
             ValidateDatabaseName(config.DatabaseName);
@@ -636,7 +625,7 @@ ORDER BY fk.name;";
         /// <summary>
         /// Row-data file groups of the database, the default one first.
         /// </summary>
-        public string GenerateGetFileGroupsScript(string databaseName)
+        public override string GenerateGetFileGroupsScript(string databaseName)
         {
             ValidateDatabaseName(databaseName);
 
@@ -648,107 +637,155 @@ ORDER BY fg.is_default DESC, fg.name;";
         #endregion
 
         #region Column Operations
-        public string GenerateCreateColumnScript(ColumnOperation.Create config)
+        public override string GenerateCreateColumnScript(ColumnOperation.Create config)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine("USE " + QUOTENAME(config.DatabaseName) + ";")
-                .AppendLine("ALTER TABLE " + QUOTENAME(config.SchemaName) + "." + QUOTENAME(config.TableName) + " ADD ");
+            ArgumentNullException.ThrowIfNull(config);
+            ValidateTableTarget(config.DatabaseName, config.SchemaName, config.TableName);
+            ArgumentNullException.ThrowIfNull(config.Column);
 
-            // Build column definition
-            var columnDef = QUOTENAME(config.ColumnName) + " " + config.DataType;
+            if (config.Column.IsPrimaryKey)
+                throw new InvalidOperationException("[BprDevKit] A primary key is added from the index section, not together with a new column.");
 
-            if (config.Length.HasValue || config.Precision.HasValue || config.Scale.HasValue)
-            {
-                if (config.Length.HasValue && config.Precision.HasValue && config.Scale.HasValue)
-                    columnDef += "(" + config.Precision.Value + "," + config.Scale.Value + ")";
-                else if (config.Length.HasValue)
-                    columnDef += "(" + config.Length.Value + ")";
-                else if (config.Precision.HasValue)
-                    columnDef += "(" + config.Precision.Value + ")";
-            }
+            var column = ValidateColumnDefinitions(new[] { config.Column })[0];
 
-            if (!config.IsNullable)
-                columnDef += " NOT NULL";
+            var builder = new StringBuilder();
+            builder.AppendLine($"USE {QUOTENAME(config.DatabaseName)};")
+                .AppendLine("GO");
+            builder.AppendLine($"ALTER TABLE {QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)} ADD {BuildColumnDefinition(column, config.SchemaName, config.TableName)};");
 
-            if (config.IsIdentity)
-                columnDef += " IDENTITY(" + config.IdentitySeed + "," + config.IdentityIncrement + ")";
+            if (!string.IsNullOrWhiteSpace(column.Description))
+                builder.AppendLine(BuildAddDescriptionStatement(column.Description, config.SchemaName, config.TableName, column.ColumnName));
 
-            if (!string.IsNullOrWhiteSpace(config.Collation) && (config.DataType?.Contains("CHAR") == true || config.DataType?.Contains("NCHAR") == true || config.DataType?.Contains("VARCHAR") == true || config.DataType?.Contains("NVARCHAR") == true || config.DataType?.Contains("TEXT") == true || config.DataType?.Contains("NTEXT") == true))
-                columnDef += " COLLATE " + config.Collation;
-
-            sb.AppendLine("    " + columnDef + ";");
-
-            if (!string.IsNullOrWhiteSpace(config.DefaultValue))
-            {
-                sb.AppendLine("ALTER TABLE " + QUOTENAME(config.SchemaName) + "." + QUOTENAME(config.TableName) + " ADD CONSTRAINT DF_" + config.SchemaName + "_" + config.TableName + "_" + config.ColumnName + " DEFAULT (" + config.DefaultValue + ") FOR " + config.ColumnName + ";");
-            }
-
-            sb.AppendLine("PRINT N'[BprDevKit] Operation completed successfully.';");
-
-            return sb.ToString();
+            return builder.ToString();
         }
 
-        public string GenerateAlterColumnScript(ColumnOperation.Alter config)
+        /// <summary>
+        /// Renames a column, changes its data type / nullability, replaces or removes its default and/or its description.
+        /// A default constraint blocks ALTER COLUMN, so it is dropped first and put back unchanged unless a new default was requested.
+        /// </summary>
+        public override string GenerateAlterColumnScript(ColumnOperation.Alter config)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine("USE " + QUOTENAME(config.DatabaseName) + ";")
-                .AppendLine("ALTER TABLE " + QUOTENAME(config.SchemaName) + "." + QUOTENAME(config.TableName) + " ALTER COLUMN ");
+            ArgumentNullException.ThrowIfNull(config);
+            ValidateTableTarget(config.DatabaseName, config.SchemaName, config.TableName);
+            ValidateObjectName(config.ColumnName, "Column name");
+            ValidateDescription(config.Description);
 
-            // Build column definition
-            var columnDef = QUOTENAME(config.ColumnName) + " " + config.DataType;
+            if (!config.IsRename && !config.ChangesDefinition && !config.ChangesDefault && !config.ChangesDescription)
+                throw new InvalidOperationException("[BprDevKit] Nothing to change: specify a new name, type, default or description.");
 
-            if (config.Length.HasValue || config.Precision.HasValue || config.Scale.HasValue)
+            if (config.IsRename)
+                ValidateObjectName(config.NewColumnName, "New column name");
+
+            var currentColumnName = config.IsRename ? config.NewColumnName! : config.ColumnName;
+            var newDefault = config.ChangesDefault && !string.IsNullOrWhiteSpace(config.DefaultValue) ? config.DefaultValue!.Trim() : null;
+            if (newDefault is not null)
+                ValidateExpression(newDefault, $"default of column [{currentColumnName}]");
+
+            ColumnDefinition? definition = null;
+            if (config.ChangesDefinition)
             {
-                if (config.Length.HasValue && config.Precision.HasValue && config.Scale.HasValue)
-                    columnDef += "(" + config.Precision.Value + "," + config.Scale.Value + ")";
-                else if (config.Length.HasValue)
-                    columnDef += "(" + config.Length.Value + ")";
-                else if (config.Precision.HasValue)
-                    columnDef += "(" + config.Precision.Value + ")";
+                var requested = config.Definition!;
+                definition = ValidateColumnDefinitions(new[]
+                {
+                    new ColumnDefinition
+                    {
+                        ColumnName = currentColumnName,
+                        DataType = requested.DataType,
+                        Length = requested.Length,
+                        Precision = requested.Precision,
+                        Scale = requested.Scale,
+                        IsNullable = requested.IsNullable,
+                        Collation = requested.Collation
+                    }
+                })[0];
             }
 
-            if (config.IsNullable.HasValue)
-                columnDef += config.IsNullable.Value ? " NULL" : " NOT NULL";
+            var table = $"{QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)}";
+            var builder = new StringBuilder();
+            builder.AppendLine($"USE {QUOTENAME(config.DatabaseName)};")
+                .AppendLine("GO");
 
-            if (!string.IsNullOrWhiteSpace(config.Collation) && (config.DataType?.Contains("CHAR") == true || config.DataType?.Contains("NCHAR") == true || config.DataType?.Contains("VARCHAR") == true || config.DataType?.Contains("NVARCHAR") == true || config.DataType?.Contains("TEXT") == true || config.DataType?.Contains("NTEXT") == true))
-                columnDef += " COLLATE " + config.Collation;
-
-            sb.AppendLine("    " + columnDef + ";");
-
-            if (!string.IsNullOrWhiteSpace(config.DefaultValue))
+            if (config.IsRename)
             {
-                sb.AppendLine("USE " + QUOTENAME(config.DatabaseName) + ";");
-                sb.AppendLine("IF OBJECT_ID(N'DF_" + config.SchemaName + "_" + config.TableName + "_" + config.ColumnName + "') IS NOT NULL");
-                sb.AppendLine("BEGIN");
-                sb.AppendLine("    EXEC('ALTER TABLE " + QUOTENAME(config.SchemaName) + "." + QUOTENAME(config.TableName) + " DROP CONSTRAINT [DF_" + config.SchemaName + "_" + config.TableName + "_" + config.ColumnName + "]');");
-                sb.AppendLine("END");
-
-                if (!string.IsNullOrWhiteSpace(config.DefaultName))
-                    sb.AppendLine("ALTER TABLE " + QUOTENAME(config.SchemaName) + "." + QUOTENAME(config.TableName) + " ADD CONSTRAINT " + QUOTENAME(config.DefaultName) + " DEFAULT (" + config.DefaultValue + ") FOR " + config.ColumnName + ";");
-                else
-                    sb.AppendLine("ALTER TABLE " + QUOTENAME(config.SchemaName) + "." + QUOTENAME(config.TableName) + " ADD CONSTRAINT DF_" + config.SchemaName + "_" + config.TableName + "_" + config.ColumnName + " DEFAULT (" + config.DefaultValue + ") FOR " + config.ColumnName + ";");
+                builder.AppendLine($@"DECLARE @renameTarget nvarchar(776) = QUOTENAME({SQLLiteral(config.SchemaName)}) + N'.' + QUOTENAME({SQLLiteral(config.TableName)}) + N'.' + QUOTENAME({SQLLiteral(config.ColumnName)});
+EXEC sys.sp_rename @objname = @renameTarget, @newname = {SQLLiteral(config.NewColumnName!)}, @objtype = N'COLUMN';")
+                    .AppendLine("GO");
             }
 
-            if (!string.IsNullOrWhiteSpace(config.Description))
+            if (config.ChangesDefinition || config.ChangesDefault)
             {
-                sb.AppendLine("USE " + QUOTENAME(config.DatabaseName) + ";");
-                sb.AppendLine("IF EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'" + config.SchemaName + "." + config.TableName + "') AND minor_id = (SELECT column_id FROM sys.columns WHERE object_id = OBJECT_ID(N'" + config.SchemaName + "." + config.TableName + "') AND name = N'" + config.ColumnName + "') AND name = N'MS_Description'))");
-                sb.AppendLine("    EXEC sys.sp_updateextendedproperty @name=N'MS_Description', @value=N'" + config.Description + "', @level0type=N'SCHEMA', @level0name=N'" + config.SchemaName + "', @level1type=N'TABLE', @level1name=N'" + config.TableName + "', @level2type=N'COLUMN', @level2name=N'" + config.ColumnName + "';");
-                sb.AppendLine("ELSE");
-                sb.AppendLine("    EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'" + config.Description + "', @level0type=N'SCHEMA', @level0name=N'" + config.SchemaName + "', @level1type=N'TABLE', @level1name=N'" + config.TableName + "', @level2type=N'COLUMN', @level2name=N'" + config.ColumnName + "';");
+                builder.AppendLine($@"DECLARE @table nvarchar(517) = QUOTENAME({SQLLiteral(config.SchemaName)}) + N'.' + QUOTENAME({SQLLiteral(config.TableName)});
+DECLARE @column sysname = {SQLLiteral(currentColumnName)}, @defaultName sysname, @defaultDefinition nvarchar(max), @sql nvarchar(max);
+
+SELECT @defaultName = dc.name, @defaultDefinition = dc.definition
+FROM sys.default_constraints AS dc
+INNER JOIN sys.columns AS c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
+WHERE dc.parent_object_id = OBJECT_ID(@table) AND c.name = @column;
+
+IF @defaultName IS NOT NULL
+BEGIN
+    SET @sql = N'ALTER TABLE ' + @table + N' DROP CONSTRAINT ' + QUOTENAME(@defaultName) + N';';
+    EXEC (@sql);
+END");
+
+                if (definition is not null)
+                {
+                    var collation = BuildCollationClause(definition);
+                    builder.AppendLine($"ALTER TABLE {table} ALTER COLUMN {QUOTENAME(definition.ColumnName)} {FormatColumnDataType(definition, ColumnDataType.Find(definition.DataType)!)}{collation} {(definition.IsNullable ? "NULL" : "NOT NULL")};");
+                }
+
+                if (newDefault is not null)
+                {
+                    builder.AppendLine($"ALTER TABLE {table} ADD DEFAULT ({newDefault}) FOR {QUOTENAME(currentColumnName)};");
+                }
+                else if (!config.ChangesDefault)
+                {
+                    builder.AppendLine(@"IF @defaultName IS NOT NULL
+BEGIN
+    SET @sql = N'ALTER TABLE ' + @table + N' ADD CONSTRAINT ' + QUOTENAME(@defaultName) + N' DEFAULT ' + @defaultDefinition + N' FOR ' + QUOTENAME(@column) + N';';
+    EXEC (@sql);
+END");
+                }
+
+                builder.AppendLine("GO");
             }
 
-            sb.AppendLine("PRINT N'[BprDevKit] Operation completed successfully.';");
+            if (config.ChangesDescription)
+                AppendDescriptionUpsert(builder, config.SchemaName, config.TableName, currentColumnName, config.Description);
 
-            return sb.ToString();
+            return builder.ToString();
         }
 
-        public string GenerateDropColumnScript(ColumnOperation.Drop config)
+        /// <summary>
+        /// Drops a column. Its default constraint is removed first because SQL Server refuses to drop a column that still has one;
+        /// indexes, keys and check constraints that use the column must be removed beforehand (SQL Server reports which).
+        /// </summary>
+        public override string GenerateDropColumnScript(ColumnOperation.Drop config)
         {
-            return $"USE {QUOTENAME(config.DatabaseName)}; ALTER TABLE {QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)} DROP COLUMN {QUOTENAME(config.ColumnName)}; PRINT N'[BprDevKit] Column [{config.ColumnName}] dropped successfully from table [{config.SchemaName}.{config.TableName}].';";
+            ArgumentNullException.ThrowIfNull(config);
+            ValidateTableTarget(config.DatabaseName, config.SchemaName, config.TableName);
+            ValidateObjectName(config.ColumnName, "Column name");
+
+            var builder = new StringBuilder();
+            builder.AppendLine($"USE {QUOTENAME(config.DatabaseName)};")
+                .AppendLine("GO");
+            builder.AppendLine($@"DECLARE @table nvarchar(517) = QUOTENAME({SQLLiteral(config.SchemaName)}) + N'.' + QUOTENAME({SQLLiteral(config.TableName)});
+DECLARE @sql nvarchar(max) = N'';
+
+SELECT @sql += N'ALTER TABLE ' + @table + N' DROP CONSTRAINT ' + QUOTENAME(dc.name) + N';'
+FROM sys.default_constraints AS dc
+INNER JOIN sys.columns AS c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
+WHERE dc.parent_object_id = OBJECT_ID(@table) AND c.name = {SQLLiteral(config.ColumnName)};
+
+IF LEN(@sql) > 0
+    EXEC (@sql);
+
+ALTER TABLE {QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)} DROP COLUMN {QUOTENAME(config.ColumnName)};");
+
+            return builder.ToString();
         }
 
-        public string GenerateGetColumnInfoScript(ColumnOperation.Information config)
+        public override string GenerateGetColumnInfoScript(ColumnOperation.Information config)
         {
             return $@"USE {QUOTENAME(config.DatabaseName)};
 SELECT
@@ -769,12 +806,12 @@ INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
 WHERE s.name = {SQLLiteral(config.SchemaName)} AND t.name = {SQLLiteral(config.TableName)} AND c.name = {SQLLiteral(config.ColumnName)};";
         }
 
-        public string GenerateGetDataTypesScript()
+        public override string GenerateGetDataTypesScript()
         {
             return "SELECT name FROM sys.types WHERE is_user_defined = 0 GROUP BY name ORDER BY name;";
         }
 
-        public string GenerateGetColumnsScript(string databaseName, string schemaName, string tableName)
+        public override string GenerateGetColumnsScript(string databaseName, string schemaName, string tableName)
         {
             return $@"USE {QUOTENAME(databaseName)};
 SELECT c.name AS ColumnName
@@ -787,47 +824,104 @@ ORDER BY c.column_id;";
         #endregion
 
         #region Index Operations
-        public string GenerateCreateIndexScript(IndexOperation.Create config)
+        /// <summary>
+        /// Creates a nonclustered/clustered (unique) index, or a PRIMARY KEY constraint when IsPrimaryKey is set.
+        /// </summary>
+        public override string GenerateCreateIndexScript(IndexOperation.Create config)
         {
-            if (string.IsNullOrWhiteSpace(config.Columns))
-                throw new ArgumentException("At least one index column is required.", nameof(config.Columns));
+            ArgumentNullException.ThrowIfNull(config);
+            ValidateTableTarget(config.DatabaseName, config.SchemaName, config.TableName);
+            ValidateOptionalObjectName(config.IndexName, "Index name");
+            ValidateOptionalObjectName(config.FileGroup, "File group");
 
-            var indexName = string.IsNullOrWhiteSpace(config.IndexName)
-                ? $"IX_{config.TableName}_{config.Columns.Replace(" ", "").Replace(",", "_").Replace("ASC", "").Replace("DESC", "_desc")}"
-                : config.IndexName;
+            var keys = config.Columns ?? new List<IndexOperation.KeyColumn>();
+            var includes = config.IncludeColumns ?? new List<string>();
+            ValidateIndexColumns(keys, includes);
 
-            var indexType = (config.IndexType ?? "NONCLUSTERED").Trim();
-            if (config.IsUnique && !indexType.StartsWith("UNIQUE ", StringComparison.OrdinalIgnoreCase))
-                indexType = "UNIQUE " + indexType;
+            if (config.FillFactor < 0 || config.FillFactor > 100)
+                throw new InvalidOperationException("[BprDevKit] The fill factor must be between 0 (server default) and 100.");
 
-            var sb = new StringBuilder();
-            sb.AppendLine($"USE {QUOTENAME(config.DatabaseName)};");
-            sb.Append($"CREATE {indexType} INDEX {QUOTENAME(indexName)} ON {QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)} ({config.Columns})");
+            var hasFilter = !string.IsNullOrWhiteSpace(config.FilterPredicate);
+            if (config.IsPrimaryKey && (includes.Count > 0 || hasFilter))
+                throw new InvalidOperationException("[BprDevKit] A primary key cannot have included columns or a filter.");
+            if (config.IsClustered && (includes.Count > 0 || hasFilter))
+                throw new InvalidOperationException("[BprDevKit] A clustered index cannot have included columns or a filter.");
+            if (hasFilter)
+                ValidateExpression(config.FilterPredicate!, "index filter");
 
-            if (!string.IsNullOrWhiteSpace(config.IncludeColumns))
-                sb.Append($" INCLUDE ({config.IncludeColumns})");
+            var indexName = ResolveIndexName(config, keys);
+            var table = $"{QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)}";
+            var keyList = string.Join(", ", keys.Select(key => QUOTENAME(key.ColumnName) + (key.IsDescending ? " DESC" : " ASC")));
+            var clustering = config.IsClustered ? "CLUSTERED" : "NONCLUSTERED";
+
+            var builder = new StringBuilder();
+            builder.AppendLine($"USE {QUOTENAME(config.DatabaseName)};")
+                .AppendLine("GO");
+
+            if (config.IsPrimaryKey)
+                builder.Append($"ALTER TABLE {table} ADD CONSTRAINT {QUOTENAME(indexName)} PRIMARY KEY {clustering} ({keyList})");
+            else
+            {
+                builder.Append($"CREATE {(config.IsUnique ? "UNIQUE " : string.Empty)}{clustering} INDEX {QUOTENAME(indexName)} ON {table} ({keyList})");
+                if (includes.Count > 0)
+                    builder.Append($" INCLUDE ({string.Join(", ", includes.Select(include => QUOTENAME(include)))})");
+                if (hasFilter)
+                    builder.Append($" WHERE {config.FilterPredicate!.Trim()}");
+            }
 
             if (config.FillFactor > 0)
-                sb.Append($" WITH (FILLFACTOR = {config.FillFactor})");
-
+                builder.Append($" WITH (FILLFACTOR = {config.FillFactor})");
             if (!string.IsNullOrWhiteSpace(config.FileGroup))
-                sb.Append($" ON {QUOTENAME(config.FileGroup)}");
+                builder.Append($" ON {QUOTENAME(config.FileGroup)}");
 
-            sb.AppendLine(";");
-            return sb.ToString();
+            builder.AppendLine(";");
+            return builder.ToString();
         }
 
-        public string GenerateAlterIndexScript(IndexOperation.Alter config)
+        /// <summary>
+        /// Renames an index or key constraint. Other changes require dropping and recreating the index.
+        /// </summary>
+        public override string GenerateAlterIndexScript(IndexOperation.Alter config)
         {
-            return $"USE {QUOTENAME(config.DatabaseName)}; PRINT N'[BprDevKit] Index [{config.IndexName}] alter script generated (requires implementation).';";
+            ArgumentNullException.ThrowIfNull(config);
+            ValidateTableTarget(config.DatabaseName, config.SchemaName, config.TableName);
+            ValidateObjectName(config.IndexName, "Index name");
+            ValidateObjectName(config.NewIndexName, "New index name");
+
+            if (string.Equals(config.IndexName, config.NewIndexName, StringComparison.Ordinal))
+                throw new InvalidOperationException("[BprDevKit] The new index name is the same as the current one.");
+
+            return $@"USE {QUOTENAME(config.DatabaseName)};
+GO
+DECLARE @renameTarget nvarchar(776) = QUOTENAME({SQLLiteral(config.SchemaName)}) + N'.' + QUOTENAME({SQLLiteral(config.TableName)}) + N'.' + QUOTENAME({SQLLiteral(config.IndexName)});
+EXEC sys.sp_rename @objname = @renameTarget, @newname = {SQLLiteral(config.NewIndexName)}, @objtype = N'INDEX';
+";
         }
 
-        public string GenerateDropIndexScript(IndexOperation.Drop config)
+        /// <summary>
+        /// Drops an index; primary key and unique constraints are dropped as constraints because DROP INDEX rejects them.
+        /// </summary>
+        public override string GenerateDropIndexScript(IndexOperation.Drop config)
         {
-            return $"USE {QUOTENAME(config.DatabaseName)}; DROP INDEX {QUOTENAME(config.IndexName)} ON {QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)}; PRINT N'[BprDevKit] Index [{config.IndexName}] dropped successfully.';";
+            ArgumentNullException.ThrowIfNull(config);
+            ValidateTableTarget(config.DatabaseName, config.SchemaName, config.TableName);
+            ValidateObjectName(config.IndexName, "Index name");
+
+            return $@"USE {QUOTENAME(config.DatabaseName)};
+GO
+DECLARE @tableName nvarchar(517) = QUOTENAME({SQLLiteral(config.SchemaName)}) + N'.' + QUOTENAME({SQLLiteral(config.TableName)});
+DECLARE @indexName sysname = {SQLLiteral(config.IndexName)}, @sql nvarchar(max);
+
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(@tableName) AND name = @indexName AND (is_primary_key = 1 OR is_unique_constraint = 1))
+    SET @sql = N'ALTER TABLE ' + @tableName + N' DROP CONSTRAINT ' + QUOTENAME(@indexName) + N';';
+ELSE
+    SET @sql = N'DROP INDEX ' + QUOTENAME(@indexName) + N' ON ' + @tableName + N';';
+
+EXEC (@sql);
+";
         }
 
-        public string GenerateGetIndexInfoScript(IndexOperation.Information config)
+        public override string GenerateGetIndexInfoScript(IndexOperation.Information config)
         {
             return $@"USE {QUOTENAME(config.DatabaseName)};
 SELECT
@@ -836,7 +930,7 @@ SELECT
     s.name AS SchemaName,
     i.is_unique AS IsUnique,
     i.type_desc AS IndexType,
-    i.fill_factor AS FillFactor,
+    i.fill_factor AS [FillFactor],
     c.name AS ColumnName
 FROM sys.indexes i
 INNER JOIN sys.tables t ON i.object_id = t.object_id
@@ -847,7 +941,7 @@ WHERE s.name = {SQLLiteral(config.SchemaName)} AND t.name = {SQLLiteral(config.T
 ORDER BY i.name;";
         }
 
-        public string GenerateGetIndexNamesScript(string databaseName, string schemaName, string tableName)
+        public override string GenerateGetIndexNamesScript(string databaseName, string schemaName, string tableName)
         {
             return $@"USE {QUOTENAME(databaseName)};
 SELECT i.name AS IndexName
@@ -858,48 +952,92 @@ WHERE o.type = 'U' AND s.name = {SQLLiteral(schemaName)} AND o.name = {SQLLitera
 ORDER BY i.name;";
         }
 
-        public string GenerateGetIndexTypesScript()
+        public override string GenerateGetIndexTypesScript()
         {
             return "SELECT 'NONCLUSTERED' AS IndexType UNION SELECT 'CLUSTERED' AS IndexType UNION SELECT 'UNIQUE CLUSTERED' AS IndexType UNION SELECT 'UNIQUE NONCLUSTERED' AS IndexType;";
         }
         #endregion
 
         #region Foreign Key Operations
-        public string GenerateCreateForeignKeyScript(ForeignKeyOperation.Create config)
+        public override string GenerateCreateForeignKeyScript(ForeignKeyOperation.Create config)
         {
-            string fkName = "FK_" + config.SchemaName + "_" + config.TableName + "_" + config.ColumnName + "_" + config.RefSchemaName + "_" + config.RefTableName + "_" + config.RefColumnName;
+            ArgumentNullException.ThrowIfNull(config);
+            ValidateTableTarget(config.DatabaseName, config.SchemaName, config.TableName);
+            ValidateOptionalObjectName(config.FKName, "Foreign key name");
+            ValidateObjectName(config.RefSchemaName, "Referenced schema name");
+            ValidateObjectName(config.RefTableName, "Referenced table name");
 
-            return "USE " + QUOTENAME(config.DatabaseName) + ";\n" +
-                   "ALTER TABLE " + QUOTENAME(config.SchemaName) + "." + QUOTENAME(config.TableName) + "\n" +
-                   "ADD CONSTRAINT " + QUOTENAME(fkName) + "\n" +
-                   "FOREIGN KEY (" + QUOTENAME(config.ColumnName) + ")\n" +
-                   "REFERENCES " + QUOTENAME(config.RefSchemaName) + "." + QUOTENAME(config.RefTableName) + " (" + QUOTENAME(config.RefColumnName) + ")\n" +
-                   "ON DELETE " + config.OnDelete + ";";
+            var mappings = config.Columns ?? new List<ForeignKeyOperation.ColumnMapping>();
+            if (mappings.Count == 0)
+                throw new InvalidOperationException("[BprDevKit] A foreign key needs at least one column pair.");
+            if (mappings.Count > 32)
+                throw new InvalidOperationException("[BprDevKit] A foreign key can use at most 32 columns.");
+
+            var localColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var mapping in mappings)
+            {
+                ValidateObjectName(mapping.ColumnName, "Column name");
+                ValidateObjectName(mapping.RefColumnName, "Referenced column name");
+                if (!localColumns.Add(mapping.ColumnName))
+                    throw new InvalidOperationException($"[BprDevKit] Column [{mapping.ColumnName}] is used more than once in the foreign key.");
+            }
+
+            var onDelete = NormalizeReferentialAction(config.OnDelete, "ON DELETE");
+            var onUpdate = NormalizeReferentialAction(config.OnUpdate, "ON UPDATE");
+
+            var foreignKeyName = string.IsNullOrWhiteSpace(config.FKName)
+                ? $"FK_{config.RefSchemaName}_{config.RefTableName}_{string.Join("_", mappings.Select(mapping => mapping.RefColumnName))}_2_{config.SchemaName}_{config.TableName}_{string.Join("_", mappings.Select(mapping => mapping.ColumnName))}"
+                : config.FKName;
+            if (foreignKeyName.Length > 128)
+                throw new InvalidOperationException("[BprDevKit] The generated foreign key name is longer than 128 characters; specify a shorter name.");
+
+            var table = $"{QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)}";
+            var builder = new StringBuilder();
+            builder.AppendLine($"USE {QUOTENAME(config.DatabaseName)};")
+                .AppendLine("GO");
+
+            builder.Append($"ALTER TABLE {table} {(config.Enabled ? "WITH CHECK" : "WITH NOCHECK")} ADD CONSTRAINT {QUOTENAME(foreignKeyName)} ")
+                .Append($"FOREIGN KEY ({string.Join(", ", mappings.Select(mapping => QUOTENAME(mapping.ColumnName)))}) ")
+                .Append($"REFERENCES {QUOTENAME(config.RefSchemaName)}.{QUOTENAME(config.RefTableName)} ({string.Join(", ", mappings.Select(mapping => QUOTENAME(mapping.RefColumnName)))}) ")
+                .Append($"ON DELETE {onDelete} ON UPDATE {onUpdate}");
+            if (config.IsNotForReplication)
+                builder.Append(" NOT FOR REPLICATION");
+            builder.AppendLine(";");
+
+            if (!config.Enabled)
+                builder.AppendLine($"ALTER TABLE {table} NOCHECK CONSTRAINT {QUOTENAME(foreignKeyName)};");
+
+            return builder.ToString();
         }
 
-        public string GenerateAlterForeignKeyScript(ForeignKeyOperation.Alter config)
+        /// <summary>
+        /// Enables a foreign key (re-validating the existing rows so it is trusted again) or disables it.
+        /// </summary>
+        public override string GenerateAlterForeignKeyScript(ForeignKeyOperation.Alter config)
         {
-            string fkName = "FK_" + config.SchemaName + "_" + config.TableName + "_" + config.ColumnName + "_" + config.RefSchemaName + "_" + config.RefTableName + "_" + config.RefColumnName;
+            ArgumentNullException.ThrowIfNull(config);
+            ValidateTableTarget(config.DatabaseName, config.SchemaName, config.TableName);
+            ValidateObjectName(config.FKName, "Foreign key name");
 
-            return "USE " + QUOTENAME(config.DatabaseName) + ";\n" +
-                   "ALTER TABLE " + QUOTENAME(config.SchemaName) + "." + QUOTENAME(config.TableName) + "\n" +
-                   "DROP CONSTRAINT " + QUOTENAME(fkName) + ";\n" +
-                   "GO\n" +
-                   "ALTER TABLE " + QUOTENAME(config.SchemaName) + "." + QUOTENAME(config.TableName) + "\n" +
-                   "ADD CONSTRAINT " + QUOTENAME(fkName) + "\n" +
-                   "FOREIGN KEY (" + QUOTENAME(config.ColumnName) + ")\n" +
-                   "REFERENCES " + QUOTENAME(config.RefSchemaName) + "." + QUOTENAME(config.RefTableName) + " (" + QUOTENAME(config.RefColumnName) + ")\n" +
-                   "ON DELETE " + config.OnDelete + ";";
+            var table = $"{QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)}";
+            var statement = config.Enabled
+                ? $"ALTER TABLE {table} WITH CHECK CHECK CONSTRAINT {QUOTENAME(config.FKName)};"
+                : $"ALTER TABLE {table} NOCHECK CONSTRAINT {QUOTENAME(config.FKName)};";
+
+            return $"USE {QUOTENAME(config.DatabaseName)};{Environment.NewLine}GO{Environment.NewLine}{statement}{Environment.NewLine}";
         }
 
-        public string GenerateDropForeignKeyScript(ForeignKeyOperation.Drop config)
+        public override string GenerateDropForeignKeyScript(ForeignKeyOperation.Drop config)
         {
-            string fkName = string.IsNullOrWhiteSpace(config.FKName) ? "FK_" + config.SchemaName + "_" + config.TableName + "_" + config.ColumnName + "_" + config.RefSchemaName + "_" + config.RefTableName + "_" + config.RefColumnName : config.FKName;
+            ArgumentNullException.ThrowIfNull(config);
+            ValidateTableTarget(config.DatabaseName, config.SchemaName, config.TableName);
+            ValidateObjectName(config.FKName, "Foreign key name");
 
-            return $"USE {QUOTENAME(config.DatabaseName)}; ALTER TABLE {QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)} DROP CONSTRAINT {QUOTENAME(fkName)}; PRINT N'[BprDevKit] Foreign key [{fkName}] dropped successfully.';";
+            return $"USE {QUOTENAME(config.DatabaseName)};{Environment.NewLine}GO{Environment.NewLine}"
+                + $"ALTER TABLE {QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)} DROP CONSTRAINT {QUOTENAME(config.FKName)};{Environment.NewLine}";
         }
 
-        public string GenerateGetForeignKeyInfoScript(ForeignKeyOperation.Information config)
+        public override string GenerateGetForeignKeyInfoScript(ForeignKeyOperation.Information config)
         {
             return $@"USE {QUOTENAME(config.DatabaseName)};
 SELECT
@@ -923,14 +1061,14 @@ INNER JOIN sys.columns rc ON fk.referenced_object_id = rc.object_id AND fkc.refe
 WHERE s.name = {SQLLiteral(config.SchemaName)} AND t.name = {SQLLiteral(config.TableName)} AND c.name = {SQLLiteral(config.ColumnName)};";
         }
 
-        public string GenerateGetReferentialActionsScript()
+        public override string GenerateGetReferentialActionsScript()
         {
             return "SELECT 'NO ACTION' AS Action UNION SELECT 'CASCADE' AS Action UNION SELECT 'SET NULL' AS Action UNION SELECT 'SET DEFAULT' AS Action ORDER BY Action;";
         }
         #endregion
 
         #region View Operations
-        public string GenerateCreateViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true)
+        public override string GenerateCreateViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true)
         {
             var sb = new StringBuilder();
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
@@ -958,7 +1096,7 @@ WHERE s.name = {SQLLiteral(config.SchemaName)} AND t.name = {SQLLiteral(config.T
             return sb.ToString();
         }
 
-        public string GenerateAlterViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true)
+        public override string GenerateAlterViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true)
         {
             var sb = new StringBuilder();
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
@@ -986,12 +1124,12 @@ WHERE s.name = {SQLLiteral(config.SchemaName)} AND t.name = {SQLLiteral(config.T
             return sb.ToString();
         }
 
-        public string GenerateDropViewScript(string databaseName, string schemaName, string viewName)
+        public override string GenerateDropViewScript(string databaseName, string schemaName, string viewName)
         {
             return $"USE {QUOTENAME(databaseName)}; DROP VIEW {QUOTENAME(schemaName)}.{QUOTENAME(viewName)}; PRINT N'[BprDevKit] View [{viewName}] dropped successfully.';";
         }
 
-        public string GenerateGetViewInfoScript(string databaseName, string schemaName, string viewName)
+        public override string GenerateGetViewInfoScript(string databaseName, string schemaName, string viewName)
         {
             return $@"USE {QUOTENAME(databaseName)};
 SELECT
@@ -1006,19 +1144,19 @@ LEFT JOIN sys.sql_modules m ON v.object_id = m.object_id
 WHERE s.name = {SQLLiteral(schemaName)} AND v.name = {SQLLiteral(viewName)};";
         }
 
-        public string GenerateGetViewsScript(string databaseName)
+        public override string GenerateGetViewsScript(string databaseName)
         {
             return $"USE {QUOTENAME(databaseName)}; SELECT v.name AS ViewName, s.name AS SchemaName FROM sys.views v INNER JOIN sys.schemas s ON v.schema_id = s.schema_id ORDER BY s.name, v.name;";
         }
 
-        public string GenerateTestViewScript(string databaseName, string selectStatement)
+        public override string GenerateTestViewScript(string databaseName, string selectStatement)
         {
             return $"USE {QUOTENAME(databaseName)}; SET NOCOUNT ON; {selectStatement};";
         }
         #endregion
 
         #region Stored Procedure Operations
-        public string GenerateCreateProcedureScript(string databaseName, string schemaName, string procName, string body, bool withEncryption = true)
+        public override string GenerateCreateProcedureScript(string databaseName, string schemaName, string procName, string body, bool withEncryption = true)
         {
             var sb = new StringBuilder();
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
@@ -1046,7 +1184,7 @@ WHERE s.name = {SQLLiteral(schemaName)} AND v.name = {SQLLiteral(viewName)};";
             return sb.ToString();
         }
 
-        public string GenerateAlterProcedureScript(string databaseName, string schemaName, string procName, string body, bool withEncryption = true)
+        public override string GenerateAlterProcedureScript(string databaseName, string schemaName, string procName, string body, bool withEncryption = true)
         {
             var sb = new StringBuilder();
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
@@ -1074,12 +1212,12 @@ WHERE s.name = {SQLLiteral(schemaName)} AND v.name = {SQLLiteral(viewName)};";
             return sb.ToString();
         }
 
-        public string GenerateDropProcedureScript(string databaseName, string schemaName, string procName)
+        public override string GenerateDropProcedureScript(string databaseName, string schemaName, string procName)
         {
             return $"USE {QUOTENAME(databaseName)}; DROP PROCEDURE {QUOTENAME(schemaName)}.{QUOTENAME(procName)}; PRINT N'[BprDevKit] Stored Procedure [{procName}] dropped successfully.';";
         }
 
-        public string GenerateGetProcedureInfoScript(string databaseName, string schemaName, string procName)
+        public override string GenerateGetProcedureInfoScript(string databaseName, string schemaName, string procName)
         {
             return $@"USE {QUOTENAME(databaseName)};
 SELECT
@@ -1094,19 +1232,19 @@ LEFT JOIN sys.sql_modules m ON p.object_id = m.object_id
 WHERE s.name = {SQLLiteral(schemaName)} AND p.name = {SQLLiteral(procName)};";
         }
 
-        public string GenerateGetProceduresScript(string databaseName)
+        public override string GenerateGetProceduresScript(string databaseName)
         {
             return $"USE {QUOTENAME(databaseName)}; SELECT p.name AS ProcedureName, s.name AS SchemaName FROM sys.procedures p INNER JOIN sys.schemas s ON p.schema_id = s.schema_id ORDER BY s.name, p.name;";
         }
 
-        public string GenerateTestProcedureScript(string databaseName, string procName, string body)
+        public override string GenerateTestProcedureScript(string databaseName, string procName, string body)
         {
             return $"USE {QUOTENAME(databaseName)}; PRINT N'[BprDevKit] Testing Stored Procedure [{procName}]...'; BEGIN {body} END; PRINT N'[BprDevKit] Stored Procedure [{procName}] test completed successfully.';";
         }
         #endregion
 
         #region Function Operations
-        public string GenerateCreateFunctionScript(string databaseName, string schemaName, string funcName, string body, bool withEncryption = true)
+        public override string GenerateCreateFunctionScript(string databaseName, string schemaName, string funcName, string body, bool withEncryption = true)
         {
             var sb = new StringBuilder();
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
@@ -1134,7 +1272,7 @@ WHERE s.name = {SQLLiteral(schemaName)} AND p.name = {SQLLiteral(procName)};";
             return sb.ToString();
         }
 
-        public string GenerateAlterFunctionScript(string databaseName, string schemaName, string funcName, string body, bool withEncryption = true)
+        public override string GenerateAlterFunctionScript(string databaseName, string schemaName, string funcName, string body, bool withEncryption = true)
         {
             var sb = new StringBuilder();
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
@@ -1162,12 +1300,12 @@ WHERE s.name = {SQLLiteral(schemaName)} AND p.name = {SQLLiteral(procName)};";
             return sb.ToString();
         }
 
-        public string GenerateDropFunctionScript(string databaseName, string schemaName, string funcName)
+        public override string GenerateDropFunctionScript(string databaseName, string schemaName, string funcName)
         {
             return $"USE {QUOTENAME(databaseName)}; DROP FUNCTION {QUOTENAME(schemaName)}.{QUOTENAME(funcName)}; PRINT N'[BprDevKit] Function [{funcName}] dropped successfully.';";
         }
 
-        public string GenerateGetFunctionInfoScript(string databaseName, string schemaName, string funcName)
+        public override string GenerateGetFunctionInfoScript(string databaseName, string schemaName, string funcName)
         {
             return $@"USE {QUOTENAME(databaseName)};
 SELECT
@@ -1182,57 +1320,171 @@ LEFT JOIN sys.sql_modules m ON f.object_id = m.object_id
 WHERE s.name = {SQLLiteral(schemaName)} AND f.name = {SQLLiteral(funcName)} AND f.type = 'FN';";
         }
 
-        public string GenerateGetFunctionsScript(string databaseName)
+        public override string GenerateGetFunctionsScript(string databaseName)
         {
             return $"USE {QUOTENAME(databaseName)}; SELECT f.name AS FunctionName, s.name AS SchemaName FROM sys.objects f INNER JOIN sys.schemas s ON f.schema_id = s.schema_id WHERE f.type = 'FN' ORDER BY s.name, f.name;";
         }
 
-        public string GenerateTestFunctionScript(string databaseName, string funcName, string body)
+        public override string GenerateTestFunctionScript(string databaseName, string funcName, string body)
         {
             return $"USE {QUOTENAME(databaseName)}; PRINT N'[BprDevKit] Testing Function [{funcName}]...'; DECLARE @Result INT; {body} SELECT @Result; PRINT N'[BprDevKit] Function [{funcName}] test completed successfully.';";
         }
         #endregion
 
         #region Backup/Restore
-        public string GenerateBackupScript(BackupOperation config)
+        public override string GenerateBackupScript(BackupOperation config)
         {
             return $"BACKUP DATABASE {QUOTENAME(config.DatabaseName)} TO DISK = {SQLLiteral(config.BackupPath)} WITH FORMAT, INIT, STATS = 10; PRINT N'[BprDevKit] Database [{config.DatabaseName}] backed up successfully to [{config.BackupPath}].';";
         }
 
-        public string GenerateRestoreScript(RestoreOperation config)
+        public override string GenerateRestoreScript(RestoreOperation config)
         {
             return $"RESTORE DATABASE {QUOTENAME(config.DatabaseName)} FROM DISK = {SQLLiteral(config.RestorePath)} WITH REPLACE; PRINT N'[BprDevKit] Database [{config.DatabaseName}] restored successfully from [{config.RestorePath}].';";
         }
         #endregion
 
         #region Utility
-        public string GenerateUseDatabaseScript(string databaseName)
+        public override string GenerateUseDatabaseScript(string databaseName)
         {
             return "USE " + QUOTENAME(databaseName) + ";";
         }
 
-        public string GenerateTransactionBeginScript()
+        public override string GenerateTransactionBeginScript()
         {
             return "BEGIN TRANSACTION;";
         }
 
-        public string GenerateTransactionCommitScript()
+        public override string GenerateTransactionCommitScript()
         {
             return "COMMIT TRANSACTION;";
         }
 
-        public string GenerateTransactionRollbackScript()
+        public override string GenerateTransactionRollbackScript()
         {
             return "ROLLBACK TRANSACTION;";
         }
 
-        public string GenerateTryCatchBlock(string tryBlock, string catchBlock)
+        public override string GenerateTryCatchBlock(string tryBlock, string catchBlock)
         {
             return $"TRY\n{tryBlock}\nCATCH\nBEGIN\n    {catchBlock}\n    RETURN;\nEND";
         }
         #endregion
 
         #region Helper Methods
+        private static void ValidateTableTarget(string databaseName, string schemaName, string tableName)
+        {
+            ValidateDatabaseName(databaseName);
+            ValidateObjectName(schemaName, "Schema name");
+            ValidateObjectName(tableName, "Table name");
+        }
+
+        private static string NormalizeReferentialAction(string? action, string label)
+        {
+            var normalized = (action ?? string.Empty).Trim().ToUpperInvariant();
+            if (!ForeignKeyOperation.ReferentialActions.Contains(normalized))
+                throw new InvalidOperationException($"[BprDevKit] {label} must be one of: {string.Join(", ", ForeignKeyOperation.ReferentialActions)}.");
+
+            return normalized;
+        }
+
+        private static void ValidateIndexColumns(IReadOnlyCollection<IndexOperation.KeyColumn> keys, IReadOnlyCollection<string> includes)
+        {
+            if (keys.Count == 0)
+                throw new InvalidOperationException("[BprDevKit] An index needs at least one key column.");
+            if (keys.Count > 32)
+                throw new InvalidOperationException("[BprDevKit] An index can have at most 32 key columns.");
+            if (includes.Count > 1023)
+                throw new InvalidOperationException("[BprDevKit] An index can include at most 1023 columns.");
+
+            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var key in keys)
+            {
+                ValidateObjectName(key.ColumnName, "Column name");
+                if (!used.Add(key.ColumnName))
+                    throw new InvalidOperationException($"[BprDevKit] Column [{key.ColumnName}] is used more than once in the index.");
+            }
+
+            foreach (var include in includes)
+            {
+                ValidateObjectName(include, "Included column name");
+                if (!used.Add(include))
+                    throw new InvalidOperationException($"[BprDevKit] Column [{include}] is used more than once in the index.");
+            }
+        }
+
+        private static string ResolveIndexName(IndexOperation.Create config, IReadOnlyCollection<IndexOperation.KeyColumn> keys)
+        {
+            if (!string.IsNullOrWhiteSpace(config.IndexName))
+                return config.IndexName;
+
+            string name;
+            if (config.IsPrimaryKey)
+            {
+                var pkCols = string.Join("_", keys.Select(key => key.ColumnName));
+                name = $"PK_{config.SchemaName}_{config.TableName}_{pkCols}";
+            }
+            else
+            {
+                var prefix = config.IsUnique ? "UIX" : "IX";
+                name = $"{prefix}_{config.SchemaName}_{config.TableName}_{string.Join("_", keys.Select(key => key.ColumnName))}";
+            }
+
+            if (name.Length > 128)
+                throw new InvalidOperationException("[BprDevKit] The generated index name is longer than 128 characters; specify a shorter name.");
+
+            return name;
+        }
+
+        private static string BuildCollationClause(ColumnDefinition column)
+        {
+            if (string.IsNullOrWhiteSpace(column.Collation))
+                return string.Empty;
+
+            var type = ColumnDataType.Find(column.DataType);
+            var isCharacterType = type is { Kind: ColumnDataTypeKind.Length } && !type.Name.Contains("binary", StringComparison.OrdinalIgnoreCase);
+            if (!isCharacterType)
+                return string.Empty;
+
+            if (!column.Collation.All(character => char.IsAsciiLetterOrDigit(character) || character == '_'))
+                throw new InvalidOperationException($"[BprDevKit] The collation of column [{column.ColumnName}] contains invalid characters.");
+
+            return " COLLATE " + column.Collation;
+        }
+
+        /// <summary>
+        /// Sets, replaces or (for an empty description) removes the MS_Description property of a table or one of its columns.
+        /// </summary>
+        private static void AppendDescriptionUpsert(StringBuilder builder, string schemaName, string tableName, string? columnName, string? description)
+        {
+            var schema = SQLLiteral(schemaName);
+            var table = SQLLiteral(tableName);
+            var tableId = $"OBJECT_ID(QUOTENAME({schema}) + N'.' + QUOTENAME({table}))";
+
+            var levels = $"@level0type = N'SCHEMA', @level0name = {schema}, @level1type = N'TABLE', @level1name = {table}";
+            var target = $"major_id = {tableId} AND minor_id = 0";
+            if (columnName is not null)
+            {
+                var column = SQLLiteral(columnName);
+                levels += $", @level2type = N'COLUMN', @level2name = {column}";
+                target = $"major_id = {tableId} AND minor_id = COLUMNPROPERTY({tableId}, {column}, 'ColumnId')";
+            }
+
+            var exists = $"EXISTS (SELECT 1 FROM sys.extended_properties WHERE class = 1 AND name = N'MS_Description' AND {target})";
+
+            if (string.IsNullOrWhiteSpace(description))
+            {
+                builder.AppendLine($@"IF {exists}
+    EXEC sys.sp_dropextendedproperty @name = N'MS_Description', {levels};");
+                return;
+            }
+
+            var value = SQLLiteral(description);
+            builder.AppendLine($@"IF {exists}
+    EXEC sys.sp_updateextendedproperty @name = N'MS_Description', @value = {value}, {levels};
+ELSE
+    EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = {value}, {levels};");
+        }
+
         private const int MaxDescriptionLength = 3000;
 
         private static void ValidateDescription(string? description)
@@ -1278,7 +1530,7 @@ WHERE s.name = {SQLLiteral(schemaName)} AND f.name = {SQLLiteral(funcName)} AND 
                 }
 
                 if (!string.IsNullOrWhiteSpace(column.DefaultValue))
-                    ValidateDefaultExpression(column.DefaultValue, column.ColumnName);
+                    ValidateExpression(column.DefaultValue, $"default of column [{column.ColumnName}]");
 
                 result.Add(column);
             }
@@ -1289,21 +1541,25 @@ WHERE s.name = {SQLLiteral(schemaName)} AND f.name = {SQLLiteral(funcName)} AND 
             return result;
         }
 
-        private static string BuildColumnDefinition(ColumnDefinition column)
+        private static string BuildColumnDefinition(ColumnDefinition column, string schemaName, string tableName)
         {
             var type = ColumnDataType.Find(column.DataType)!;
             var nullable = column.IsNullable && !column.IsPrimaryKey && !column.IsIdentity;
 
             var definition = new StringBuilder()
                 .Append(QUOTENAME(column.ColumnName)).Append(' ')
-                .Append(FormatColumnDataType(column, type)).Append(' ')
+                .Append(FormatColumnDataType(column, type))
+                .Append(BuildCollationClause(column)).Append(' ')
                 .Append(nullable ? "NULL" : "NOT NULL");
 
             if (column.IsIdentity)
                 definition.Append($" IDENTITY({column.IdentitySeed},{column.IdentityIncrement})");
 
             if (!string.IsNullOrWhiteSpace(column.DefaultValue))
-                definition.Append($" DEFAULT ({column.DefaultValue!.Trim()})");
+            {
+                var dfName = $"DF_{schemaName}_{tableName}_{column.ColumnName}";
+                definition.Append($" CONSTRAINT {QUOTENAME(dfName)} DEFAULT ({column.DefaultValue!.Trim()})");
+            }
 
             return definition.ToString();
         }
@@ -1340,6 +1596,11 @@ WHERE s.name = {SQLLiteral(schemaName)} AND f.name = {SQLLiteral(funcName)} AND 
                         throw new InvalidOperationException($"[BprDevKit] The fractional seconds precision of column [{column.ColumnName}] must be between 0 and 7.");
                     return $"{type.Name}({column.Scale})";
 
+                case ColumnDataTypeKind.VectorDimensions:
+                    if (column.Length is null || column.Length < 1)
+                        throw new InvalidOperationException($"[BprDevKit] Column [{column.ColumnName}] of type vector requires a positive dimension count.");
+                    return $"{type.Name}({column.Length})";
+
                 default:
                     return type.Name;
             }
@@ -1350,7 +1611,7 @@ WHERE s.name = {SQLLiteral(schemaName)} AND f.name = {SQLLiteral(funcName)} AND 
         /// surrounding DEFAULT (...) clause or start another statement: no ';', no comments and balanced
         /// parentheses (string literals are skipped).
         /// </summary>
-        private static void ValidateDefaultExpression(string expression, string columnName)
+        private static void ValidateExpression(string expression, string subject)
         {
             var depth = 0;
             var inString = false;
@@ -1369,22 +1630,22 @@ WHERE s.name = {SQLLiteral(schemaName)} AND f.name = {SQLLiteral(funcName)} AND 
                     continue;
 
                 if (current == ';')
-                    throw new InvalidOperationException($"[BprDevKit] The default of column [{columnName}] cannot contain ';'.");
+                    throw new InvalidOperationException($"[BprDevKit] The {subject} cannot contain ';'.");
 
                 if (index + 1 < expression.Length)
                 {
                     var pair = expression.Substring(index, 2);
                     if (pair == "--" || pair == "/*" || pair == "*/")
-                        throw new InvalidOperationException($"[BprDevKit] The default of column [{columnName}] cannot contain comments.");
+                        throw new InvalidOperationException($"[BprDevKit] The {subject} cannot contain comments.");
                 }
 
                 if (current == '(') depth++;
                 if (current == ')' && --depth < 0)
-                    throw new InvalidOperationException($"[BprDevKit] The default of column [{columnName}] has unbalanced parentheses.");
+                    throw new InvalidOperationException($"[BprDevKit] The {subject} has unbalanced parentheses.");
             }
 
             if (inString || depth != 0)
-                throw new InvalidOperationException($"[BprDevKit] The default of column [{columnName}] has an unterminated string or unbalanced parentheses.");
+                throw new InvalidOperationException($"[BprDevKit] The {subject} has an unterminated string or unbalanced parentheses.");
         }
 
         private static string BuildAddDescriptionStatement(string description, string schemaName, string tableName, string? columnName)
