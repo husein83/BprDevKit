@@ -12,6 +12,8 @@ builder.Services.AddRazorComponents()
 
 // Register configuration and services
 builder.Services.AddSingleton<ServerConfiguration>();
+builder.Services.AddSingleton<BprDevKit.Localization.ITranslationFactory, BprDevKit.Localization.TranslationFactory>();
+builder.Services.AddSingleton<IDatabaseConnectionFactory, DatabaseConnectionFactory>();
 builder.Services.AddSingleton<ISqlGeneratorFactory, SqlGeneratorFactory>();
 builder.Services.AddSingleton<SqlServerGenerator>();
 builder.Services.AddSingleton<ISqlGenerator, SqlServerGenerator>();

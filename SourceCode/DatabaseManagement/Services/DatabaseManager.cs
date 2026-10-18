@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Microsoft.Data.SqlClient;
 using BprDevKit.DatabaseManagement.Models.Metadata;
 using BprDevKit.DatabaseManagement.Models.Operations;
 using BprDevKit.DatabaseManagement.Services;
@@ -20,11 +20,13 @@ namespace BprDevKit.DatabaseManagement.Services
     {
         private readonly ISqlGenerator _sqlGenerator;
         private readonly ServerConfiguration _config;
+        private readonly IDatabaseConnectionFactory _connectionFactory;
 
-        public DatabaseManager(ISqlGenerator sqlGenerator, ServerConfiguration config)
+        public DatabaseManager(ISqlGenerator sqlGenerator, ServerConfiguration config, IDatabaseConnectionFactory? connectionFactory = null)
         {
             _sqlGenerator = sqlGenerator ?? throw new ArgumentNullException(nameof(sqlGenerator));
             _config = config ?? throw new ArgumentNullException(nameof(config));
+            _connectionFactory = connectionFactory ?? new DatabaseConnectionFactory();
         }
 
         #region Database Operations
@@ -1375,36 +1377,25 @@ namespace BprDevKit.DatabaseManagement.Services
         #endregion
 
         #region Private Methods
-        private async Task<SqlConnection> OpenConnectionAsync(string databaseName)
+        private Task<DbConnection> OpenConnectionAsync(string? databaseName = null)
         {
-            var connectionString = new SqlConnectionStringBuilder(_config.Server.BuildConnectionString())
-            {
-                InitialCatalog = databaseName
-            }.ConnectionString;
-
-            var connection = new SqlConnection(connectionString);
-            try
-            {
-                await connection.OpenAsync();
-                return connection;
-            }
-            catch
-            {
-                connection.Dispose();
-                throw;
-            }
+            return _connectionFactory.OpenConnectionAsync(_config, databaseName);
         }
 
         private async Task<bool> ExistsAsync(string databaseName, string sql, params (string Name, string Value)[] parameters)
         {
             using var connection = await OpenConnectionAsync(databaseName);
-            using var command = new SqlCommand(sql, connection)
-            {
-                CommandTimeout = _config.Server.CommandTimeout
-            };
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.CommandTimeout = _config.Server.CommandTimeout;
 
             foreach (var (name, value) in parameters)
-                command.Parameters.AddWithValue(name, value);
+            {
+                var param = command.CreateParameter();
+                param.ParameterName = name;
+                param.Value = (object?)value ?? DBNull.Value;
+                command.Parameters.Add(param);
+            }
 
             return await command.ExecuteScalarAsync() is not null;
         }
@@ -1544,14 +1535,15 @@ WHERE s.name = @schemaName AND t.name = @tableName AND fk.name = @foreignKeyName
             if (string.IsNullOrWhiteSpace(databaseName))
                 return false;
 
-            using var connection = new SqlConnection(_config.Server.BuildConnectionString());
-            await connection.OpenAsync();
+            using var connection = await OpenConnectionAsync();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT 1 FROM sys.databases WHERE name = @databaseName;";
+            command.CommandTimeout = _config.Server.CommandTimeout;
 
-            using var command = new SqlCommand("SELECT 1 FROM sys.databases WHERE name = @databaseName;", connection)
-            {
-                CommandTimeout = _config.Server.CommandTimeout
-            };
-            command.Parameters.AddWithValue("@databaseName", databaseName);
+            var param = command.CreateParameter();
+            param.ParameterName = "@databaseName";
+            param.Value = databaseName;
+            command.Parameters.Add(param);
 
             return await command.ExecuteScalarAsync() is not null;
         }
@@ -1569,15 +1561,13 @@ WHERE s.name = @schemaName AND t.name = @tableName AND fk.name = @foreignKeyName
 
         private async Task<OperationResult> ExecuteDatabaseCommand(string sql, string successMessage)
         {
-            using var connection = new SqlConnection(_config.Server.BuildConnectionString());
-            await connection.OpenAsync();
+            using var connection = await OpenConnectionAsync();
 
             foreach (var batch in SplitSqlBatches(sql))
             {
-                using var command = new SqlCommand(batch, connection)
-                {
-                    CommandTimeout = _config.Server.CommandTimeout
-                };
+                using var command = connection.CreateCommand();
+                command.CommandText = batch;
+                command.CommandTimeout = _config.Server.CommandTimeout;
                 await command.ExecuteNonQueryAsync();
             }
 
@@ -1586,21 +1576,18 @@ WHERE s.name = @schemaName AND t.name = @tableName AND fk.name = @foreignKeyName
 
         private async Task<OperationResult> ExecuteInTransaction(List<string> scripts, string successMessage, string customMessage)
         {
-            var connectionString = _config.Server.BuildConnectionString();
-            using var connection = new SqlConnection(connectionString);
-            await connection.OpenAsync();
-
-            using var transaction = connection.BeginTransaction();
+            using var connection = await OpenConnectionAsync();
+            using var transaction = await connection.BeginTransactionAsync();
             try
             {
                 foreach (var script in scripts)
                 {
                     foreach (var batch in SplitSqlBatches(script))
                     {
-                        using var command = new SqlCommand(batch, connection, transaction)
-                        {
-                            CommandTimeout = _config.Server.CommandTimeout
-                        };
+                        using var command = connection.CreateCommand();
+                        command.CommandText = batch;
+                        command.Transaction = transaction;
+                        command.CommandTimeout = _config.Server.CommandTimeout;
 
                         await command.ExecuteNonQueryAsync();
                     }
@@ -1614,7 +1601,7 @@ WHERE s.name = @schemaName AND t.name = @tableName AND fk.name = @foreignKeyName
             {
                 try
                 {
-                    transaction.Rollback();
+                    await transaction.RollbackAsync();
                 }
                 catch
                 {
@@ -1656,17 +1643,13 @@ WHERE s.name = @schemaName AND t.name = @tableName AND fk.name = @foreignKeyName
             DataTable result = new();
             try
             {
-                var connectionString = _config.Server.BuildConnectionString();
-                using var connection = new SqlConnection(connectionString);
-                await connection.OpenAsync();
+                using var connection = await OpenConnectionAsync();
+                using var command = connection.CreateCommand();
+                command.CommandText = sql;
+                command.CommandTimeout = _config.Server.CommandTimeout;
 
-                using var command = new SqlCommand(sql, connection)
-                {
-                    CommandTimeout = _config.Server.CommandTimeout
-                };
-
-                using var adapter = new SqlDataAdapter(command);
-                adapter.Fill(result);
+                using var reader = await command.ExecuteReaderAsync();
+                result.Load(reader);
             }
             catch (Exception exp)
             {
@@ -1680,20 +1663,17 @@ WHERE s.name = @schemaName AND t.name = @tableName AND fk.name = @foreignKeyName
             List<string> result = new();
             try
             {
-                var connectionString = _config.Server.BuildConnectionString();
-                using var connection = new SqlConnection(connectionString);
-                await connection.OpenAsync();
-
-                using var command = new SqlCommand(sql, connection)
-                {
-                    CommandTimeout = _config.Server.CommandTimeout
-                };
+                using var connection = await OpenConnectionAsync();
+                using var command = connection.CreateCommand();
+                command.CommandText = sql;
+                command.CommandTimeout = _config.Server.CommandTimeout;
 
                 using var reader = await command.ExecuteReaderAsync();
 
                 while (await reader.ReadAsync())
                 {
-                    result.Add(reader.GetString(0));
+                    if (!reader.IsDBNull(0))
+                        result.Add(reader.GetString(0));
                 }
             }
             catch (Exception exp)

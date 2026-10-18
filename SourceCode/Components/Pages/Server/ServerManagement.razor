@@ -1,23 +1,34 @@
 @page "/server-management"
 @using BprDevKit.Config
 @using BprDevKit.Utility
+@using BprDevKit.Localization
 @using System.IO
 @inject NavigationManager NavigationManager
+@inject ITranslationFactory TranslationFactory
+@implements IDisposable
 @rendermode InteractiveServer
+
+@{
+    var t = TranslationFactory.Current;
+}
 
 <div class="container-fluid settings-page py-4 px-lg-5">
     <div class="row">
         <div class="col-md-12">
             <div class="settings-hero d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
-                <div><p class="settings-eyebrow mb-1">Configuration workspace</p><h1 class="h2 mb-1">Server & Application Settings</h1><p class="mb-0">Manage SQL Server connections and application preferences in one place.</p></div>
+                <div>
+                    <p class="settings-eyebrow mb-1">@t[TranslationKeys.ServerConfigWorkspace]</p>
+                    <h1 class="h2 mb-1">@t[TranslationKeys.ServerTitle]</h1>
+                    <p class="mb-0">@t[TranslationKeys.ServerSubtitle]</p>
+                </div>
                 @if (!_showAddForm && !_showAppAddForm)
                 {
                     <div class="settings-action-buttons d-flex flex-wrap gap-2">
                         <button class="settings-primary-action btn btn-primary" @onclick="OpenAddServerForm">
-                            <i class="bi bi-plus-lg me-1"></i> Add New Server
+                            <i class="bi bi-plus-lg me-1"></i> @t[TranslationKeys.AddNewServer]
                         </button>
                         <button class="settings-secondary-action btn btn-outline-primary" @onclick="OpenApplicationForm">
-                            <i class="bi bi-gear-fill me-1"></i> Application Settings
+                            <i class="bi bi-gear-fill me-1"></i> @t[TranslationKeys.ApplicationSettings]
                         </button>
                     </div>
                 }
@@ -39,7 +50,7 @@
                         {
                             <div class="settings-empty-state text-center p-5">
                                 <i class="bi bi-server text-muted display-4"></i>
-                                <p class="text-muted mt-3 mb-0">No saved server configurations found. Create one to start managing your databases.</p>
+                                <p class="text-muted mt-3 mb-0">@t[TranslationKeys.ServerNoServersFound]</p>
                             </div>
                         }
                         else
@@ -48,13 +59,13 @@
                                 <table class="table table-hover align-middle mb-0">
                                     <thead class="table-light">
                                         <tr>
-                                            <th class="ps-4">Server / Alias</th>
-                                            <th>Database Engine</th>
-                                            <th>Default DB</th>
-                                            <th>Authentication</th>
-                                            <th>Created</th>
-                                            <th>Last Modified</th>
-                                            <th class="text-end pe-4">Actions</th>
+                                            <th class="ps-4">@t[TranslationKeys.ServerOrAlias]</th>
+                                            <th>@t[TranslationKeys.DatabaseEngine]</th>
+                                            <th>@t[TranslationKeys.DefaultDatabase]</th>
+                                            <th>@t[TranslationKeys.Authentication]</th>
+                                            <th>@t[TranslationKeys.Created]</th>
+                                            <th>@t[TranslationKeys.LastModified]</th>
+                                            <th class="text-end pe-4">@t[TranslationKeys.Actions]</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -71,7 +82,7 @@
                                                 <td class="font-monospace">@server.Server.DefaultDatabase</td>
                                                 <td>
                                                     <span class="badge @(server.Server.UseWindowsAuth ? "bg-info-subtle text-info" : "bg-warning-subtle text-warning")">
-                                                        @(server.Server.UseWindowsAuth ? "Windows Auth" : "SQL Server Auth")
+                                                        @(server.Server.UseWindowsAuth ? t[TranslationKeys.WindowsAuth] : t[TranslationKeys.SqlAuth])
                                                     </span>
                                                 </td>
                                                 <td class="text-muted small">@server.CreateDate.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
@@ -89,14 +100,14 @@
                                                     <div class="btn-group btn-group-sm" role="group">
                                                         <button class="btn btn-outline-primary"
                                                                 @onclick="() => EditServer(server)"
-                                                                title="Edit server configuration"
+                                                                title="@t[TranslationKeys.Edit]"
                                                                 data-bs-toggle="tooltip"
                                                                 data-bs-placement="top">
                                                             <i class="bi bi-pencil-square fs-5"></i>
                                                         </button>
                                                         <button class="btn btn-outline-danger"
                                                                 @onclick="() => ConfirmDeleteServer(server)"
-                                                                title="Delete server configuration"
+                                                                title="@t[TranslationKeys.Delete]"
                                                                 data-bs-toggle="tooltip"
                                                                 data-bs-placement="top">
                                                             <i class="bi bi-trash3 fs-5"></i>
@@ -118,26 +129,26 @@
                         <div class="modal-dialog modal-dialog-centered">
                             <div class="modal-content shadow-lg">
                                 <div class="modal-header bg-danger text-white">
-                                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>Confirm Delete</h5>
+                                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>@t[TranslationKeys.ConfirmDelete]</h5>
                                     <button type="button" class="btn-close btn-close-white" @onclick="CancelDeleteConfirmation"></button>
                                 </div>
                                 <div class="modal-body">
-                                    <p>Are you sure you want to delete the server configuration <strong>@(_serverToDelete?.Server.Alias ?? _serverToDelete?.Server.ServerName)</strong>?</p>
+                                    <p>@t[TranslationKeys.ConfirmDeleteText]</p>
                                     <p class="text-muted small mb-0">
-                                        Server: @_serverToDelete?.Server.ServerName<br />
-                                        Type: @_serverToDelete?.Server.DatabaseServerType<br />
+                                        @t[TranslationKeys.ServerName]: @_serverToDelete?.Server.ServerName<br />
+                                        @t[TranslationKeys.DatabaseEngine]: @_serverToDelete?.Server.DatabaseServerType<br />
                                     </p>
                                     <div class="alert alert-warning mt-3 mb-0">
                                         <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                                        This action cannot be undone.
+                                        @t[TranslationKeys.ServerActionUndoneWarning]
                                     </div>
                                 </div>
                                 <div class="modal-footer">
                                     <button class="btn btn-outline-secondary" @onclick="CancelDeleteConfirmation">
-                                        <i class="bi bi-x-lg me-1"></i> Cancel
+                                        <i class="bi bi-x-lg me-1"></i> @t[TranslationKeys.Cancel]
                                     </button>
                                     <button class="btn btn-danger" @onclick="DeleteServerConfirmed">
-                                        <i class="bi bi-trash3 me-1"></i> Yes, Delete
+                                        <i class="bi bi-trash3 me-1"></i> @t[TranslationKeys.YesDelete]
                                     </button>
                                 </div>
                             </div>
@@ -150,26 +161,60 @@
                 <!-- Application Configuration Tabbed Form -->
                 <div class="settings-editor card shadow border-0 mb-5">
                     <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
-                        <h4 class="m-0 text-primary"><i class="bi bi-gear-fill"></i> Application Settings</h4>
+                        <h4 class="m-0 text-primary"><i class="bi bi-gear-fill"></i> @t[TranslationKeys.ApplicationSettings]</h4>
                         <button type="button" class="btn-close" @onclick="CancelApplicationForm"></button>
                     </div>
 
                     <!-- Tabs Header for Application Settings -->
                     <ul class="nav nav-tabs px-4 pt-3 bg-light-subtle" role="tablist">
                         <li class="nav-item">
+                            <button class="nav-link @(_appActiveTab == "general" ? "active" : "")" @onclick='() => SetAppActiveTab("general")'>
+                                <i class="bi bi-globe2 me-1"></i> @t[TranslationKeys.ServerGeneralLanguageTab]
+                            </button>
+                        </li>
+                        <li class="nav-item">
                             <button class="nav-link @(_appActiveTab == "logging" ? "active" : "")" @onclick='() => SetAppActiveTab("logging")'>
-                                <i class="bi bi-bell-fill me-1"></i> Logging
+                                <i class="bi bi-bell-fill me-1"></i> @t[TranslationKeys.Logging]
                             </button>
                         </li>
                     </ul>
 
                     <div class="card-body p-4">
-                        @if (_appActiveTab == "logging")
+                        @if (_appActiveTab == "general")
                         {
-                            <!-- Tab 1: Logging Settings -->
+                            <!-- Tab 1: General Settings -->
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label font-weight-bold">Log Level</label>
+                                    <label class="form-label font-weight-bold">@t[TranslationKeys.Language]</label>
+                                    <select class="form-select" @bind="_appConfig.Language">
+                                        <option value="@Language.English">@t[TranslationKeys.English]</option>
+                                        <option value="@Language.Persian">@t[TranslationKeys.Persian]</option>
+                                    </select>
+                                    <small class="text-muted">@t[TranslationKeys.ServerLanguageHelp]</small>
+                                </div>
+                                <div class="col-12 mt-4">
+                                    <div class="card bg-light-subtle border p-3 rounded-3">
+                                        <h6 class="fw-bold mb-2 text-primary"><i class="bi bi-fonts me-2"></i>@t[TranslationKeys.FontSettingsHelp]</h6>
+                                        <div class="row g-3 mt-1">
+                                            <div class="col-md-6">
+                                                <label class="form-label font-weight-bold">@t[TranslationKeys.PersianFont]</label>
+                                                <input type="text" class="form-control" @bind="_appConfig.PersianFont" placeholder="AppFontFa" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label font-weight-bold">@t[TranslationKeys.EnglishFont]</label>
+                                                <input type="text" class="form-control" @bind="_appConfig.EnglishFont" placeholder="AppFontEn" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else if (_appActiveTab == "logging")
+                        {
+                            <!-- Tab 2: Logging Settings -->
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label font-weight-bold">@t[TranslationKeys.LogLevel]</label>
                                     <select class="form-select" @bind="_appConfig.Logging.LogLevel">
                                         @foreach (var level in Enum.GetValues<LogLevel>())
                                         {
@@ -178,25 +223,25 @@
                                     </select>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label font-weight-bold">Enable Console Logging</label>
+                                    <label class="form-label font-weight-bold">@t[TranslationKeys.EnableConsoleLogging]</label>
                                     <div class="form-check form-switch">
                                         <input type="checkbox" class="form-check-input" id="enableConsoleLogging" @bind="_appConfig.Logging.EnableConsoleLogging" />
-                                        <label class="form-check-label font-weight-bold" for="enableConsoleLogging">Enable</label>
+                                        <label class="form-check-label font-weight-bold" for="enableConsoleLogging">@t[TranslationKeys.Enable]</label>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label font-weight-bold">Enable File Logging</label>
+                                    <label class="form-label font-weight-bold">@t[TranslationKeys.EnableFileLogging]</label>
                                     <div class="form-check form-switch">
                                         <input type="checkbox" class="form-check-input" id="enableFileLogging" @bind="_appConfig.Logging.EnableFileLogging" />
-                                        <label class="form-check-label font-weight-bold" for="enableFileLogging">Enable</label>
+                                        <label class="form-check-label font-weight-bold" for="enableFileLogging">@t[TranslationKeys.Enable]</label>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label font-weight-bold">Max Log File Size (MB)</label>
+                                    <label class="form-label font-weight-bold">@t[TranslationKeys.ServerMaxLogFileSize]</label>
                                     <input type="number" class="form-control" @bind="_appConfig.Logging.MaxLogFileSizeMB" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label font-weight-bold">Retention Days</label>
+                                    <label class="form-label font-weight-bold">@t[TranslationKeys.ServerLogRetentionDays]</label>
                                     <input type="number" class="form-control" @bind="_appConfig.Logging.RetentionDays" />
                                 </div>
                             </div>
@@ -204,9 +249,9 @@
 
                         <!-- Action Buttons for Application Settings -->
                         <div class="d-flex justify-content-end gap-2 border-top mt-4 pt-4">
-                            <button class="btn btn-outline-secondary px-4 py-2" @onclick="CancelApplicationForm">Cancel</button>
+                            <button class="btn btn-outline-secondary px-4 py-2" @onclick="CancelApplicationForm">@t[TranslationKeys.Cancel]</button>
                             <button class="btn btn-success px-5 py-2 shadow-sm" @onclick="SaveApplicationConfig">
-                                <i class="bi bi-check-lg me-1"></i> Save Application Settings
+                                <i class="bi bi-check-lg me-1"></i> @t[TranslationKeys.SaveAppSettings]
                             </button>
                         </div>
                     </div>
@@ -217,7 +262,7 @@
                 <!-- Main Tabbed Form for Server Configuration -->
                 <div class="settings-editor card shadow border-0 mb-5">
                     <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
-                        <h4 class="m-0 text-primary"><i class="bi bi-sliders"></i> @(_isEditMode ? "Edit" : "Configure") Server Configuration</h4>
+                        <h4 class="m-0 text-primary"><i class="bi bi-sliders"></i> @(_isEditMode ? t[TranslationKeys.ServerEditTitle] : t[TranslationKeys.ServerNewTitle])</h4>
                         <button type="button" class="btn-close" @onclick="CancelForm"></button>
                     </div>
 
@@ -225,12 +270,12 @@
                     <ul class="nav nav-tabs px-4 pt-3 bg-light-subtle" role="tablist">
                         <li class="nav-item">
                             <button class="nav-link @(_activeTab == "connection" ? "active" : "")" @onclick='() => SetActiveTab("connection")'>
-                                <i class="bi bi-plug-fill me-1"></i> Connection
+                                <i class="bi bi-plug-fill me-1"></i> @t[TranslationKeys.ServerConnectionTab]
                             </button>
                         </li>
                         <li class="nav-item">
                             <button class="nav-link @(_activeTab == "database" ? "active" : "")" @onclick='() => SetActiveTab("database")'>
-                                <i class="bi bi-database-fill-gear me-1"></i> Database Defaults
+                                <i class="bi bi-database-fill-gear me-1"></i> @t[TranslationKeys.ServerDatabaseDefaultsTab]
                             </button>
                         </li>
                     </ul>
@@ -241,64 +286,86 @@
                             <!-- Tab 1: Connection -->
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label font-weight-bold">Server Name / IP Address</label>
+                                    <label class="form-label font-weight-bold">@t[TranslationKeys.ServerName]</label>
                                     <input type="text" class="form-control" @bind="_currentConfig.Server.ServerName" placeholder="e.g. localhost\SQLEXPRESS" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label font-weight-bold">Alias (Friendly Name)</label>
+                                    <label class="form-label font-weight-bold">@t[TranslationKeys.ServerAlias]</label>
                                     <input type="text" class="form-control" @bind="_currentConfig.Server.Alias" placeholder="e.g. Production DB" />
                                 </div>
+                                @{
+                                    var caps = DatabaseProviderMetadata.GetCapabilities(_currentConfig.Server.DatabaseServerType);
+                                }
+
                                 <div class="col-md-4">
-                                    <label class="form-label">Database Server Type</label>
-                                    <select class="form-select" @bind="_currentConfig.Server.DatabaseServerType">
+                                    <label class="form-label">@t[TranslationKeys.DatabaseEngine]</label>
+                                    <select class="form-select" value="@_currentConfig.Server.DatabaseServerType" @onchange="OnServerTypeChanged">
                                         @foreach (var type in Enum.GetValues<DatabaseServerType>())
                                         {
-                                            <option value="@type">@type</option>
+                                            <option value="@type">@DatabaseProviderMetadata.GetCapabilities(type).DisplayName</option>
                                         }
                                     </select>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Default Database</label>
-                                    <input type="text" class="form-control" @bind="_currentConfig.Server.DefaultDatabase" />
+                                    <label class="form-label">@t[TranslationKeys.DefaultDatabase]</label>
+                                    <input type="text" class="form-control font-monospace" @bind="_currentConfig.Server.DefaultDatabase" placeholder="@caps.DefaultDatabase" />
                                 </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Port (Optional)</label>
-                                    <input type="number" class="form-control" @bind="_currentConfig.Server.Port" placeholder="1433" />
-                                </div>
-
-                                <div class="col-12 my-3">
-                                    <div class="form-check form-switch">
-                                        <input type="checkbox" class="form-check-input" id="winAuth" @bind="_currentConfig.Server.UseWindowsAuth" />
-                                        <label class="form-check-label font-weight-bold" for="winAuth">Use Windows Authentication (Integrated Security)</label>
+                                @if (caps.SupportsPort)
+                                {
+                                    <div class="col-md-4">
+                                        <label class="form-label">@t[TranslationKeys.Port]</label>
+                                        <input type="number" class="form-control" @bind="_currentConfig.Server.Port" placeholder="@caps.DefaultPort" />
                                     </div>
-                                </div>
+                                }
 
-                                @if (!_currentConfig.Server.UseWindowsAuth)
+                                @if (_currentConfig.Server.DatabaseServerType == DatabaseServerType.Sqlite)
+                                {
+                                    <div class="col-12">
+                                        <div class="alert alert-info py-2 small mb-0">
+                                            <i class="bi bi-info-circle me-1"></i> @t[TranslationKeys.ServerSqliteNotice]
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (caps.SupportsWindowsAuth)
+                                {
+                                    <div class="col-12 my-3">
+                                        <div class="form-check form-switch">
+                                            <input type="checkbox" class="form-check-input" id="winAuth" @bind="_currentConfig.Server.UseWindowsAuth" />
+                                            <label class="form-check-label font-weight-bold" for="winAuth">@t[TranslationKeys.ServerWindowsAuthSwitch]</label>
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (caps.SupportsCredentials && !_currentConfig.Server.UseWindowsAuth)
                                 {
                                     <div class="col-md-6">
-                                        <label class="form-label">Username</label>
-                                        <input type="text" class="form-control" @bind="_currentConfig.Server.Username" />
+                                        <label class="form-label">@t[TranslationKeys.Username]</label>
+                                        <input type="text" class="form-control" @bind="_currentConfig.Server.Username" placeholder="@caps.DefaultUsername" />
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label">Password</label>
+                                        <label class="form-label">@t[TranslationKeys.Password]</label>
                                         <input type="password" class="form-control" @bind="_currentConfig.Server.Password" />
                                     </div>
                                 }
 
                                 <div class="col-md-6">
-                                    <label class="form-label">Connection Timeout (Seconds)</label>
+                                    <label class="form-label">@t[TranslationKeys.ConnectionTimeout]</label>
                                     <input type="number" class="form-control" @bind="_currentConfig.Server.ConnectionTimeoutSeconds" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Command Timeout (Seconds)</label>
+                                    <label class="form-label">@t[TranslationKeys.CommandTimeout]</label>
                                     <input type="number" class="form-control" @bind="_currentConfig.Server.CommandTimeout" />
                                 </div>
-                                <div class="col-12 mt-2">
-                                    <div class="form-check">
-                                        <input type="checkbox" class="form-check-input" id="trustCert" @bind="_currentConfig.Server.TrustServerCertificate" />
-                                        <label class="form-check-label" for="trustCert">Trust Server Certificate</label>
+                                @if (_currentConfig.Server.DatabaseServerType == DatabaseServerType.SqlServer)
+                                {
+                                    <div class="col-12 mt-2">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" id="trustCert" @bind="_currentConfig.Server.TrustServerCertificate" />
+                                            <label class="form-check-label" for="trustCert">@t[TranslationKeys.TrustServerCertificate]</label>
+                                        </div>
                                     </div>
-                                </div>
+                                }
                             </div>
                         }
                         else if (_activeTab == "database")
@@ -306,41 +373,41 @@
                             <!-- Tab 2: Database Defaults -->
                             <div class="row g-3">
                                 <div class="col-md-3">
-                                    <label class="form-label">Max Schema Name</label>
+                                    <label class="form-label">@t[TranslationKeys.ServerMaxSchemaName]</label>
                                     <input type="number" class="form-control" @bind="_currentConfig.Database.MaxSchemaNameLength" />
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label">Max Table Name</label>
+                                    <label class="form-label">@t[TranslationKeys.ServerMaxTableName]</label>
                                     <input type="number" class="form-control" @bind="_currentConfig.Database.MaxTableNameLength" />
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label">Max Column Name</label>
+                                    <label class="form-label">@t[TranslationKeys.ServerMaxColumnName]</label>
                                     <input type="number" class="form-control" @bind="_currentConfig.Database.MaxColumnNameLength" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Max Index Name</label>
+                                    <label class="form-label">@t[TranslationKeys.ServerMaxIndexName]</label>
                                     <input type="number" class="form-control" @bind="_currentConfig.Database.MaxIndexNameLength" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Max Foreign Key Name</label>
+                                    <label class="form-label">@t[TranslationKeys.ServerMaxForeignKeyName]</label>
                                     <input type="number" class="form-control" @bind="_currentConfig.Database.MaxForeignKeyNameLength" />
                                 </div>
 
-                                <h6 class="mt-4 text-secondary"><i class="bi bi-file-earmark-binary"></i> File Management Defaults</h6>
+                                <h6 class="mt-4 text-secondary"><i class="bi bi-file-earmark-binary"></i> @t[TranslationKeys.ServerFileManagementDefaults]</h6>
                                 <div class="col-md-3">
-                                    <label class="form-label">Data File Size (MB)</label>
+                                    <label class="form-label">@t[TranslationKeys.ServerDataFileSize]</label>
                                     <input type="number" class="form-control" @bind="_currentConfig.Database.DefaultDataFileSizeMB" />
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label">Log File Size (MB)</label>
+                                    <label class="form-label">@t[TranslationKeys.ServerLogFileSize]</label>
                                     <input type="number" class="form-control" @bind="_currentConfig.Database.DefaultLogFileSizeMB" />
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label">File Growth (MB)</label>
+                                    <label class="form-label">@t[TranslationKeys.ServerFileGrowth]</label>
                                     <input type="number" class="form-control" @bind="_currentConfig.Database.DefaultFileGrowthMB" />
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label">Log Growth (MB)</label>
+                                    <label class="form-label">@t[TranslationKeys.ServerLogGrowth]</label>
                                     <input type="number" class="form-control" @bind="_currentConfig.Database.DefaultLogFileGrowthMB" />
                                 </div>
                             </div>
@@ -348,9 +415,9 @@
 
                         <!-- Action Buttons for Server Configuration -->
                         <div class="d-flex justify-content-end gap-2 border-top mt-4 pt-4">
-                            <button class="btn btn-outline-secondary px-4 py-2" @onclick="CancelForm">Cancel</button>
+                            <button class="btn btn-outline-secondary px-4 py-2" @onclick="CancelForm">@t[TranslationKeys.Cancel]</button>
                             <button class="btn btn-success px-5 py-2 shadow-sm" @onclick="SaveServerConfig">
-                                <i class="bi bi-check-lg me-1"></i> Save Configuration
+                                <i class="bi bi-check-lg me-1"></i> @t[TranslationKeys.SaveServerConfig]
                             </button>
                         </div>
                     </div>
@@ -380,9 +447,15 @@
 
     protected override async Task OnInitializedAsync()
     {
+        TranslationFactory.LanguageChanged += OnLanguageChanged;
         LoadSavedServers();
         LoadApplicationConfig();
         await Task.CompletedTask;
+    }
+
+    private void OnLanguageChanged(Language language)
+    {
+        InvokeAsync(StateHasChanged);
     }
 
     private void SetActiveTab(string tab)
@@ -466,11 +539,20 @@
         StateHasChanged();
     }
 
+    private void OnServerTypeChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<DatabaseServerType>(e.Value?.ToString(), out var type))
+        {
+            DatabaseProviderMetadata.ApplyDefaultsOnTypeChange(_currentConfig.Server, type);
+            StateHasChanged();
+        }
+    }
+
     private void OpenApplicationForm()
     {
         _appConfig = ApplicationConfiguration.Config;
         _showAppAddForm = true;
-        _appActiveTab = "logging";
+        _appActiveTab = "general";
         StateHasChanged();
     }
 
@@ -538,11 +620,11 @@
     {
         try
         {
+            TranslationFactory.SetLanguage(_appConfig.Language);
             ApplicationConfiguration.SaveChanges(_appConfig);
             _bprMessage = new BprMessage("Application configuration saved successfully", MessageType.Success);
             _showAppAddForm = false;
-            LoadApplicationConfig();
-            StateHasChanged();
+            NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
         }
         catch (Exception ex)
         {
@@ -600,5 +682,10 @@
             DeleteServer(_serverToDelete);
         }
         CancelDeleteConfirmation();
+    }
+
+    public void Dispose()
+    {
+        TranslationFactory.LanguageChanged -= OnLanguageChanged;
     }
 }

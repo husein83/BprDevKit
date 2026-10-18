@@ -1,9 +1,14 @@
 @using System.Globalization
 @using BprDevKit.DatabaseManagement.Models.Operations
+@inject ITranslationFactory TranslationFactory
+
+@{
+    var t = TranslationFactory.Current;
+}
 
 @if (Schema is null || Schema.Objects.Count == 0)
 {
-    <p class="text-muted mb-0">This schema does not contain any objects.</p>
+    <p class="text-muted mb-0">@t[TranslationKeys.SchemaObjNoObjects]</p>
 }
 else
 {
@@ -16,7 +21,7 @@ else
     <div class="table-responsive" style="max-height: 20rem;">
         <table class="table table-sm table-hover align-middle mb-0">
             <thead class="table-light">
-                <tr><th>Type</th><th>Name</th><th>Created</th></tr>
+                <tr><th>@t[TranslationKeys.Type]</th><th>@t[TranslationKeys.Name]</th><th>@t[TranslationKeys.Created]</th></tr>
             </thead>
             <tbody>
                 @foreach (var item in Schema.Objects)

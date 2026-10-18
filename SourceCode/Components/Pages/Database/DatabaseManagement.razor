@@ -2,20 +2,26 @@
 @using BprDevKit.Config
 @using BprDevKit.DatabaseManagement.Services
 @using BprDevKit.Utility
+@using BprDevKit.Localization
 @inject DatabaseManagerFactory DatabaseManagerFactory
+@inject ITranslationFactory TranslationFactory
 @rendermode InteractiveServer
+
+@{
+    var t = TranslationFactory.Current;
+}
 
 <div class="container-fluid py-4 px-lg-5 database-management-page">
     <section class="management-hero d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
         <div>
-            <p class="text-primary text-uppercase fw-semibold small mb-1">BprDevKit</p>
-            <h1 class="h2 mb-1"><i class="bi bi-database-gear me-2"></i>Database Management</h1>
-            <p class="text-muted mb-0">Select a saved SQL Server configuration before managing its databases.</p>
+            <p class="text-primary text-uppercase fw-semibold small mb-1">@t[TranslationKeys.AppName]</p>
+            <h1 class="h2 mb-1"><i class="bi bi-database-gear me-2"></i>@t[TranslationKeys.DatabaseManagement]</h1>
+            <p class="text-muted mb-0">@t[TranslationKeys.DbSubtitle]</p>
         </div>
         @if (_selectedServer is not null)
         {
             <span class="badge rounded-pill text-bg-success px-3 py-2 align-self-lg-start">
-                <i class="bi bi-check-circle-fill me-1"></i> Server selected
+                <i class="bi bi-check-circle-fill me-1"></i> @t[TranslationKeys.DbServerSelected]
             </span>
         }
     </section>
@@ -26,14 +32,14 @@
                 <div class="row g-3 align-items-end">
                     <div class="col-lg-8">
                         <label class="form-label fw-semibold" for="server-configuration">
-                            <i class="bi bi-server me-1 text-primary"></i> Server configuration
+                            <i class="bi bi-server me-1 text-primary"></i> @t[TranslationKeys.DbServerConfigLabel]
                         </label>
                         <select id="server-configuration"
                                 class="form-select form-select-lg"
                                 @bind="_selectedServerId"
                                 @bind:after="OnServerSelected"
                                 disabled="@_isLoadingServers">
-                            <option value="">-- Select a configured server --</option>
+                            <option value="">@t[TranslationKeys.DbSelectServerPlaceholder]</option>
                             @foreach (var server in _serverConfigurations)
                             {
                                 <option value="@server.Id">@GetServerDisplayName(server)</option>
@@ -42,23 +48,23 @@
                     </div>
                     <div class="col-lg-4 d-flex gap-2">
                         <button class="btn btn-outline-secondary flex-fill" type="button" @onclick="RefreshServers" disabled="@_isLoadingServers">
-                            <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                            <i class="bi bi-arrow-clockwise me-1"></i> @t[TranslationKeys.Refresh]
                         </button>
-                        <button class="btn btn-outline-danger" type="button" @onclick="ClearServerSelection" disabled="@(_selectedServer is null)">
-                            <i class="bi bi-x-lg"></i><span class="visually-hidden">Clear selected server</span>
+                        <button class="btn btn-outline-danger" type="button" @onclick="ClearServerSelection" disabled="@(_selectedServer is null)" title="@t[TranslationKeys.DbClearServer]">
+                            <i class="bi bi-x-lg"></i><span class="visually-hidden">@t[TranslationKeys.DbClearServer]</span>
                         </button>
                     </div>
                 </div>
 
                 @if (_isLoadingServers)
                 {
-                    <div class="form-text mt-2"><span class="spinner-border spinner-border-sm me-1"></span> Loading server configurations…</div>
+                    <div class="form-text mt-2"><span class="spinner-border spinner-border-sm me-1"></span> @t[TranslationKeys.DbLoadingServers]</div>
                 }
                 else if (_serverConfigurations.Count == 0)
                 {
                     <div class="alert alert-warning mb-0 mt-3">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                        No server configuration is available. <a href="server-management" class="alert-link">Create one in Settings</a> first.
+                        @t[TranslationKeys.DbNoServersWarning]
                     </div>
                 }
                 else if (!string.IsNullOrWhiteSpace(_loadError))
@@ -69,7 +75,7 @@
                 {
                     <div class="d-flex flex-wrap gap-2 mt-3 small">
                         <span class="badge text-bg-light border"><i class="bi bi-hdd-network me-1"></i>@_selectedServer.Server.ServerName</span>
-                        <span class="badge text-bg-light border"><i class="bi bi-shield-lock me-1"></i>@(_selectedServer.Server.UseWindowsAuth ? "Windows authentication" : "SQL Server authentication")</span>
+                        <span class="badge text-bg-light border"><i class="bi bi-shield-lock me-1"></i>@(_selectedServer.Server.UseWindowsAuth ? t[TranslationKeys.WindowsAuth] : t[TranslationKeys.SqlAuth])</span>
                     </div>
                 }
             </div>
@@ -86,7 +92,7 @@
                                 type="button"
                                 @onclick="() => SetActiveTab(tab.Key)"
                                 disabled="@(_selectedServer is null)">
-                            <i class="bi @tab.Icon me-1"></i>@tab.Title
+                            <i class="bi @tab.Icon me-1"></i>@t[tab.KeyResource]
                         </button>
                     </li>
                 }
@@ -97,8 +103,8 @@
             {
                 <div class="text-center text-muted py-5">
                     <i class="bi bi-server display-5"></i>
-                    <h2 class="h5 mt-3">Select a server to begin</h2>
-                    <p class="mb-0">Database tabs are unavailable until a server configuration is selected.</p>
+                    <h2 class="h5 mt-3">@t[TranslationKeys.DbSelectServerToBegin]</h2>
+                    <p class="mb-0">@t[TranslationKeys.DbTabsUnavailableNotice]</p>
                 </div>
             }
             else if (_activeTab == "databases")
@@ -117,8 +123,8 @@
             {
                 <div class="text-center text-muted py-5">
                     <i class="bi bi-tools display-5"></i>
-                    <h2 class="h5 mt-3">@GetActiveTab().Title is next</h2>
-                    <p class="mb-0">The selected server is preserved; this area will be implemented in the next phase.</p>
+                    <h2 class="h5 mt-3">@t.Get(TranslationKeys.DbAreaUnderDevelopment, t[GetActiveTab().KeyResource])</h2>
+                    <p class="mb-0">@t[TranslationKeys.DbAreaUnderDevelopmentDesc]</p>
                 </div>
             }
         </div>
@@ -126,14 +132,14 @@
 </div>
 
 @code {
-    private static readonly (string Key, string Title, string Icon)[] ManagementTabs =
+    private static readonly (string Key, string KeyResource, string Icon)[] ManagementTabs =
     {
-        ("databases", "Databases", "bi-database-fill"),
-        ("schemas", "Schemas", "bi-diagram-3"),
-        ("tables", "Tables", "bi-table"),
-        ("views", "Views", "bi-eye"),
-        ("procedures", "Procedures", "bi-braces"),
-        ("functions", "Functions", "bi-function")
+        ("databases", TranslationKeys.Databases, "bi-database-fill"),
+        ("schemas", TranslationKeys.Schemas, "bi-diagram-3"),
+        ("tables", TranslationKeys.Tables, "bi-table"),
+        ("views", TranslationKeys.Views, "bi-eye"),
+        ("procedures", TranslationKeys.StoredProcedures, "bi-braces"),
+        ("functions", TranslationKeys.Functions, "bi-function")
     };
 
     private List<ServerConfiguration> _serverConfigurations = new();
@@ -201,7 +207,7 @@
             _activeTab = tab;
     }
 
-    private (string Key, string Title, string Icon) GetActiveTab()
+    private (string Key, string KeyResource, string Icon) GetActiveTab()
     {
         return ManagementTabs.First(tab => tab.Key == _activeTab);
     }

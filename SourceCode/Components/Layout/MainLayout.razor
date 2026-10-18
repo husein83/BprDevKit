@@ -1,6 +1,8 @@
 @inherits LayoutComponentBase
+@inject ITranslationFactory TranslationFactory
+@implements IDisposable
 
-<div class="page">
+<div class="page @(TranslationFactory.Current.IsRtl ? "rtl" : "ltr")" dir="@(TranslationFactory.Current.IsRtl ? "rtl" : "ltr")" lang="@(TranslationFactory.Current.LanguageCode)">
     <aside class="sidebar">
         <NavMenu />
     </aside>
@@ -17,3 +19,20 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        TranslationFactory.LanguageChanged += OnLanguageChanged;
+    }
+
+    private void OnLanguageChanged(Language language)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        TranslationFactory.LanguageChanged -= OnLanguageChanged;
+    }
+}

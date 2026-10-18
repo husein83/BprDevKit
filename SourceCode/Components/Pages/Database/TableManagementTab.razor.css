@@ -98,8 +98,51 @@
     background: #f8fafc;
 }
 
-.tables-editor .form-check-input {
+.tables-editor .form-switch .form-check-input {
     margin-left: -2.25rem;
+}
+
+.tables-editor .table .form-control,
+.tables-editor .table .form-select {
+    min-height: 2.15rem;
+    border-color: #dbe4f0;
+    border-radius: 0.45rem;
+    box-shadow: none;
+    font-size: 0.85rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.tables-editor .table .input-group {
+    flex-wrap: nowrap;
+}
+
+.tables-editor .table .input-group > .form-control:first-child {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+.tables-editor .table .input-group > .input-group-text:last-child {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+}
+
+.tables-editor .table .input-group-text {
+    min-height: 2.15rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.78rem;
+    background-color: #f1f5f9;
+    border-color: #dbe4f0;
+    border-radius: 0.45rem;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.tables-editor .table .form-check-input,
+.tables-editor .table .input-group-text .form-check-input {
+    margin: 0 !important;
+    float: none !important;
 }
 
 .tables-list-card {

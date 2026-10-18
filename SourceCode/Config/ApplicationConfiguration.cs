@@ -1,4 +1,4 @@
-﻿using BprDevKit.Utility;
+using BprDevKit.Utility;
 
 namespace BprDevKit.Config
 {
@@ -10,6 +10,10 @@ namespace BprDevKit.Config
     {
         #region Property
         public Language Language { get; set; } = Language.English;
+
+        public string PersianFont { get; set; } = "AppFontFa";
+
+        public string EnglishFont { get; set; } = "AppFontEn";
 
         // Security settings
         public SecuritySettings Security { get; set; } = new();

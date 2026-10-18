@@ -1,14 +1,16 @@
 @using System.Globalization
 @using BprDevKit.DatabaseManagement.Models.Metadata
 @using BprDevKit.DatabaseManagement.Models.Operations
+@inject ITranslationFactory TranslationFactory
 
 @{
+    var t = TranslationFactory.Current;
     var type = ColumnDataType.Find(Column.DataType);
 }
 
 <div class="row g-2">
     <div class="col-sm-6">
-        <label class="form-label small fw-semibold">Data type</label>
+        <label class="form-label small fw-semibold">@t[TranslationKeys.DataType]</label>
         <select class="form-select form-select-sm" value="@Column.DataType" @onchange="e => Column.ApplyDataType(e.Value?.ToString())">
             @foreach (var option in ColumnDataType.All)
             {
@@ -17,27 +19,28 @@
         </select>
     </div>
     <div class="col-sm-6">
-        <label class="form-label small fw-semibold">Size</label>
+        <label class="form-label small fw-semibold">@t[TranslationKeys.ColPanelSize]</label>
         @if (type?.Kind == ColumnDataTypeKind.Length)
         {
-            <div class="input-group input-group-sm">
-                <input type="number" class="form-control" min="1" max="@(type.MaxLength)" disabled="@(Column.Length == -1)"
+            <div class="input-group input-group-sm flex-nowrap">
+                <input type="number" class="form-control font-monospace" min="1" max="@(type.MaxLength)" disabled="@(Column.Length == -1)"
                        value="@(Column.Length is > 0 ? Column.Length.Value.ToString(CultureInfo.InvariantCulture) : string.Empty)"
                        @onchange="e => Column.Length = ParseInt(e.Value)" />
                 @if (type.SupportsMax)
                 {
-                    <div class="input-group-text">
-                        <input class="form-check-input mt-0 me-1" type="checkbox" checked="@(Column.Length == -1)" @onchange="e => Column.Length = (bool)e.Value! ? -1 : Math.Min(50, type.MaxLength)" />MAX
-                    </div>
+                    <span class="input-group-text d-inline-flex align-items-center gap-1">
+                        <input class="form-check-input m-0" type="checkbox" id="col-editor-max" checked="@(Column.Length == -1)" @onchange="e => Column.Length = (bool)e.Value! ? -1 : Math.Min(50, type.MaxLength)" />
+                        <label class="form-check-label small mb-0 user-select-none" for="col-editor-max">MAX</label>
+                    </span>
                 }
             </div>
         }
         else if (type?.Kind == ColumnDataTypeKind.PrecisionScale)
         {
             <div class="input-group input-group-sm">
-                <input type="number" class="form-control" min="1" max="38" title="Precision" placeholder="precision"
+                <input type="number" class="form-control" min="1" max="38" title="@t[TranslationKeys.Precision]" placeholder="p"
                        value="@(Column.Precision?.ToString(CultureInfo.InvariantCulture))" @onchange="e => Column.Precision = ParseInt(e.Value)" />
-                <input type="number" class="form-control" min="0" max="38" title="Scale" placeholder="scale"
+                <input type="number" class="form-control" min="0" max="38" title="@t[TranslationKeys.Scale]" placeholder="s"
                        value="@(Column.Scale?.ToString(CultureInfo.InvariantCulture))" @onchange="e => Column.Scale = ParseInt(e.Value)" />
             </div>
         }
@@ -45,6 +48,15 @@
         {
             <input type="number" class="form-control form-control-sm" min="0" max="7" title="Fractional seconds precision" placeholder="default"
                    value="@(Column.Scale?.ToString(CultureInfo.InvariantCulture))" @onchange="e => Column.Scale = ParseInt(e.Value)" />
+        }
+        else if (type?.Kind == ColumnDataTypeKind.VectorDimensions)
+        {
+            <div class="input-group input-group-sm">
+                <input type="number" class="form-control" min="1" max="1998" title="Vector dimensions" placeholder="dimensions (e.g. 1536)"
+                       value="@(Column.Length is > 0 ? Column.Length.Value.ToString(CultureInfo.InvariantCulture) : "1536")"
+                       @onchange="e => Column.Length = ParseInt(e.Value)" />
+                <span class="input-group-text text-muted small">dim</span>
+            </div>
         }
         else
         {

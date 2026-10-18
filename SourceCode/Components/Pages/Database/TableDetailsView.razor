@@ -2,32 +2,37 @@
 @using BprDevKit.Utility
 @using BprDevKit.DatabaseManagement.Models.Operations
 @using BprDevKit.DatabaseManagement.Services
+@inject ITranslationFactory TranslationFactory
+
+@{
+    var t = TranslationFactory.Current;
+}
 
 <dl class="row small mb-3">
-    <dt class="col-sm-3 text-muted fw-normal">Created</dt>
+    <dt class="col-sm-3 text-muted fw-normal">@t[TranslationKeys.Created]</dt>
     <dd class="col-sm-9">@FormatDate(Table.CreateDate)</dd>
-    <dt class="col-sm-3 text-muted fw-normal">Last modified</dt>
+    <dt class="col-sm-3 text-muted fw-normal">@t[TranslationKeys.LastModified]</dt>
     <dd class="col-sm-9">@FormatDate(Table.ModifyDate)</dd>
-    <dt class="col-sm-3 text-muted fw-normal">File group</dt>
+    <dt class="col-sm-3 text-muted fw-normal">@t[TranslationKeys.TableTabFileGroup]</dt>
     <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Table.FileGroup) ? "—" : Table.FileGroup)</dd>
-    <dt class="col-sm-3 text-muted fw-normal">Description</dt>
+    <dt class="col-sm-3 text-muted fw-normal">@t[TranslationKeys.Description]</dt>
     <dd class="col-sm-9 mb-0">@(string.IsNullOrWhiteSpace(Table.Description) ? "—" : Table.Description)</dd>
 </dl>
 
 <ul class="nav nav-tabs mb-3">
     <li class="nav-item">
         <button class="nav-link @(_activeTab == DetailsTab.Columns ? "active" : string.Empty)" type="button" @onclick="() => _activeTab = DetailsTab.Columns">
-            Columns <span class="badge text-bg-light border">@Table.Columns.Count</span>
+            @t[TranslationKeys.Columns] <span class="badge text-bg-light border">@Table.Columns.Count</span>
         </button>
     </li>
     <li class="nav-item">
         <button class="nav-link @(_activeTab == DetailsTab.Indexes ? "active" : string.Empty)" type="button" @onclick="() => _activeTab = DetailsTab.Indexes">
-            Indexes <span class="badge text-bg-light border">@Table.Indexes.Count</span>
+            @t[TranslationKeys.Indexes] <span class="badge text-bg-light border">@Table.Indexes.Count</span>
         </button>
     </li>
     <li class="nav-item">
         <button class="nav-link @(_activeTab == DetailsTab.ForeignKeys ? "active" : string.Empty)" type="button" @onclick="() => _activeTab = DetailsTab.ForeignKeys">
-            Foreign keys <span class="badge text-bg-light border">@Table.ForeignKeys.Count</span>
+            @t[TranslationKeys.ForeignKeys] <span class="badge text-bg-light border">@Table.ForeignKeys.Count</span>
         </button>
     </li>
 </ul>

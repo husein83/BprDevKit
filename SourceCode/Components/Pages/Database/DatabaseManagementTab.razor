@@ -3,15 +3,20 @@
 @using BprDevKit.DatabaseManagement.Models.Operations;
 @using BprDevKit.DatabaseManagement.Services
 @inject DatabaseManagerFactory DatabaseManagerFactory
+@inject ITranslationFactory TranslationFactory
+
+@{
+    var t = TranslationFactory.Current;
+}
 
 <div class="databases-management">
     <div class="database-toolbar d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
         <div>
-            <h2 class="h4 mb-1"><i class="bi bi-database-fill text-primary me-2"></i>Databases</h2>
-            <p class="text-muted mb-0">Create, update, inspect, and remove databases on the selected server.</p>
+            <h2 class="h4 mb-1"><i class="bi bi-database-fill text-primary me-2"></i>@t[TranslationKeys.Databases]</h2>
+            <p class="text-muted mb-0">@t[TranslationKeys.DbTabSubtitle]</p>
         </div>
         <button class="create-database-button btn btn-primary" type="button" @onclick="OpenCreateDatabase">
-            <i class="bi bi-plus-lg me-1"></i> Create database
+            <i class="bi bi-plus-lg me-1"></i> @t[TranslationKeys.DbTabCreateDb]
         </button>
     </div>
 
@@ -27,19 +32,19 @@
     {
         <div class="database-editor card border-primary shadow-sm mb-4">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <span class="fw-semibold"><i class="bi bi-database-add me-2"></i>Create database</span>
+                <span class="fw-semibold"><i class="bi bi-database-add me-2"></i>@t[TranslationKeys.DbTabCreateDb]</span>
                 <button class="btn-close btn-close-white" type="button" @onclick="CloseCreateDatabase"></button>
             </div>
             <div class="card-body p-4">
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label fw-semibold" for="database-name">Database name</label>
+                        <label class="form-label fw-semibold" for="database-name">@t[TranslationKeys.Name]</label>
                         <input id="database-name" class="form-control" maxlength="128" @bind="_createConfiguration.DatabaseName" placeholder="ExampleDb" />
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label fw-semibold" for="database-collation">Collation <span class="text-muted fw-normal">(optional)</span></label>
+                        <label class="form-label fw-semibold" for="database-collation">@t[TranslationKeys.DbTabCollation] <span class="text-muted fw-normal">@t[TranslationKeys.DbTabOptional]</span></label>
                         <select id="database-collation" class="form-select" @bind="_createConfiguration.Collation">
-                            <option value="">Server default</option>
+                            <option value="">@t[TranslationKeys.DbTabServerDefault]</option>
                             @foreach (var collation in _collations)
                             {
                                 <option value="@collation">@collation</option>
@@ -47,100 +52,100 @@
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label fw-semibold" for="data-directory">Data directory</label>
+                        <label class="form-label fw-semibold" for="data-directory">@t[TranslationKeys.DbTabDataDirectory]</label>
                         <input id="data-directory" class="form-control" @bind="_createConfiguration.DataFilePath" placeholder="D:\\SqlData" />
-                        <div class="form-text">The application creates <code>DatabaseName.mdf</code> in this directory.</div>
+                        <div class="form-text">@t[TranslationKeys.DbTabDataDirHelp]</div>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label fw-semibold" for="log-directory">Log directory <span class="text-muted fw-normal">(optional)</span></label>
+                        <label class="form-label fw-semibold" for="log-directory">@t[TranslationKeys.DbTabLogDirectory] <span class="text-muted fw-normal">@t[TranslationKeys.DbTabOptional]</span></label>
                         <input id="log-directory" class="form-control" @bind="_createConfiguration.LogFilePath" placeholder="D:\\SqlLogs" />
-                        <div class="form-text">Empty uses the data directory and creates <code>DatabaseName_log.ldf</code>.</div>
+                        <div class="form-text">@t[TranslationKeys.DbTabLogDirHelp]</div>
                     </div>
                 </div>
 
                 <hr class="my-4" />
-                <h3 class="h6 text-uppercase text-muted mb-3">Data file</h3>
+                <h3 class="h6 text-uppercase text-muted mb-3">@t[TranslationKeys.DbTabDataFile]</h3>
                 <div class="row g-3">
                     <div class="col-md-4">
-                        <label class="form-label" for="data-initial-size">Initial size (MB)</label>
+                        <label class="form-label" for="data-initial-size">@t[TranslationKeys.DbTabInitialSizeMB]</label>
                         <input id="data-initial-size" type="number" min="1" class="form-control" @bind="_createConfiguration.InitialSizeMB" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="data-max-size">Max size (MB)</label>
-                        <input id="data-max-size" type="number" min="1" class="form-control" @bind="_createConfiguration.MaxSizeMB" placeholder="Unlimited" />
+                        <label class="form-label" for="data-max-size">@t[TranslationKeys.DbTabMaxSizeMB]</label>
+                        <input id="data-max-size" type="number" min="1" class="form-control" @bind="_createConfiguration.MaxSizeMB" placeholder="@t[TranslationKeys.DbTabUnlimited]" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="data-growth">Growth (MB)</label>
+                        <label class="form-label" for="data-growth">@t[TranslationKeys.DbTabGrowthMB]</label>
                         <input id="data-growth" type="number" min="1" class="form-control" @bind="_createConfiguration.FileGrowthMB" />
                     </div>
                 </div>
 
-                <h3 class="h6 text-uppercase text-muted mb-3 mt-4">Log file</h3>
+                <h3 class="h6 text-uppercase text-muted mb-3 mt-4">@t[TranslationKeys.DbTabLogFile]</h3>
                 <div class="row g-3">
                     <div class="col-md-4">
-                        <label class="form-label" for="log-initial-size">Initial size (MB)</label>
+                        <label class="form-label" for="log-initial-size">@t[TranslationKeys.DbTabInitialSizeMB]</label>
                         <input id="log-initial-size" type="number" min="1" class="form-control" @bind="_createConfiguration.LogInitialSizeMB" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="log-max-size">Max size (MB)</label>
-                        <input id="log-max-size" type="number" min="1" class="form-control" @bind="_createConfiguration.LogMaxSizeMB" placeholder="Unlimited" />
+                        <label class="form-label" for="log-max-size">@t[TranslationKeys.DbTabMaxSizeMB]</label>
+                        <input id="log-max-size" type="number" min="1" class="form-control" @bind="_createConfiguration.LogMaxSizeMB" placeholder="@t[TranslationKeys.DbTabUnlimited]" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="log-growth">Growth (MB)</label>
+                        <label class="form-label" for="log-growth">@t[TranslationKeys.DbTabGrowthMB]</label>
                         <input id="log-growth" type="number" min="1" class="form-control" @bind="_createConfiguration.LogFileGrowthMB" />
                     </div>
                 </div>
 
-                <h3 class="h6 text-uppercase text-muted mb-3 mt-4">Database options</h3>
+                <h3 class="h6 text-uppercase text-muted mb-3 mt-4">@t[TranslationKeys.DbTabDbOptions]</h3>
                 <div class="row g-3">
                     <div class="col-md-4">
-                        <label class="form-label" for="recovery-model">Recovery model</label>
+                        <label class="form-label" for="recovery-model">@t[TranslationKeys.DbTabRecoveryModel]</label>
                         <select id="recovery-model" class="form-select" @bind="_createConfiguration.RecoveryModel">
-                            <option value="SIMPLE">Simple</option>
-                            <option value="FULL">Full</option>
-                            <option value="BULK_LOGGED">Bulk logged</option>
+                            <option value="SIMPLE">@t[TranslationKeys.DbTabRecoverySimple]</option>
+                            <option value="FULL">@t[TranslationKeys.DbTabRecoveryFull]</option>
+                            <option value="BULK_LOGGED">@t[TranslationKeys.DbTabRecoveryBulkLogged]</option>
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="page-verify">Page verify</label>
+                        <label class="form-label" for="page-verify">@t[TranslationKeys.DbTabPageVerify]</label>
                         <select id="page-verify" class="form-select" @bind="_createConfiguration.PageVerify">
-                            <option value="CHECKSUM">Checksum</option>
-                            <option value="TORN_PAGE_DETECTION">Torn page detection</option>
-                            <option value="NONE">None</option>
+                            <option value="CHECKSUM">@t[TranslationKeys.DbTabPageVerifyChecksum]</option>
+                            <option value="TORN_PAGE_DETECTION">@t[TranslationKeys.DbTabPageVerifyTornPage]</option>
+                            <option value="NONE">@t[TranslationKeys.DbTabPageVerifyNone]</option>
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="compatibility-level">Compatibility level <span class="text-muted fw-normal">(optional)</span></label>
-                        <input id="compatibility-level" type="number" min="1" class="form-control" @bind="_createConfiguration.CompatibilityLevel" placeholder="Server default" />
+                        <label class="form-label" for="compatibility-level">@t[TranslationKeys.DbTabCompatibilityLevel] <span class="text-muted fw-normal">@t[TranslationKeys.DbTabOptional]</span></label>
+                        <input id="compatibility-level" type="number" min="1" class="form-control" @bind="_createConfiguration.CompatibilityLevel" placeholder="@t[TranslationKeys.DbTabServerDefault]" />
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="file-group">Additional filegroup <span class="text-muted fw-normal">(optional)</span></label>
+                        <label class="form-label" for="file-group">@t[TranslationKeys.DbTabAdditionalFilegroup] <span class="text-muted fw-normal">@t[TranslationKeys.DbTabOptional]</span></label>
                         <input id="file-group" maxlength="128" class="form-control" @bind="_createConfiguration.FileGroup" placeholder="Reporting" />
-                        <div class="form-text">Creates an empty filegroup after the database is created.</div>
+                        <div class="form-text">@t[TranslationKeys.DbTabFilegroupHelp]</div>
                     </div>
                 </div>
                 <div class="row g-3 mt-1">
                     <div class="col-md-4">
                         <div class="form-check form-switch">
-                            <input id="is-read-only" class="form-check-input" type="checkbox" @bind="_createConfiguration.IsReadOnly" /><label class="form-check-label" for="is-read-only">Read-only</label>
+                            <input id="is-read-only" class="form-check-input" type="checkbox" @bind="_createConfiguration.IsReadOnly" /><label class="form-check-label" for="is-read-only">@t[TranslationKeys.DbTabReadOnly]</label>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="form-check form-switch">
-                            <input id="auto-shrink" class="form-check-input" type="checkbox" @bind="_createConfiguration.AutoShrink" /><label class="form-check-label" for="auto-shrink">Auto shrink</label>
+                            <input id="auto-shrink" class="form-check-input" type="checkbox" @bind="_createConfiguration.AutoShrink" /><label class="form-check-label" for="auto-shrink">@t[TranslationKeys.DbTabAutoShrink]</label>
                         </div>
                     </div>
-                    <div class="col-md-4"><div class="form-check form-switch"><input id="auto-close" class="form-check-input" type="checkbox" @bind="_createConfiguration.AutoClose" /><label class="form-check-label" for="auto-close">Auto close</label></div></div>
+                    <div class="col-md-4"><div class="form-check form-switch"><input id="auto-close" class="form-check-input" type="checkbox" @bind="_createConfiguration.AutoClose" /><label class="form-check-label" for="auto-close">@t[TranslationKeys.DbTabAutoClose]</label></div></div>
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
-                    <button class="btn btn-light" type="button" @onclick="CloseCreateDatabase">Cancel</button>
+                    <button class="btn btn-light" type="button" @onclick="CloseCreateDatabase">@t[TranslationKeys.Cancel]</button>
                     <button class="btn btn-success" type="button" @onclick="CreateDatabase" disabled="@_isSaving">
                         @if (_isSaving)
                         {
                             <span class="spinner-border spinner-border-sm me-1"></span>
                         }
-                        Create database
+                        @t[TranslationKeys.DbTabCreateDb]
                     </button>
                 </div>
             </div>
@@ -151,17 +156,17 @@
         <div class="card-body p-0">
             @if (_isLoading)
             {
-                <div class="text-center py-5"><span class="spinner-border text-primary me-2"></span>Loading databases…</div>
+                <div class="text-center py-5"><span class="spinner-border text-primary me-2"></span>@t[TranslationKeys.DbTabLoadingDatabases]</div>
             }
             else if (_databases.Count == 0)
             {
-                <div class="text-center text-muted py-5"><i class="bi bi-database-x display-6"></i><p class="mt-3 mb-0">No user databases were found on this server.</p></div>
+                <div class="text-center text-muted py-5"><i class="bi bi-database-x display-6"></i><p class="mt-3 mb-0">@t[TranslationKeys.DbTabNoDatabasesFound]</p></div>
             }
             else
             {
                 <div class="table-responsive">
                     <table class="database-list-table table table-hover align-middle mb-0">
-                        <thead class="table-light"><tr><th class="ps-4">Database</th><th class="text-end pe-4">Actions</th></tr></thead>
+                        <thead class="table-light"><tr><th class="ps-4">@t[TranslationKeys.Database]</th><th class="text-end pe-4">@t[TranslationKeys.Actions]</th></tr></thead>
                         <tbody>
                             @foreach (var databaseName in _databases)
                             {
@@ -169,9 +174,9 @@
                                     <td class="ps-4"><i class="bi bi-database me-2 text-primary"></i><span class="font-monospace">@databaseName</span></td>
                                     <td class="text-end pe-4">
                                         <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-primary" type="button" title="View details" @onclick="() => ViewDatabase(databaseName)"><i class="bi bi-info-circle"></i></button>
-                                            <button class="btn btn-outline-secondary" type="button" title="Edit options" @onclick="() => OpenEditDatabase(databaseName)"><i class="bi bi-pencil-square"></i></button>
-                                            <button class="btn btn-outline-danger" type="button" title="Delete database" @onclick="() => OpenDeleteDatabase(databaseName)"><i class="bi bi-trash"></i></button>
+                                            <button class="btn btn-outline-primary" type="button" title="@t[TranslationKeys.DbTabViewDetails]" @onclick="() => ViewDatabase(databaseName)"><i class="bi bi-info-circle"></i></button>
+                                            <button class="btn btn-outline-secondary" type="button" title="@t[TranslationKeys.DbTabEditOptions]" @onclick="() => OpenEditDatabase(databaseName)"><i class="bi bi-pencil-square"></i></button>
+                                            <button class="btn btn-outline-danger" type="button" title="@t[TranslationKeys.DbTabDeleteDb]" @onclick="() => OpenDeleteDatabase(databaseName)"><i class="bi bi-trash"></i></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -188,38 +193,38 @@
         <div class="modal fade show d-block" tabindex="-1">
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
-                    <div class="modal-header"><h2 class="modal-title fs-5"><i class="bi bi-pencil-square me-2"></i>Edit <span class="font-monospace">@_editConfiguration.DatabaseName</span></h2><button class="btn-close" type="button" @onclick="CloseDialogs"></button></div>
+                    <div class="modal-header"><h2 class="modal-title fs-5"><i class="bi bi-pencil-square me-2"></i>@t.Get(TranslationKeys.DbTabEditTitle, _editConfiguration.DatabaseName)</h2><button class="btn-close" type="button" @onclick="CloseDialogs"></button></div>
                     <div class="modal-body">
-                        <p class="text-muted small">Leave a select box on “Keep current value” to leave that setting unchanged.</p>
+                        <p class="text-muted small">@t[TranslationKeys.DbTabKeepCurrentValueHelp]</p>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label" for="edit-collation">Collation</label><select id="edit-collation" class="form-select" @bind="_editConfiguration.Collation">
-                                <option value="">Keep current value</option>@foreach (var collation in _collations) {
+                                <label class="form-label" for="edit-collation">@t[TranslationKeys.DbTabCollation]</label><select id="edit-collation" class="form-select" @bind="_editConfiguration.Collation">
+                                <option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option>@foreach (var collation in _collations) {
                                 <option value="@collation">@collation</option>
                             }
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="edit-recovery">Recovery model</label><select id="edit-recovery" class="form-select" @bind="_editConfiguration.RecoveryModel"><option value="">Keep current value</option><option value="SIMPLE">Simple</option><option value="FULL">Full</option><option value="BULK_LOGGED">Bulk logged</option></select>
+                        <label class="form-label" for="edit-recovery">@t[TranslationKeys.DbTabRecoveryModel]</label><select id="edit-recovery" class="form-select" @bind="_editConfiguration.RecoveryModel"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="SIMPLE">@t[TranslationKeys.DbTabRecoverySimple]</option><option value="FULL">@t[TranslationKeys.DbTabRecoveryFull]</option><option value="BULK_LOGGED">@t[TranslationKeys.DbTabRecoveryBulkLogged]</option></select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="edit-page-verify">Page verify</label><select id="edit-page-verify" class="form-select" @bind="_editConfiguration.PageVerify"><option value="">Keep current value</option><option value="CHECKSUM">Checksum</option><option value="TORN_PAGE_DETECTION">Torn page detection</option><option value="NONE">None</option></select>
+                        <label class="form-label" for="edit-page-verify">@t[TranslationKeys.DbTabPageVerify]</label><select id="edit-page-verify" class="form-select" @bind="_editConfiguration.PageVerify"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="CHECKSUM">@t[TranslationKeys.DbTabPageVerifyChecksum]</option><option value="TORN_PAGE_DETECTION">@t[TranslationKeys.DbTabPageVerifyTornPage]</option><option value="NONE">@t[TranslationKeys.DbTabPageVerifyNone]</option></select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="edit-compatibility">Compatibility level</label><input id="edit-compatibility" type="number" min="1" class="form-control" @bind="_editConfiguration.CompatibilityLevel" placeholder="Keep current value" />
+                        <label class="form-label" for="edit-compatibility">@t[TranslationKeys.DbTabCompatibilityLevel]</label><input id="edit-compatibility" type="number" min="1" class="form-control" @bind="_editConfiguration.CompatibilityLevel" placeholder="@t[TranslationKeys.DbTabKeepCurrentValue]" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="edit-read-only">Read-only</label><select id="edit-read-only" class="form-select" @bind="_readOnlySelection"><option value="">Keep current value</option><option value="true">Enable</option><option value="false">Disable</option></select>
+                        <label class="form-label" for="edit-read-only">@t[TranslationKeys.DbTabReadOnly]</label><select id="edit-read-only" class="form-select" @bind="_readOnlySelection"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="true">@t[TranslationKeys.Enable]</option><option value="false">@t[TranslationKeys.Disable]</option></select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="edit-auto-shrink">Auto shrink</label><select id="edit-auto-shrink" class="form-select" @bind="_autoShrinkSelection"><option value="">Keep current value</option><option value="true">Enable</option><option value="false">Disable</option></select>
+                        <label class="form-label" for="edit-auto-shrink">@t[TranslationKeys.DbTabAutoShrink]</label><select id="edit-auto-shrink" class="form-select" @bind="_autoShrinkSelection"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="true">@t[TranslationKeys.Enable]</option><option value="false">@t[TranslationKeys.Disable]</option></select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="edit-auto-close">Auto close</label><select id="edit-auto-close" class="form-select" @bind="_autoCloseSelection"><option value="">Keep current value</option><option value="true">Enable</option><option value="false">Disable</option></select>
+                        <label class="form-label" for="edit-auto-close">@t[TranslationKeys.DbTabAutoClose]</label><select id="edit-auto-close" class="form-select" @bind="_autoCloseSelection"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="true">@t[TranslationKeys.Enable]</option><option value="false">@t[TranslationKeys.Disable]</option></select>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer"><button class="btn btn-light" type="button" @onclick="CloseDialogs">Cancel</button><button class="btn btn-primary" type="button" @onclick="SaveDatabaseChanges" disabled="@_isSaving">Save changes</button></div>
+            <div class="modal-footer"><button class="btn btn-light" type="button" @onclick="CloseDialogs">@t[TranslationKeys.Cancel]</button><button class="btn btn-primary" type="button" @onclick="SaveDatabaseChanges" disabled="@_isSaving">@t[TranslationKeys.SaveChanges]</button></div>
         </div>
     </div>
 </div><div class="modal-backdrop fade show"></div>
@@ -231,13 +236,13 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-danger text-white">
-                    <h2 class="modal-title fs-5"><i class="bi bi-exclamation-triangle-fill me-2"></i>Delete database</h2><button class="btn-close btn-close-white" type="button" @onclick="CloseDialogs"></button>
+                    <h2 class="modal-title fs-5"><i class="bi bi-exclamation-triangle-fill me-2"></i>@t[TranslationKeys.DbTabDeleteDb]</h2><button class="btn-close btn-close-white" type="button" @onclick="CloseDialogs"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Delete <strong class="font-monospace">@_deleteConfiguration.DatabaseName</strong> permanently?</p><p class="text-danger small">This action cannot be undone.</p><div class="form-check"><input id="force-disconnect" type="checkbox" class="form-check-input" @bind="_deleteConfiguration.ForceDisconnect" /><label class="form-check-label" for="force-disconnect">Disconnect active users and roll back their transactions</label></div><div class="form-check mt-2"><input id="ignore-if-not-exists" type="checkbox" class="form-check-input" @bind="_deleteConfiguration.IgnoreIfNotExists" /><label class="form-check-label" for="ignore-if-not-exists">Treat an already deleted database as successful</label></div>
+                    <p>@t.Get(TranslationKeys.DbTabDeleteConfirm, _deleteConfiguration.DatabaseName)</p><p class="text-danger small">@t[TranslationKeys.ServerActionUndoneWarning]</p><div class="form-check"><input id="force-disconnect" type="checkbox" class="form-check-input" @bind="_deleteConfiguration.ForceDisconnect" /><label class="form-check-label" for="force-disconnect">@t[TranslationKeys.DbTabForceDisconnect]</label></div><div class="form-check mt-2"><input id="ignore-if-not-exists" type="checkbox" class="form-check-input" @bind="_deleteConfiguration.IgnoreIfNotExists" /><label class="form-check-label" for="ignore-if-not-exists">@t[TranslationKeys.DbTabIgnoreIfNotExists]</label></div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-light" type="button" @onclick="CloseDialogs">Cancel</button><button class="btn btn-danger" type="button" @onclick="DeleteDatabase" disabled="@_isSaving">Delete database</button>
+                    <button class="btn btn-light" type="button" @onclick="CloseDialogs">@t[TranslationKeys.Cancel]</button><button class="btn btn-danger" type="button" @onclick="DeleteDatabase" disabled="@_isSaving">@t[TranslationKeys.DbTabDeleteDb]</button>
                 </div>
             </div>
         </div>
@@ -250,7 +255,7 @@
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2 class="modal-title fs-5"><i class="bi bi-info-circle me-2"></i>Database details</h2><button class="btn-close" type="button" @onclick="CloseDialogs"></button>
+                    <h2 class="modal-title fs-5"><i class="bi bi-info-circle me-2"></i>@t[TranslationKeys.DbTabDetailsTitle]</h2><button class="btn-close" type="button" @onclick="CloseDialogs"></button>
                 </div>
                 <div class="modal-body">
                     <dl class="row mb-0">
@@ -261,7 +266,7 @@
                         }
                     </dl>
                 </div>
-                <div class="modal-footer"><button class="btn btn-primary" type="button" @onclick="CloseDialogs">Close</button></div>
+                <div class="modal-footer"><button class="btn btn-primary" type="button" @onclick="CloseDialogs">@t[TranslationKeys.Close]</button></div>
             </div>
         </div>
     </div><div class="modal-backdrop fade show"></div>

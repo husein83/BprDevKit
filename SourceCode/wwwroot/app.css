@@ -1,3 +1,51 @@
+/* Custom Persian Fonts (AppFontFa / AppFont) */
+@font-face {
+    font-family: 'AppFontFa';
+    src: url('fonts/AppFontFa.woff2') format('woff2'),
+         url('fonts/AppFontFa.woff') format('woff'),
+         url('fonts/AppFontFa.ttf') format('truetype'),
+         url('fonts/AppFont.woff2') format('woff2'),
+         url('fonts/AppFont.woff') format('woff'),
+         url('fonts/AppFont.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'AppFontFa';
+    src: url('fonts/AppFontFa-Bold.woff2') format('woff2'),
+         url('fonts/AppFontFa-Bold.woff') format('woff'),
+         url('fonts/AppFontFa-Bold.ttf') format('truetype'),
+         url('fonts/AppFont-Bold.woff2') format('woff2'),
+         url('fonts/AppFont-Bold.woff') format('woff'),
+         url('fonts/AppFont-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Custom English Fonts (AppFontEn) */
+@font-face {
+    font-family: 'AppFontEn';
+    src: url('fonts/AppFontEn.woff2') format('woff2'),
+         url('fonts/AppFontEn.woff') format('woff'),
+         url('fonts/AppFontEn.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'AppFontEn';
+    src: url('fonts/AppFontEn-Bold.woff2') format('woff2'),
+         url('fonts/AppFontEn-Bold.woff') format('woff'),
+         url('fonts/AppFontEn-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
 :root {
     --sidebar-width: 280px;
     --primary-color: #1a2a3a;
@@ -5,11 +53,42 @@
     --accent-color: #3498db;
     --text-light: #ecf0f1;
     --bg-light: #f8f9fa;
+    --font-fa: 'AppFontFa', 'Vazirmatn', 'IRANSans', 'Vazir', 'Tahoma', system-ui, -apple-system, sans-serif;
+    --font-en: 'AppFontEn', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 body {
     background-color: var(--bg-light);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: var(--font-en);
+}
+
+/* Persian / RTL Font Scope */
+[dir="rtl"], .page.rtl, [lang="fa"] {
+    font-family: var(--font-fa);
+}
+
+[dir="rtl"] input, [dir="rtl"] button, [dir="rtl"] select, [dir="rtl"] textarea,
+[dir="rtl"] .form-control, [dir="rtl"] .form-select, [dir="rtl"] .btn, [dir="rtl"] .table,
+.page.rtl input, .page.rtl button, .page.rtl select, .page.rtl textarea,
+.page.rtl .form-control, .page.rtl .form-select, .page.rtl .btn, .page.rtl .table {
+    font-family: var(--font-fa);
+}
+
+/* English / LTR Font Scope */
+[dir="ltr"], .page.ltr, [lang="en"] {
+    font-family: var(--font-en);
+}
+
+[dir="ltr"] input, [dir="ltr"] button, [dir="ltr"] select, [dir="ltr"] textarea,
+[dir="ltr"] .form-control, [dir="ltr"] .form-select, [dir="ltr"] .btn, [dir="ltr"] .table,
+.page.ltr input, .page.ltr button, .page.ltr select, .page.ltr textarea,
+.page.ltr .form-control, .page.ltr .form-select, .page.ltr .btn, .page.ltr .table {
+    font-family: var(--font-en);
+}
+
+/* Ensure code, identifiers & monospace remain monospace */
+code, pre, kbd, samp, .font-monospace {
+    font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
 }
 
 .main-layout {

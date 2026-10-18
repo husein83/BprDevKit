@@ -5,15 +5,20 @@
 @using BprDevKit.DatabaseManagement.Models.Operations
 @using BprDevKit.DatabaseManagement.Services
 @inject DatabaseManagerFactory DatabaseManagerFactory
+@inject ITranslationFactory TranslationFactory
+
+@{
+    var t = TranslationFactory.Current;
+}
 
 <div class="tables-management">
     <div class="tables-toolbar d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
         <div>
-            <h2 class="h4 mb-1"><i class="bi bi-table text-primary me-2"></i>Tables</h2>
-            <p class="text-muted mb-0">Create tables, inspect their columns, indexes and foreign keys, rename them, and drop them.</p>
+            <h2 class="h4 mb-1"><i class="bi bi-table text-primary me-2"></i>@t[TranslationKeys.Tables]</h2>
+            <p class="text-muted mb-0">@t[TranslationKeys.TableTabSubtitle]</p>
         </div>
         <button class="create-table-button btn btn-primary" type="button" @onclick="OpenCreateTable" disabled="@(!HasDatabase || _isSaving)">
-            <i class="bi bi-plus-lg me-1"></i> Create table
+            <i class="bi bi-plus-lg me-1"></i> @t[TranslationKeys.TableTabCreateTable]
         </button>
     </div>
 
@@ -21,9 +26,9 @@
         <div class="card-body p-3">
             <div class="row g-2 align-items-end">
                 <div class="col-md-5">
-                    <label class="form-label fw-semibold" for="table-database"><i class="bi bi-database me-1 text-primary"></i>Database</label>
+                    <label class="form-label fw-semibold" for="table-database"><i class="bi bi-database me-1 text-primary"></i>@t[TranslationKeys.Database]</label>
                     <select id="table-database" class="form-select" @bind="_selectedDatabase" @bind:after="OnDatabaseSelected" disabled="@(_isLoadingDatabases || _isSaving)">
-                        <option value="">-- Select a database --</option>
+                        <option value="">@t[TranslationKeys.SchemaTabSelectDbPrompt]</option>
                         @foreach (var databaseName in _databases)
                         {
                             <option value="@databaseName">@databaseName</option>
@@ -31,9 +36,9 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label fw-semibold" for="table-schema-filter">Schema</label>
+                    <label class="form-label fw-semibold" for="table-schema-filter">@t[TranslationKeys.SchemaName]</label>
                     <select id="table-schema-filter" class="form-select" @bind="_schemaFilter" disabled="@(!HasDatabase)">
-                        <option value="">All schemas</option>
+                        <option value="">@t[TranslationKeys.TableTabAllSchemas]</option>
                         @foreach (var schemaName in _tables.Select(table => table.SchemaName).Distinct().OrderBy(name => name))
                         {
                             <option value="@schemaName">@schemaName</option>
@@ -41,12 +46,12 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label fw-semibold" for="table-name-filter">Search</label>
-                    <input id="table-name-filter" class="form-control" placeholder="Table name" @bind="_nameFilter" @bind:event="oninput" disabled="@(!HasDatabase)" />
+                    <label class="form-label fw-semibold" for="table-name-filter">@t[TranslationKeys.Search]</label>
+                    <input id="table-name-filter" class="form-control" placeholder="@t[TranslationKeys.TableName]" @bind="_nameFilter" @bind:event="oninput" disabled="@(!HasDatabase)" />
                 </div>
                 <div class="col-auto">
                     <button class="btn btn-outline-secondary" type="button" @onclick="RefreshAll" disabled="@(_isLoadingDatabases || _isLoadingTables || _isSaving)">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                        <i class="bi bi-arrow-clockwise me-1"></i> @t[TranslationKeys.Refresh]
                     </button>
                 </div>
             </div>
@@ -65,13 +70,13 @@
     {
         <div class="tables-editor card border-primary shadow-sm mb-4">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <span class="fw-semibold"><i class="bi bi-plus-square me-2"></i>Create table in <span class="font-monospace">@_selectedDatabase</span></span>
+                <span class="fw-semibold"><i class="bi bi-plus-square me-2"></i>@t.Get(TranslationKeys.TableTabCreateInDb, _selectedDatabase)</span>
                 <button class="btn-close btn-close-white" type="button" @onclick="CloseCreateTable"></button>
             </div>
             <div class="card-body p-4">
                 <div class="row g-3 mb-4">
                     <div class="col-md-3">
-                        <label class="form-label fw-semibold" for="new-table-schema">Schema</label>
+                        <label class="form-label fw-semibold" for="new-table-schema">@t[TranslationKeys.SchemaName]</label>
                         <select id="new-table-schema" class="form-select" @bind="_createConfiguration.SchemaName">
                             @foreach (var schemaName in _schemas)
                             {
@@ -80,13 +85,13 @@
                         </select>
                     </div>
                     <div class="col-md-5">
-                        <label class="form-label fw-semibold" for="new-table-name">Table name</label>
+                        <label class="form-label fw-semibold" for="new-table-name">@t[TranslationKeys.TableName]</label>
                         <input id="new-table-name" class="form-control" maxlength="128" placeholder="Customers" @bind="_createConfiguration.TableName" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label fw-semibold" for="new-table-filegroup">File group</label>
+                        <label class="form-label fw-semibold" for="new-table-filegroup">@t[TranslationKeys.TableTabFileGroup]</label>
                         <select id="new-table-filegroup" class="form-select" @bind="_createConfiguration.FileGroup">
-                            <option value="">Database default</option>
+                            <option value="">@t[TranslationKeys.TableTabDbDefault]</option>
                             @foreach (var fileGroup in _fileGroups)
                             {
                                 <option value="@fileGroup">@fileGroup</option>
@@ -94,23 +99,23 @@
                         </select>
                     </div>
                     <div class="col-12">
-                        <label class="form-label fw-semibold" for="new-table-description">Description <span class="text-muted fw-normal">(optional)</span></label>
+                        <label class="form-label fw-semibold" for="new-table-description">@t[TranslationKeys.Description] <span class="text-muted fw-normal">@t[TranslationKeys.DbTabOptional]</span></label>
                         <input id="new-table-description" class="form-control" maxlength="3000" @bind="_createConfiguration.Description" />
                     </div>
                 </div>
 
-                <h3 class="h6 fw-semibold mb-2"><i class="bi bi-columns-gap me-1 text-primary"></i>Columns</h3>
+                <h3 class="h6 fw-semibold mb-2"><i class="bi bi-columns-gap me-1 text-primary"></i>@t[TranslationKeys.Columns]</h3>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-2">
                         <thead class="table-light">
                             <tr>
-                                <th style="min-width: 11rem;">Name</th>
-                                <th style="min-width: 9rem;">Type</th>
-                                <th style="min-width: 10rem;">Size</th>
-                                <th class="text-center">Null</th>
-                                <th class="text-center">PK</th>
-                                <th class="text-center">Identity</th>
-                                <th style="min-width: 11rem;">Default</th>
+                                <th style="min-width: 11rem;">@t[TranslationKeys.Name]</th>
+                                <th style="min-width: 9rem;">@t[TranslationKeys.Type]</th>
+                                <th style="min-width: 12rem;">@t[TranslationKeys.ColPanelSize]</th>
+                                <th class="text-center">@t[TranslationKeys.AllowNull]</th>
+                                <th class="text-center">@t[TranslationKeys.PrimaryKey]</th>
+                                <th class="text-center">@t[TranslationKeys.IsIdentity]</th>
+                                <th style="min-width: 11rem;">@t[TranslationKeys.DefaultValue]</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -131,15 +136,16 @@
                                     <td>
                                         @if (type?.Kind == ColumnDataTypeKind.Length)
                                         {
-                                            <div class="input-group input-group-sm">
-                                                <input type="number" class="form-control" min="1" max="@(type!.MaxLength)" disabled="@(column.Length == -1)"
+                                            <div class="input-group input-group-sm flex-nowrap">
+                                                <input type="number" class="form-control font-monospace" min="1" max="@(type!.MaxLength)" disabled="@(column.Length == -1)"
                                                        value="@(column.Length is > 0 ? column.Length.Value.ToString(CultureInfo.InvariantCulture) : string.Empty)"
                                                        @onchange="e => column.Length = ParseInt(e.Value)" />
                                                 @if (type.SupportsMax)
                                                 {
-                                                    <div class="input-group-text">
-                                                        <input class="form-check-input mt-0 me-1" type="checkbox" checked="@(column.Length == -1)" @onchange="e => ToggleMax(column, type, (bool)e.Value!)" />MAX
-                                                    </div>
+                                                    <span class="input-group-text d-inline-flex align-items-center gap-1">
+                                                        <input class="form-check-input m-0" type="checkbox" id="@($"max-{column.GetHashCode()}")" checked="@(column.Length == -1)" @onchange="e => ToggleMax(column, type, (bool)e.Value!)" />
+                                                        <label class="form-check-label small mb-0 user-select-none" for="@($"max-{column.GetHashCode()}")">MAX</label>
+                                                    </span>
                                                 }
                                             </div>
                                         }
@@ -179,7 +185,7 @@
                                                @bind="column.DefaultValue" />
                                     </td>
                                     <td class="text-end">
-                                        <button class="btn btn-sm btn-outline-danger" type="button" title="Remove column" disabled="@(_createConfiguration.Columns.Count == 1)"
+                                        <button class="btn btn-sm btn-outline-danger" type="button" title="@t[TranslationKeys.Delete]" disabled="@(_createConfiguration.Columns.Count == 1)"
                                                 @onclick="() => RemoveColumn(column)"><i class="bi bi-x-lg"></i></button>
                                     </td>
                                 </tr>
@@ -187,16 +193,16 @@
                         </tbody>
                     </table>
                 </div>
-                <button class="btn btn-sm btn-outline-primary" type="button" @onclick="AddColumn"><i class="bi bi-plus-lg me-1"></i>Add column</button>
+                <button class="btn btn-sm btn-outline-primary" type="button" @onclick="AddColumn"><i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.ColPanelAddColumn]</button>
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
-                    <button class="btn btn-light" type="button" @onclick="CloseCreateTable">Cancel</button>
+                    <button class="btn btn-light" type="button" @onclick="CloseCreateTable">@t[TranslationKeys.Cancel]</button>
                     <button class="btn btn-success" type="button" @onclick="CreateTable" disabled="@_isSaving">
                         @if (_isSaving)
                         {
                             <span class="spinner-border spinner-border-sm me-1"></span>
                         }
-                        Create table
+                        @t[TranslationKeys.TableTabCreateTable]
                     </button>
                 </div>
             </div>
@@ -207,22 +213,22 @@
         <div class="card-body p-0">
             @if (!HasDatabase)
             {
-                <div class="text-center text-muted py-5"><i class="bi bi-database display-6"></i><p class="mt-3 mb-0">Select a database to manage its tables.</p></div>
+                <div class="text-center text-muted py-5"><i class="bi bi-database display-6"></i><p class="mt-3 mb-0">@t[TranslationKeys.TableTabSelectDbToManage]</p></div>
             }
             else if (_isLoadingTables)
             {
-                <div class="text-center py-5"><span class="spinner-border text-primary me-2"></span>Loading tables…</div>
+                <div class="text-center py-5"><span class="spinner-border text-primary me-2"></span>@t[TranslationKeys.TableTabLoadingTables]</div>
             }
             else if (!VisibleTables.Any())
             {
-                <div class="text-center text-muted py-5"><i class="bi bi-table display-6"></i><p class="mt-3 mb-0">@(_tables.Count == 0 ? "This database has no user tables yet." : "No table matches the current filter.")</p></div>
+                <div class="text-center text-muted py-5"><i class="bi bi-table display-6"></i><p class="mt-3 mb-0">@(_tables.Count == 0 ? t[TranslationKeys.TableTabNoTablesFound] : t[TranslationKeys.TableTabNoMatchFilter])</p></div>
             }
             else
             {
                 <div class="table-responsive">
                     <table class="tables-list-table table table-hover align-middle mb-0">
                         <thead class="table-light">
-                            <tr><th class="ps-4">Table</th><th class="text-end">Rows</th><th class="text-center">Columns</th><th>Modified</th><th class="text-end pe-4">Actions</th></tr>
+                            <tr><th class="ps-4">@t[TranslationKeys.TableName]</th><th class="text-end">@t[TranslationKeys.TableTabRows]</th><th class="text-center">@t[TranslationKeys.Columns]</th><th>@t[TranslationKeys.LastModified]</th><th class="text-end pe-4">@t[TranslationKeys.Actions]</th></tr>
                         </thead>
                         <tbody>
                             @foreach (var table in VisibleTables)
@@ -240,9 +246,9 @@
                                     <td class="text-muted small">@table.ModifyDate.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</td>
                                     <td class="text-end pe-4">
                                         <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-primary" type="button" title="View details" @onclick="() => OpenViewTable(table)"><i class="bi bi-eye"></i></button>
-                                            <button class="btn btn-outline-secondary" type="button" title="Rename or change description" @onclick="() => OpenEditTable(table)"><i class="bi bi-pencil-square"></i></button>
-                                            <button class="btn btn-outline-danger" type="button" title="Drop table" @onclick="() => OpenDeleteTable(table)"><i class="bi bi-trash"></i></button>
+                                            <button class="btn btn-outline-primary" type="button" title="@t[TranslationKeys.DbTabViewDetails]" @onclick="() => OpenViewTable(table)"><i class="bi bi-eye"></i></button>
+                                            <button class="btn btn-outline-secondary" type="button" title="@t[TranslationKeys.TableTabRenameOrDesc]" @onclick="() => OpenEditTable(table)"><i class="bi bi-pencil-square"></i></button>
+                                            <button class="btn btn-outline-danger" type="button" title="@t[TranslationKeys.TableTabDropTable]" @onclick="() => OpenDeleteTable(table)"><i class="bi bi-trash"></i></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -250,7 +256,7 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="px-4 py-2 border-top text-muted small">Row counts come from partition metadata and are approximate.</div>
+                <div class="px-4 py-2 border-top text-muted small">@t[TranslationKeys.TableTabRowCountNote]</div>
             }
         </div>
     </div>
@@ -267,14 +273,14 @@
                     <div class="modal-body">
                         @if (_isLoadingDetails)
                         {
-                            <div class="text-center py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading table details…</div>
+                            <div class="text-center py-4"><span class="spinner-border spinner-border-sm me-2"></span>@t[TranslationKeys.TableTabLoadingDetails]</div>
                         }
                         else if (_details is not null)
                         {
                             <TableDetailsView Manager="_databaseManager!" Table="_details" Tables="_tables" FileGroups="_fileGroups" OnChanged="OnTableStructureChanged" />
                         }
                     </div>
-                    <div class="modal-footer"><button class="btn btn-primary" type="button" @onclick="CloseDialogs">Close</button></div>
+                    <div class="modal-footer"><button class="btn btn-primary" type="button" @onclick="CloseDialogs">@t[TranslationKeys.Close]</button></div>
                 </div>
             </div>
         </div>
@@ -287,30 +293,30 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h2 class="modal-title fs-5"><i class="bi bi-pencil-square me-2"></i>Edit <span class="font-monospace">@_dialogTable.FullName</span></h2>
+                        <h2 class="modal-title fs-5"><i class="bi bi-pencil-square me-2"></i>@t.Get(TranslationKeys.TableTabEditTitle, _dialogTable.FullName)</h2>
                         <button class="btn-close" type="button" @onclick="CloseDialogs"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold" for="edit-table-name">Table name</label>
+                            <label class="form-label fw-semibold" for="edit-table-name">@t[TranslationKeys.TableName]</label>
                             <input id="edit-table-name" class="form-control" maxlength="128" @bind="_editNewName" @bind:event="oninput" />
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-semibold" for="edit-table-description">Description</label>
+                            <label class="form-label fw-semibold" for="edit-table-description">@t[TranslationKeys.Description]</label>
                             <textarea id="edit-table-description" class="form-control" rows="3" maxlength="3000" @bind="_editDescription" @bind:event="oninput"></textarea>
-                            <div class="form-text">Clear the field to remove the description.</div>
+                            <div class="form-text">@t[TranslationKeys.TableTabClearDescHelp]</div>
                         </div>
                         @if (IsRenameRequested)
                         {
                             <div class="alert alert-warning small mb-0">
                                 <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                                Renaming does not update code that still uses the old name (procedures, views, application SQL), and constraints or indexes named after the table (for example <span class="font-monospace">@("PK_" + _dialogTable.TableName)</span>) keep their names.
+                                @t[TranslationKeys.TableTabRenameWarning]
                             </div>
                         }
                     </div>
                     <div class="modal-footer">
-                        <button class="btn btn-light" type="button" @onclick="CloseDialogs">Cancel</button>
-                        <button class="btn btn-primary" type="button" @onclick="SaveTableChanges" disabled="@(_isSaving || !HasEditChanges)">Save changes</button>
+                        <button class="btn btn-light" type="button" @onclick="CloseDialogs">@t[TranslationKeys.Cancel]</button>
+                        <button class="btn btn-primary" type="button" @onclick="SaveTableChanges" disabled="@(_isSaving || !HasEditChanges)">@t[TranslationKeys.SaveChanges]</button>
                     </div>
                 </div>
             </div>
@@ -324,24 +330,25 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header bg-danger text-white">
-                        <h2 class="modal-title fs-5"><i class="bi bi-exclamation-triangle-fill me-2"></i>Drop table</h2>
+                        <h2 class="modal-title fs-5"><i class="bi bi-exclamation-triangle-fill me-2"></i>@t[TranslationKeys.TableTabDropTable]</h2>
                         <button class="btn-close btn-close-white" type="button" @onclick="CloseDialogs"></button>
                     </div>
                     <div class="modal-body">
                         @if (_isLoadingDetails)
                         {
-                            <div class="text-center py-3"><span class="spinner-border spinner-border-sm me-2"></span>Checking dependencies…</div>
+                            <div class="text-center py-3"><span class="spinner-border spinner-border-sm me-2"></span>@t[TranslationKeys.TableTabCheckingDependencies]</div>
                         }
                         else if (_details is not null)
                         {
                             <p>
-                                <strong class="font-monospace">@_dialogTable.FullName</strong> and its data (about @_dialogTable.RowCount.ToString("N0", CultureInfo.InvariantCulture) row(s)) will be deleted permanently.
+                                @t.Get(TranslationKeys.TableTabDeleteConfirm, _dialogTable.FullName, _dialogTable.RowCount.ToString("N0", CultureInfo.InvariantCulture))
                             </p>
+                            <p class="text-danger small mb-0">@t[TranslationKeys.ServerActionUndoneWarning]</p>
 
                             @if (IncomingForeignKeys.Count > 0)
                             {
-                                <div class="alert alert-warning small">
-                                    Other tables reference this table, so SQL Server will refuse to drop it unless those foreign keys are removed first:
+                                <div class="alert alert-warning small mt-2">
+                                    @t[TranslationKeys.TableTabFkDependencyWarning]
                                     <ul class="mb-2 mt-1">
                                         @foreach (var foreignKey in IncomingForeignKeys)
                                         {
@@ -350,18 +357,18 @@
                                     </ul>
                                     <div class="form-check">
                                         <input id="drop-dependent-fks" class="form-check-input" type="checkbox" @bind="_dropDependentForeignKeys" />
-                                        <label class="form-check-label" for="drop-dependent-fks">Also drop these foreign keys</label>
+                                        <label class="form-check-label" for="drop-dependent-fks">@t[TranslationKeys.TableTabDropDependentFks]</label>
                                     </div>
                                 </div>
                             }
 
-                            <label class="form-label small" for="delete-confirmation">Type <span class="font-monospace fw-semibold">@_dialogTable.TableName</span> to confirm</label>
+                            <label class="form-label small mt-2" for="delete-confirmation">@t.Get(TranslationKeys.ColPanelDropConfirmType, _dialogTable.TableName)</label>
                             <input id="delete-confirmation" class="form-control" @bind="_deleteConfirmation" @bind:event="oninput" autocomplete="off" />
                         }
                     </div>
                     <div class="modal-footer">
-                        <button class="btn btn-light" type="button" @onclick="CloseDialogs">Cancel</button>
-                        <button class="btn btn-danger" type="button" @onclick="DeleteTable" disabled="@(_isSaving || !CanDelete)">Drop table</button>
+                        <button class="btn btn-light" type="button" @onclick="CloseDialogs">@t[TranslationKeys.Cancel]</button>
+                        <button class="btn btn-danger" type="button" @onclick="DeleteTable" disabled="@(_isSaving || !CanDelete)">@t[TranslationKeys.TableTabDropTable]</button>
                     </div>
                 </div>
             </div>

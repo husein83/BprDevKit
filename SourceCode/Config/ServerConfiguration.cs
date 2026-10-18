@@ -177,12 +177,42 @@ namespace BprDevKit.Config
             return $"{server},{Port.Value}";
         }
 
-        public string BuildConnectionString()
+        public string BuildConnectionString(string? databaseName = null)
+        {
+            var targetDatabase = !string.IsNullOrWhiteSpace(databaseName)
+                ? databaseName
+                : (string.IsNullOrWhiteSpace(DefaultDatabase) ? GetDefaultDatabaseName() : DefaultDatabase);
+
+            return DatabaseServerType switch
+            {
+                DatabaseServerType.SqlServer => BuildSqlServerConnectionString(targetDatabase),
+                DatabaseServerType.PostgreSql => BuildPostgreSqlConnectionString(targetDatabase),
+                DatabaseServerType.MySql or DatabaseServerType.MariaDb => BuildMySqlConnectionString(targetDatabase),
+                DatabaseServerType.Oracle => BuildOracleConnectionString(targetDatabase),
+                DatabaseServerType.Sqlite => BuildSqliteConnectionString(targetDatabase),
+                _ => BuildSqlServerConnectionString(targetDatabase)
+            };
+        }
+
+        private string GetDefaultDatabaseName()
+        {
+            return DatabaseServerType switch
+            {
+                DatabaseServerType.SqlServer => "master",
+                DatabaseServerType.PostgreSql => "postgres",
+                DatabaseServerType.MySql or DatabaseServerType.MariaDb => "mysql",
+                DatabaseServerType.Oracle => string.Empty,
+                DatabaseServerType.Sqlite => "database.db",
+                _ => "master"
+            };
+        }
+
+        private string BuildSqlServerConnectionString(string database)
         {
             var builder = new SqlConnectionStringBuilder
             {
                 DataSource = BuildDataSource(),
-                InitialCatalog = string.IsNullOrWhiteSpace(DefaultDatabase) ? "master" : DefaultDatabase,
+                InitialCatalog = database,
                 ConnectTimeout = ConnectionTimeoutSeconds,
                 MultipleActiveResultSets = true,
                 TrustServerCertificate = TrustServerCertificate,
@@ -200,6 +230,39 @@ namespace BprDevKit.Config
             }
 
             return builder.ConnectionString;
+        }
+
+        private string BuildPostgreSqlConnectionString(string database)
+        {
+            var host = string.IsNullOrWhiteSpace(ServerName) ? "localhost" : ServerName.Trim();
+            var port = Port ?? 5432;
+            var user = Username ?? "postgres";
+            var pass = Password ?? string.Empty;
+            return $"Host={host};Port={port};Database={database};Username={user};Password={pass};Timeout={ConnectionTimeoutSeconds};Command Timeout={CommandTimeout};";
+        }
+
+        private string BuildMySqlConnectionString(string database)
+        {
+            var host = string.IsNullOrWhiteSpace(ServerName) ? "localhost" : ServerName.Trim();
+            var port = Port ?? 3306;
+            var user = Username ?? "root";
+            var pass = Password ?? string.Empty;
+            return $"Server={host};Port={port};Database={database};User ID={user};Password={pass};ConnectionTimeout={ConnectionTimeoutSeconds};DefaultCommandTimeout={CommandTimeout};";
+        }
+
+        private string BuildOracleConnectionString(string database)
+        {
+            var host = string.IsNullOrWhiteSpace(ServerName) ? "localhost" : ServerName.Trim();
+            var port = Port ?? 1521;
+            var user = Username ?? string.Empty;
+            var pass = Password ?? string.Empty;
+            return $"Data Source={host}:{port}/{database};User Id={user};Password={pass};Connection Timeout={ConnectionTimeoutSeconds};";
+        }
+
+        private string BuildSqliteConnectionString(string database)
+        {
+            var path = string.IsNullOrWhiteSpace(database) ? (string.IsNullOrWhiteSpace(ServerName) ? "database.db" : ServerName) : database;
+            return $"Data Source={path};";
         }
     }
 

@@ -40,7 +40,8 @@ namespace BprDevKit.DatabaseManagement.Models.Metadata
             if (type is null) return;
 
             DataType = type.Name;
-            Length = type.Kind == ColumnDataTypeKind.Length ? Math.Min(50, type.MaxLength) : null;
+            Length = type.Kind == ColumnDataTypeKind.Length ? Math.Min(50, type.MaxLength)
+                   : type.Kind == ColumnDataTypeKind.VectorDimensions ? 1536 : null;
             Precision = type.Kind == ColumnDataTypeKind.PrecisionScale ? 18 : null;
             Scale = type.Kind == ColumnDataTypeKind.PrecisionScale ? 0 : null;
             Collation = null;
