@@ -1,447 +1,731 @@
-@using BprDevKit.DatabaseManagement.Services
-@using BprDevKit.DatabaseManagement.Models.Operations
-@using BprDevKit.Utility
 @using System.Data
-@inject DatabaseManager DatabaseManager
+@using System.Globalization
+@using BprDevKit.Config
+@using BprDevKit.DatabaseManagement.Models.Operations
+@using BprDevKit.DatabaseManagement.Services
+@using BprDevKit.Utility
+@using BprDevKit.Localization
+@inject DatabaseManagerFactory DatabaseManagerFactory
+@inject ITranslationFactory TranslationFactory
+@inject IJSRuntime JS
+
+@{
+    var t = TranslationFactory.Current;
+}
 
 <div class="functions-management">
-    <div class="management-header d-flex justify-content-between align-items-center mb-4">
-        <h3 class="m-0"><i class="bi bi-function text-primary"></i> Function Management</h3>
-        <div class="function-actions">
-            <button class="btn btn-primary px-4 py-2" @onclick="@OpenCreateFunction">
-                <i class="bi bi-plus-circle-fill me-1"></i> Create Function
+    <div class="functions-toolbar d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h2 class="h5 mb-1"><i class="bi bi-function text-primary me-2"></i>@t[TranslationKeys.Functions]</h2>
+            <p class="text-muted small mb-0">@t[TranslationKeys.FuncTabSubtitle]</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="RefreshFunctions" disabled="@(_isLoading || string.IsNullOrWhiteSpace(_selectedDatabase))">
+                <i class="bi bi-arrow-clockwise me-1"></i>@t[TranslationKeys.Refresh]
+            </button>
+            <button class="btn btn-primary btn-sm" type="button" @onclick="OpenCreate" disabled="@(string.IsNullOrWhiteSpace(_selectedDatabase) || _isLoading)">
+                <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.FuncTabCreateFunc]
             </button>
         </div>
     </div>
 
-    <div class="function-container">
-        @if (ShowCreateFunction || ShowTestFunction)
-        {
-            <div class="function-editor">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>@(ShowCreateFunction ? "Create/Edit Function" : "Test Function")</h5>
-                    </div>
-                    <div class="card-body">
-                        @if (ShowCreateFunction)
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-3">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold mb-1" for="func-database-select">@t[TranslationKeys.Databases]</label>
+                    <select id="func-database-select" class="form-select form-select-sm" value="@_selectedDatabase" @onchange="OnDatabaseChanged">
+                        <option value="">@t[TranslationKeys.SchemaTabSelectDbPrompt]</option>
+                        @foreach (var db in _databases)
                         {
-                            <div class="form-group">
-                                <label for="functionName">Function Name:</label>
-                                <input type="text" id="functionName" class="form-control" @bind="_newFunction.FunctionName" placeholder="Enter function name" />
-                            </div>
+                            <option value="@db">@db</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold mb-1" for="func-schema-filter">@t[TranslationKeys.Schemas]</label>
+                    <select id="func-schema-filter" class="form-select form-select-sm" @bind="_selectedSchemaFilter" disabled="@(string.IsNullOrWhiteSpace(_selectedDatabase) || _schemas.Count == 0)">
+                        <option value="">@t[TranslationKeys.TableTabAllSchemas]</option>
+                        @foreach (var schema in _schemas)
+                        {
+                            <option value="@schema">@schema</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label small fw-semibold mb-1" for="func-search-filter">@t[TranslationKeys.Search]</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                        <input id="func-search-filter" class="form-control border-start-0" placeholder="@t[TranslationKeys.Search]" @bind="_searchFilter" @bind:event="oninput" disabled="@(string.IsNullOrWhiteSpace(_selectedDatabase))" />
+                        @if (!string.IsNullOrWhiteSpace(_searchFilter))
+                        {
+                            <button class="btn btn-outline-secondary" type="button" @onclick="() => _searchFilter = string.Empty"><i class="bi bi-x"></i></button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                            <div class="form-group mt-3">
-                                <label for="functionSchema">Schema:</label>
-                                <select id="functionSchema" class="form-control" @bind="_newFunction.SchemaName">
-                                    <option value="">-- Select Schema --</option>
-                                    @foreach (var schema in AvailableSchemas)
+    <StatusAlert Message="@_message" Success="@_messageSuccess" OnDismiss="ClearMessage" />
+
+    @if (string.IsNullOrWhiteSpace(_selectedDatabase))
+    {
+        <div class="text-center text-muted py-5 border rounded bg-light">
+            <i class="bi bi-database display-6 d-block mb-2 text-secondary"></i>
+            <p class="mb-0">@t[TranslationKeys.FuncTabSelectDbToManage]</p>
+        </div>
+    }
+    else if (_isLoading)
+    {
+        <div class="text-center text-muted py-5">
+            <span class="spinner-border text-primary me-2"></span>
+            <span>@t[TranslationKeys.FuncTabLoadingFuncs]</span>
+        </div>
+    }
+    else if (_functions.Count == 0)
+    {
+        <div class="text-center text-muted py-5 border rounded bg-light">
+            <i class="bi bi-slash-circle display-6 d-block mb-2 text-secondary"></i>
+            <p class="mb-0">@t[TranslationKeys.FuncTabNoFuncsFound]</p>
+        </div>
+    }
+    else if (FilteredFunctions.Count == 0)
+    {
+        <div class="text-center text-muted py-4 border rounded bg-light">
+            <p class="mb-0">@t[TranslationKeys.FuncTabNoMatchFilter]</p>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 3.5rem;">#</th>
+                            <th style="width: 12rem;">@t[TranslationKeys.SchemaName]</th>
+                            <th>@t[TranslationKeys.Name]</th>
+                            <th style="width: 12rem;">@t[TranslationKeys.Created]</th>
+                            <th style="width: 12rem;">@t[TranslationKeys.LastModified]</th>
+                            <th style="width: 8rem;" class="text-end">@t[TranslationKeys.Actions]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ var index = 1; }
+                        @foreach (var func in FilteredFunctions)
+                        {
+                            <tr>
+                                <td class="text-muted small">@(index++)</td>
+                                <td>
+                                    <span class="badge text-bg-light border font-monospace">@func.SchemaName</span>
+                                </td>
+                                <td>
+                                    <strong class="font-monospace text-primary">@func.FunctionName</strong>
+                                    @if (func.IsEncrypted)
+                                    {
+                                        <span class="badge text-bg-warning ms-2" title="@t[TranslationKeys.CommonEncrypted]">
+                                            <i class="bi bi-lock-fill me-1"></i>@t[TranslationKeys.CommonEncrypted]
+                                        </span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(func.FunctionType))
+                                    {
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1" title="@t[TranslationKeys.CommonType]">@func.FunctionType</span>
+                                    }
+                                </td>
+                                <td class="text-muted small">@FormatDate(func.CreateDate)</td>
+                                <td class="text-muted small">@FormatDate(func.ModifyDate)</td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-secondary" type="button" title="@t[TranslationKeys.FuncTabBody]" @onclick="() => OpenFunctionDefinition(func)" disabled="@_isSaving">
+                                            <i class="bi bi-code-slash"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" type="button" title="@t[TranslationKeys.Delete]" @onclick="() => OpenDrop(func)" disabled="@_isSaving">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    @if (_showCreateModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-plus-circle me-2 text-primary"></i>@t[TranslationKeys.FuncTabCreateFunc]</h5>
+                        <button type="button" class="btn-close" @onclick="CloseModals"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold" for="new-func-schema">@t[TranslationKeys.SchemaName]</label>
+                                <select id="new-func-schema" class="form-select form-select-sm" @bind="_createModel.SchemaName">
+                                    @foreach (var schema in _schemas)
                                     {
                                         <option value="@schema">@schema</option>
                                     }
                                 </select>
                             </div>
-
-                            <div class="form-group mt-3">
-                                <label for="functionDatabase">Database:</label>
-                                <select id="functionDatabase" class="form-control" @bind="_newFunction.DatabaseName">
-                                    <option value="">-- Select Database --</option>
-                                    @foreach (var db in AvailableDatabases)
-                                    {
-                                        <option value="@db">@db</option>
-                                    }
-                                </select>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold" for="new-func-name">@t[TranslationKeys.Name]</label>
+                                <input id="new-func-name" class="form-control form-control-sm font-monospace" maxlength="128" placeholder="fn_MyFunction" @bind="_createModel.FunctionName" />
                             </div>
-
-                            <div class="form-group mt-3">
-                                <label for="functionBody">Function Body:</label>
-                                <textarea id="functionBody" class="form-control" @bind="_newFunction.Definition" rows="15" placeholder="BEGIN&#10;    -- Function logic here&#10;END"></textarea>
-                            </div>
-
-                            <div class="form-check mt-3">
-                                <input type="checkbox" class="form-check-input" id="functionWithEncryption" @bind="_newFunction.WithEncryption" />
-                                <label class="form-check-label" for="functionWithEncryption">WITH ENCRYPTION</label>
-                            </div>
-
-                            <div class="mt-4">
-                                <button class="btn btn-success" @onclick="@OpenCreateFunction">Create Function</button>
-                                <button class="btn btn-outline-primary" @onclick="@TestFunction">Test Function</button>
-                                <button class="btn btn-secondary" @onclick="@CancelCreateFunction">Cancel</button>
-                            </div>
-                        }
-
-                        @if (ShowTestFunction)
-                        {
-                            <div class="test-function-section">
-                                <h6>Function Test Results</h6>
-                                <div class="test-result">
-                                    @if (FunctionTestResult == null)
-                                    {
-                                        <div class="text-center">
-                                            <span class="spinner-border spinner-border-sm"></span>
-                                            <span class="ms-2">Testing function...</span>
-                                        </div>
-                                    }
-                                    else
-                                    {
-                                        <div class="test-results-container">
-                                            <h6>Sample Results</h6>
-                                            @if (FunctionTestResult.Rows.Count > 0)
-                                            {
-                                                <div class="table-responsive">
-                                                    <table class="table table-sm table-striped">
-                                                        <thead>
-                                                            @foreach (var column in FunctionTestResult.Columns.Cast<DataColumn>())
-                                                            {
-                                                                <th>@column.ColumnName</th>
-                                                            }
-                                                        </thead>
-                                                        <tbody>
-                                                            @for (int i = 0; i < Math.Min(10, FunctionTestResult.Rows.Count); i++)
-                                                            {
-                                                                <tr>
-                                                                    @foreach (var column in FunctionTestResult.Columns.Cast<DataColumn>())
-                                                                    {
-                                                                        <td>@FunctionTestResult.Rows[i][column.ColumnName]</td>
-                                                                    }
-                                                                </tr>
-                                                            }
-                                                        </tbody>
-                                                    </table>
-                                                    @if (FunctionTestResult.Rows.Count > 10)
-                                                    {
-                                                        <p><small>Showing first 10 of @FunctionTestResult.Rows.Count rows</small></p>
-                                                    }
-                                                </div>
-                                            }
-                                            else
-                                            {
-                                                <p class="text-muted">No results returned.</p>
-                                            }
-                                        </div>
-                                    }
-                                </div>
-
-                                <div class="mt-4">
-                                    <button class="btn btn-primary" @onclick="@SaveFunction">Save Function</button>
-                                    <button class="btn btn-secondary" @onclick="@CancelTestFunction">Back to Editor</button>
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input id="new-func-encryption" class="form-check-input" type="checkbox" @bind="_createModel.WithEncryption" />
+                                    <label class="form-check-label small" for="new-func-encryption">@t[TranslationKeys.FuncTabWithEncryption]</label>
                                 </div>
                             </div>
-                        }
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold" for="new-func-body">@t[TranslationKeys.FuncTabBody]</label>
+                                <textarea id="new-func-body" class="form-control font-monospace" rows="12" placeholder="(@@param1 INT)&#10;RETURNS INT&#10;AS&#10;BEGIN&#10;    RETURN @@param1 * 2;&#10;END" @bind="_createModel.Body"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm btn-light" @onclick="CloseModals">@t[TranslationKeys.Cancel]</button>
+                        <button type="button" class="btn btn-sm btn-success" @onclick="ExecuteCreateFunction" disabled="@(_isSaving || string.IsNullOrWhiteSpace(_createModel.FunctionName) || string.IsNullOrWhiteSpace(_createModel.Body))">
+                            @if (_isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            @t[TranslationKeys.Create]
+                        </button>
                     </div>
                 </div>
             </div>
-        }
-
-        <div class="function-list mt-4">
-            @if (Functions == null)
-            {
-                <div class="text-center">
-                    <span class="spinner-border spinner-border-sm"></span>
-                    <span class="ms-2">Loading functions...</span>
-                </div>
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th>Function Name</th>
-                                <th>Schema</th>
-                                <th>Database</th>
-                                <th>Created Date</th>
-                                <th>Modified Date</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var function in Functions)
-                            {
-                                <tr>
-                                    <td>@function.FunctionName</td>
-                                    <td>@function.SchemaName</td>
-                                    <td>@function.DatabaseName</td>
-                                    <td>@function.CreateDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                                    <td>@function.ModifyDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-primary" @onclick="@(() => EditFunction(function))">Edit</button>
-                                            <button class="btn btn-outline-danger" @onclick="@(() => DeleteFunction(function))">Delete</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
         </div>
+    }
 
-        @if (ShowEditFunction || ShowDeleteFunction)
-        {
-            <div class="modal fade show" style="display: block;">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Function Operations</h5>
-                            <button type="button" class="btn-close" @onclick="@CloseFunctionOperations"></button>
-                        </div>
-                        <div class="modal-body">
-                            @if (ShowEditFunction)
+    @if (_showDefinitionModal && _selectedFunction is not null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="d-flex align-items-center gap-2">
+                            <h5 class="modal-title font-monospace mb-0"><i class="bi bi-function me-2 text-primary"></i>@($"{_selectedFunction.SchemaName}.{_selectedFunction.FunctionName}")</h5>
+                            @if (_selectedFunction.IsEncrypted)
                             {
-                                <div>
-                                    <h6>Edit Function Properties</h6>
-                                    <div class="form-group">
-                                        <label>New Function Name:</label>
-                                        <input type="text" class="form-control" @bind="_editFunction.FunctionName" />
+                                if (_isDecrypted)
+                                {
+                                    <span class="badge text-bg-success"><i class="bi bi-unlock-fill me-1"></i>@t[TranslationKeys.CommonDecrypted]</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-warning"><i class="bi bi-lock-fill me-1"></i>@t[TranslationKeys.CommonEncrypted]</span>
+                                }
+                            }
+                            @if (!string.IsNullOrWhiteSpace(_selectedFunction.FunctionType))
+                            {
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis border">@_selectedFunction.FunctionType</span>
+                            }
+                        </div>
+                        <button type="button" class="btn-close" @onclick="CloseModals"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (!string.IsNullOrEmpty(_modalMessage))
+                        {
+                            <div class="alert @(_modalMessageSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show py-2 px-3 mb-3 small" role="alert">
+                                <i class="bi @(_modalMessageSuccess ? "bi-check-circle-fill text-success" : "bi-exclamation-triangle-fill text-danger") me-2"></i>
+                                <span>@_modalMessage</span>
+                                <button type="button" class="btn-close py-2" @onclick="() => _modalMessage = null"></button>
+                            </div>
+                        }
+
+                        @if (_isLoadingDefinition)
+                        {
+                            <div class="text-center py-4">
+                                <span class="spinner-border spinner-border-sm text-primary me-2"></span>
+                                <span class="text-muted small">@t[TranslationKeys.Loading]</span>
+                            </div>
+                        }
+                        else
+                        {
+                            @if (_selectedFunction.IsEncrypted && !_isDecrypted && string.IsNullOrWhiteSpace(_editDefinition))
+                            {
+                                <div class="alert alert-warning border-warning-subtle shadow-sm mb-3">
+                                    <div class="d-flex align-items-start gap-3">
+                                        <i class="bi bi-shield-lock-fill text-warning fs-3 mt-1"></i>
+                                        <div class="flex-grow-1">
+                                            <h6 class="alert-heading fw-bold mb-1">@t[TranslationKeys.CommonEncrypted]</h6>
+                                            <p class="small mb-3">@t[TranslationKeys.CommonEncryptedNotice]</p>
+
+                                            @if (_isDacRequired)
+                                            {
+                                                <div class="alert alert-info py-2 px-3 small border-0 mb-3">
+                                                    <i class="bi bi-info-circle-fill me-2"></i>@t[TranslationKeys.CommonDacRequiredPrompt]
+                                                    <div class="mt-2">
+                                                        <button class="btn btn-sm btn-outline-primary" type="button" @onclick="ExecuteEnableRemoteDac" disabled="@_isEnablingDac">
+                                                            @if (_isEnablingDac)
+                                                            {
+                                                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                                                <span>@t[TranslationKeys.CommonEnablingRemoteDac]</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <i class="bi bi-shield-check me-1"></i>
+                                                                <span>@t[TranslationKeys.CommonEnableRemoteDac]</span>
+                                                            }
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            }
+
+                                            <div>
+                                                <button class="btn btn-warning btn-sm fw-semibold shadow-sm" type="button" @onclick="ExecuteDecryptFunction" disabled="@_isDecrypting">
+                                                    @if (_isDecrypting)
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm me-1"></span>
+                                                        <span>@t[TranslationKeys.CommonDecrypting]</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <i class="bi bi-unlock-fill me-1"></i>
+                                                        <span>@t[TranslationKeys.CommonDecryptObject]</span>
+                                                    }
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             }
-                            else if (ShowDeleteFunction)
+
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">@t[TranslationKeys.FuncTabBody]</label>
+                                <textarea class="form-control font-monospace" rows="14" @bind="_editDefinition" @bind:event="oninput"></textarea>
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer d-flex justify-content-between">
+                        <div>
+                            @if (!string.IsNullOrWhiteSpace(_editDefinition))
                             {
-                                <div>
-                                    <h6>Delete Function Confirmation</h6>
-                                    <p>Are you sure you want to delete function <strong>@_functionToDelete.FunctionName</strong> in schema <strong>@_functionToDelete.SchemaName</strong> of database <strong>@_functionToDelete.DatabaseName</strong>?</p>
-                                    <p class="text-danger">This action cannot be undone.</p>
-                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CopyDefinitionToClipboard" title="@t[TranslationKeys.CommonCopy]">
+                                    @if (_isCopied)
+                                    {
+                                        <i class="bi bi-check-lg text-success me-1"></i>
+                                        <span class="text-success small fw-semibold">@t[TranslationKeys.CommonCopied]</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-clipboard me-1"></i>
+                                        <span>@t[TranslationKeys.CommonCopy]</span>
+                                    }
+                                </button>
                             }
                         </div>
-                        <div class="modal-footer">
-                            @if (ShowEditFunction)
-                            {
-                                <button class="btn btn-primary" @onclick="@SaveFunctionChanges">Save Changes</button>
-                            }
-                            else if (ShowDeleteFunction)
-                            {
-                                <button class="btn btn-danger" @onclick="@ConfirmDeleteFunction">Delete</button>
-                            }
-                            <button class="btn btn-secondary" @onclick="@CloseFunctionOperations">Cancel</button>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-light" @onclick="CloseModals">@t[TranslationKeys.Close]</button>
+                            <button type="button" class="btn btn-sm btn-primary" @onclick="ExecuteAlterFunction" disabled="@(_isSaving || _isLoadingDefinition || string.IsNullOrWhiteSpace(_editDefinition) || (_selectedFunction.IsEncrypted && !_isDecrypted && string.IsNullOrWhiteSpace(_editDefinition)))">
+                                @if (_isSaving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                @t[TranslationKeys.Save]
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-backdrop fade show"></div>
-        }
-    </div>
+        </div>
+    }
+
+    @if (_showDropModal && _selectedFunction is not null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog">
+                <div class="modal-content border-danger">
+                    <div class="modal-header bg-danger text-white py-2">
+                        <h5 class="modal-title h6 mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>@t.Get(TranslationKeys.FuncTabDropTitle, _selectedFunction.FunctionName)</h5>
+                        <button type="button" class="btn-close btn-close-white" @onclick="CloseModals"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-0">@t.Get(TranslationKeys.FuncTabDropConfirm, $"{_selectedFunction.SchemaName}.{_selectedFunction.FunctionName}")</p>
+                    </div>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-sm btn-light" @onclick="CloseModals">@t[TranslationKeys.Cancel]</button>
+                        <button type="button" class="btn btn-sm btn-danger" @onclick="ExecuteDropFunction" disabled="@_isSaving">
+                            @if (_isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            @t[TranslationKeys.Delete]
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
-    [Parameter]
-    public EventCallback<string> OnOperationComplete { get; set; }
+    [Parameter] public ServerConfiguration? ServerConfig { get; set; }
+    [Parameter] public EventCallback<string> OnOperationComplete { get; set; }
 
-    private List<FunctionOperation.Information> Functions = new();
-    private List<string> AvailableSchemas = new();
-    private List<string> AvailableDatabases = new();
+    private ITranslator t => TranslationFactory.Current;
+    private DatabaseManager? _manager;
+    private List<string> _databases = new();
+    private List<string> _schemas = new();
+    private List<FunctionOperation.Information> _functions = new();
+    private string _selectedDatabase = string.Empty;
+    private string _selectedSchemaFilter = string.Empty;
+    private string _searchFilter = string.Empty;
+    private bool _isLoading;
+    private bool _isSaving;
+    private bool _isLoadingDefinition;
+    private bool _isDecrypting;
+    private bool _isDecrypted;
+    private bool _isDacRequired;
+    private bool _isEnablingDac;
+    private string? _message;
+    private bool _messageSuccess;
+    private string? _modalMessage;
+    private bool _modalMessageSuccess;
 
-    private bool ShowCreateFunction = false;
-    private bool ShowTestFunction = false;
-    private bool ShowEditFunction = false;
-    private bool ShowDeleteFunction = false;
+    private bool _showCreateModal;
+    private bool _showDefinitionModal;
+    private bool _showDropModal;
+    private FunctionOperation.Information? _selectedFunction;
+    private FunctionOperation.Create _createModel = new();
+    private string _editDefinition = string.Empty;
+    private bool _isCopied;
 
-    private FunctionOperation.Information _newFunction = new FunctionOperation.Information();
-    private FunctionOperation.Information _editFunction = new FunctionOperation.Information();
-    private FunctionOperation.Information _functionToDelete = new FunctionOperation.Information();
-
-    private DataTable? FunctionTestResult = null;
+    private List<FunctionOperation.Information> FilteredFunctions => _functions
+        .Where(f => string.IsNullOrWhiteSpace(_selectedSchemaFilter) || string.Equals(f.SchemaName, _selectedSchemaFilter, StringComparison.OrdinalIgnoreCase))
+        .Where(f => string.IsNullOrWhiteSpace(_searchFilter) || f.FunctionName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase))
+        .ToList();
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadAvailableSchemas();
-        await LoadAvailableDatabases();
-        await LoadFunctions();
+        if (ServerConfig is not null)
+        {
+            _manager = DatabaseManagerFactory.Create(ServerConfig);
+            await LoadDatabases();
+        }
     }
 
-    private async Task LoadAvailableSchemas()
+    protected override async Task OnParametersSetAsync()
     {
-        if (!string.IsNullOrEmpty(_selectedDatabase))
+        if (ServerConfig is not null)
         {
-            var result = await DatabaseManager.GetSchemas(_selectedDatabase);
-            if (result.operationResult.Success)
+            _manager = DatabaseManagerFactory.Create(ServerConfig);
+            if (_databases.Count == 0)
             {
-                AvailableSchemas = result.schemas;
-                if (AvailableSchemas.Count > 0)
-                {
-                    _newFunction.SchemaName = AvailableSchemas[0];
-                    _editFunction.SchemaName = AvailableSchemas[0];
-                }
+                await LoadDatabases();
             }
         }
     }
 
-    private async Task LoadAvailableDatabases()
+    private async Task LoadDatabases()
     {
-        var result = await DatabaseManager.GetDatabases();
-        if (result.operationResult.Success)
-        {
-            AvailableDatabases = result.databases;
-            if (AvailableDatabases.Count > 0)
-            {
-                _newFunction.DatabaseName = AvailableDatabases[0];
-                _editFunction.DatabaseName = AvailableDatabases[0];
-            }
-        }
-    }
-
-    private async Task LoadFunctions()
-    {
-        if (!string.IsNullOrEmpty(_selectedDatabase))
-        {
-            var result = await DatabaseManager.GetFunctions(_selectedDatabase);
-            if (result.operationResult.Success)
-            {
-                Functions = new List<FunctionOperation.Information>();
-                foreach (var functionName in result.functions)
-                {
-                    Functions.Add(new FunctionOperation.Information
-                    {
-                        FunctionName = functionName,
-                        SchemaName = "dbo",
-                        DatabaseName = _selectedDatabase,
-                        CreateDate = DateTime.Now,
-                        ModifyDate = DateTime.Now,
-                        Definition = "-- Function body"
-                    });
-                }
-            }
-        }
-    }
-
-    private void OpenCreateFunction()
-    {
-        _newFunction = new FunctionOperation.Information
-        {
-            SchemaName = _selectedSchema,
-            DatabaseName = _selectedDatabase,
-            WithEncryption = true
-        };
-        ShowCreateFunction = true;
-    }
-
-    private void CancelCreateFunction()
-    {
-        ShowCreateFunction = false;
-        _newFunction = new FunctionOperation.Information();
-        ShowTestFunction = false;
-        FunctionTestResult = null;
-    }
-
-    private async Task TestFunction()
-    {
-        if (string.IsNullOrWhiteSpace(_newFunction.DatabaseName))
-        {
-            await OnOperationComplete.InvokeAsync("Database must be selected");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_newFunction.FunctionName) || string.IsNullOrWhiteSpace(_newFunction.Definition))
-        {
-            await OnOperationComplete.InvokeAsync("Function name and body cannot be empty");
-            return;
-        }
-
-        var result = await DatabaseManager.TestFunction(_newFunction.DatabaseName, _newFunction.FunctionName, _newFunction.Definition);
-        if (!result.operationResult.Success)
-        {
-            await OnOperationComplete.InvokeAsync($"Function test failed: {result.operationResult.Message}");
-            return;
-        }
-
-        FunctionTestResult = result.functionTestResult;
-        ShowTestFunction = true;
-    }
-
-    private async Task SaveFunction()
-    {
-        if (string.IsNullOrWhiteSpace(_newFunction.FunctionName))
-        {
-            await OnOperationComplete.InvokeAsync("Function name cannot be empty");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_newFunction.SchemaName) || string.IsNullOrWhiteSpace(_newFunction.DatabaseName))
-        {
-            await OnOperationComplete.InvokeAsync("Schema and database must be selected");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_newFunction.Definition))
-        {
-            await OnOperationComplete.InvokeAsync("Function body cannot be empty");
-            return;
-        }
-
-        var result = await DatabaseManager.CreateFunction(_newFunction.DatabaseName, _newFunction.SchemaName, _newFunction.FunctionName, _newFunction.Definition, _newFunction.WithEncryption);
-        if (!result.Success)
-        {
-            await OnOperationComplete.InvokeAsync($"Error creating function: {result.Message}");
-            return;
-        }
-
-        await OnOperationComplete.InvokeAsync(result.Message);
-        CancelCreateFunction();
-        await LoadFunctions();
-    }
-
-    private void EditFunction(FunctionOperation.Information function)
-    {
-        _editFunction = new FunctionOperation.Information
-        {
-            FunctionName = function.FunctionName,
-            SchemaName = function.SchemaName,
-            DatabaseName = function.DatabaseName,
-            WithEncryption = function.Definition.Contains("WITH ENCRYPTION")
-        };
-        ShowEditFunction = true;
-    }
-
-    private void DeleteFunction(FunctionOperation.Information function)
-    {
-        _functionToDelete = function;
-        ShowDeleteFunction = true;
-    }
-
-    private async Task SaveFunctionChanges()
-    {
-        await OnOperationComplete.InvokeAsync($"Function update functionality requires additional implementation");
-        CloseFunctionOperations();
-    }
-
-    private async Task ConfirmDeleteFunction()
-    {
+        if (_manager is null) return;
+        _isLoading = true;
         try
         {
-            var result = await DatabaseManager.DropFunction(_functionToDelete.DatabaseName, _functionToDelete.SchemaName, _functionToDelete.FunctionName);
-            if (result.Success)
+            var result = await _manager.GetDatabases();
+            if (result.operationResult.Success)
             {
-                await OnOperationComplete.InvokeAsync(result.Message);
-                CloseFunctionOperations();
-                await LoadFunctions();
+                _databases = result.databases;
+                _selectedDatabase = string.Empty;
             }
             else
             {
-                await OnOperationComplete.InvokeAsync($"Error deleting function: {result.Message}");
+                ShowMessage(result.operationResult);
             }
         }
         catch (Exception ex)
         {
-            await OnOperationComplete.InvokeAsync($"Error deleting function: {ex.Message}");
+            _message = ex.Message;
+            _messageSuccess = false;
+        }
+        finally
+        {
+            _isLoading = false;
         }
     }
 
-    private void CloseFunctionOperations()
+    private async Task OnDatabaseChanged(ChangeEventArgs e)
     {
-        ShowEditFunction = false;
-        ShowDeleteFunction = false;
-        _editFunction = new FunctionOperation.Information();
-        _functionToDelete = new FunctionOperation.Information();
+        _selectedDatabase = e.Value?.ToString() ?? string.Empty;
+        _selectedSchemaFilter = string.Empty;
+        _searchFilter = string.Empty;
+        ClearMessage();
+        if (!string.IsNullOrWhiteSpace(_selectedDatabase))
+        {
+            await LoadSchemasAndFunctions();
+        }
     }
 
-    private void CancelTestFunction()
+    private async Task LoadSchemasAndFunctions()
     {
-        ShowTestFunction = false;
-        FunctionTestResult = null;
+        if (_manager is null || string.IsNullOrWhiteSpace(_selectedDatabase)) return;
+        _isLoading = true;
+        try
+        {
+            var schemasTask = _manager.GetSchemas(_selectedDatabase);
+            var funcsTask = _manager.GetFunctions(_selectedDatabase);
+            await Task.WhenAll(schemasTask, funcsTask);
+
+            var schemaRes = await schemasTask;
+            if (schemaRes.operationResult.Success)
+                _schemas = schemaRes.schemas;
+
+            var funcsRes = await funcsTask;
+            if (funcsRes.operationResult.Success)
+                _functions = funcsRes.functions;
+            else
+                ShowMessage(funcsRes.operationResult);
+        }
+        catch (Exception ex)
+        {
+            _message = ex.Message;
+            _messageSuccess = false;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
-    private string _selectedDatabase = "master";
-    private string _selectedSchema = "dbo";
+    private async Task RefreshFunctions() => await LoadSchemasAndFunctions();
+
+    private void OpenCreate()
+    {
+        _createModel = new FunctionOperation.Create
+        {
+            DatabaseName = _selectedDatabase,
+            SchemaName = _schemas.FirstOrDefault() ?? "dbo",
+            FunctionName = string.Empty,
+            Body = "(@param1 INT)\nRETURNS INT\nAS\nBEGIN\n    RETURN @param1 * 2;\nEND",
+            WithEncryption = false
+        };
+        _showCreateModal = true;
+    }
+
+    private async Task ExecuteCreateFunction()
+    {
+        if (_manager is null) return;
+        _isSaving = true;
+        try
+        {
+            _createModel.DatabaseName = _selectedDatabase;
+            var result = await _manager.CreateFunction(_createModel);
+            ShowMessage(result);
+            if (result.Success)
+            {
+                CloseModals();
+                await LoadSchemasAndFunctions();
+                await OnOperationComplete.InvokeAsync(result.Message);
+            }
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task OpenFunctionDefinition(FunctionOperation.Information func)
+    {
+        if (_manager is null) return;
+        _selectedFunction = func;
+        _isLoadingDefinition = true;
+        _showDefinitionModal = true;
+        _editDefinition = string.Empty;
+        _isDecrypted = false;
+        _isDacRequired = false;
+        _modalMessage = null;
+        _isCopied = false;
+
+        try
+        {
+            var info = await _manager.GetFunctionInformation(_selectedDatabase, func.SchemaName, func.FunctionName);
+            if (info.operationResult.Success && info.function is not null)
+            {
+                _selectedFunction = info.function;
+                _editDefinition = info.function.Definition;
+            }
+            else
+            {
+                ShowMessage(info.operationResult);
+            }
+        }
+        finally
+        {
+            _isLoadingDefinition = false;
+        }
+    }
+
+    private async Task ExecuteDecryptFunction()
+    {
+        if (_manager is null || _selectedFunction is null) return;
+        _isDecrypting = true;
+        _isDacRequired = false;
+        _modalMessage = null;
+        try
+        {
+            var result = await _manager.DecryptFunction(_selectedDatabase, _selectedFunction.SchemaName, _selectedFunction.FunctionName, _selectedFunction.FunctionType);
+            if (result.Success && !string.IsNullOrWhiteSpace(result.DecryptedDefinition))
+            {
+                _editDefinition = result.DecryptedDefinition;
+                _isDecrypted = true;
+                _isDacRequired = false;
+                _modalMessage = t[TranslationKeys.CommonDecryptedSuccess];
+                _modalMessageSuccess = true;
+                ShowMessage(OperationResult.SuccessResult(t[TranslationKeys.CommonDecryptedSuccess]));
+            }
+            else
+            {
+                if (result.IsDacRequired)
+                {
+                    _isDacRequired = true;
+                }
+                _modalMessage = t.Get(TranslationKeys.CommonDecryptionFailed, result.Message);
+                _modalMessageSuccess = false;
+                ShowMessage(OperationResult.ErrorResult(t.Get(TranslationKeys.CommonDecryptionFailed, result.Message)));
+            }
+        }
+        finally
+        {
+            _isDecrypting = false;
+        }
+    }
+
+    private async Task ExecuteEnableRemoteDac()
+    {
+        if (_manager is null) return;
+        _isEnablingDac = true;
+        _modalMessage = null;
+        try
+        {
+            var result = await _manager.EnableRemoteDac();
+            if (result.Success)
+            {
+                _isDacRequired = false;
+                _modalMessage = t[TranslationKeys.CommonRemoteDacEnabled];
+                _modalMessageSuccess = true;
+                ShowMessage(OperationResult.SuccessResult(t[TranslationKeys.CommonRemoteDacEnabled]));
+            }
+            else
+            {
+                _modalMessage = result.Message;
+                _modalMessageSuccess = false;
+                ShowMessage(result);
+            }
+        }
+        finally
+        {
+            _isEnablingDac = false;
+        }
+    }
+
+    private async Task ExecuteAlterFunction()
+    {
+        if (_manager is null || _selectedFunction is null) return;
+        _isSaving = true;
+        try
+        {
+            var alter = new FunctionOperation.Alter
+            {
+                DatabaseName = _selectedDatabase,
+                SchemaName = _selectedFunction.SchemaName,
+                FunctionName = _selectedFunction.FunctionName,
+                Body = _editDefinition,
+                WithEncryption = _selectedFunction.WithEncryption
+            };
+            var result = await _manager.AlterFunction(alter);
+            ShowMessage(result);
+            if (result.Success)
+            {
+                CloseModals();
+                await LoadSchemasAndFunctions();
+                await OnOperationComplete.InvokeAsync(result.Message);
+            }
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void OpenDrop(FunctionOperation.Information func)
+    {
+        _selectedFunction = func;
+        _showDropModal = true;
+    }
+
+    private async Task ExecuteDropFunction()
+    {
+        if (_manager is null || _selectedFunction is null) return;
+        _isSaving = true;
+        try
+        {
+            var drop = new FunctionOperation.Drop
+            {
+                DatabaseName = _selectedDatabase,
+                SchemaName = _selectedFunction.SchemaName,
+                FunctionName = _selectedFunction.FunctionName
+            };
+            var result = await _manager.DropFunction(drop);
+            ShowMessage(result);
+            if (result.Success)
+            {
+                CloseModals();
+                await LoadSchemasAndFunctions();
+                await OnOperationComplete.InvokeAsync(result.Message);
+            }
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void CloseModals()
+    {
+        _showCreateModal = false;
+        _showDefinitionModal = false;
+        _showDropModal = false;
+        _selectedFunction = null;
+        _isDecrypted = false;
+        _isDacRequired = false;
+        _modalMessage = null;
+        _isCopied = false;
+    }
+
+    private async Task CopyDefinitionToClipboard()
+    {
+        if (string.IsNullOrWhiteSpace(_editDefinition)) return;
+        try
+        {
+            await JS.InvokeVoidAsync("copyTextToClipboard", _editDefinition);
+            _isCopied = true;
+            StateHasChanged();
+            await Task.Delay(2000);
+            _isCopied = false;
+            StateHasChanged();
+        }
+        catch
+        {
+            // Ignore clipboard errors
+        }
+    }
+
+    private void ShowMessage(OperationResult result)
+    {
+        _message = result.Message;
+        _messageSuccess = result.Success;
+    }
+
+    private void ClearMessage() => _message = null;
+
+    private static string FormatDate(DateTime date) =>
+        date == DateTime.MinValue ? "—" : date.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
 }

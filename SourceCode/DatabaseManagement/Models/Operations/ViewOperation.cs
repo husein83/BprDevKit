@@ -42,6 +42,7 @@ namespace BprDevKit.DatabaseManagement.Models.Operations
             public DateTime CreateDate { get; set; }
             public DateTime ModifyDate { get; set; }
             public bool WithEncryption { get; set; } = true;
+            public bool IsEncrypted { get; set; }
             public string? Description { get; set; }
         }
     }

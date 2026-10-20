@@ -119,6 +119,18 @@
             {
                 <TableManagementTab ServerConfig="_selectedServer" OnOperationComplete="NotifyOperationCompleted" />
             }
+            else if (_activeTab == "views")
+            {
+                <ViewManagementTab ServerConfig="_selectedServer" OnOperationComplete="NotifyOperationCompleted" />
+            }
+            else if (_activeTab == "procedures")
+            {
+                <StoredProcedureManagementTab ServerConfig="_selectedServer" OnOperationComplete="NotifyOperationCompleted" />
+            }
+            else if (_activeTab == "functions")
+            {
+                <FunctionManagementTab ServerConfig="_selectedServer" OnOperationComplete="NotifyOperationCompleted" />
+            }
             else
             {
                 <div class="text-center text-muted py-5">

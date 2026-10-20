@@ -164,6 +164,10 @@ namespace BprDevKit.Config
         public bool TrustServerCertificate { get; set; } = false;
         public int ConnectionTimeoutSeconds { get; set; } = BprDevKit.Utility.Constants.DatabaseConnectionTimeoutSeconds;
         public int CommandTimeout { get; set; } = BprDevKit.Utility.Constants.DatabaseCommandTimeoutSeconds;
+        public bool Pooling { get; set; } = BprDevKit.Utility.Constants.DefaultPooling;
+        public int MinPoolSize { get; set; } = BprDevKit.Utility.Constants.DefaultMinPoolSize;
+        public int MaxPoolSize { get; set; } = BprDevKit.Utility.Constants.DefaultMaxPoolSize;
+        public bool Encrypt { get; set; } = false;
         private string BuildDataSource()
         {
             var server = string.IsNullOrWhiteSpace(ServerName) ? "." : ServerName.Trim();
@@ -216,7 +220,16 @@ namespace BprDevKit.Config
                 ConnectTimeout = ConnectionTimeoutSeconds,
                 MultipleActiveResultSets = true,
                 TrustServerCertificate = TrustServerCertificate,
+                Pooling = Pooling,
+                Encrypt = Encrypt,
+                ApplicationName = BprDevKit.Utility.Constants.ApplicationName,
             };
+
+            if (Pooling)
+            {
+                if (MinPoolSize >= 0) builder.MinPoolSize = MinPoolSize;
+                if (MaxPoolSize > 0) builder.MaxPoolSize = MaxPoolSize;
+            }
 
             if (UseWindowsAuth)
                 builder.IntegratedSecurity = true;
@@ -238,7 +251,9 @@ namespace BprDevKit.Config
             var port = Port ?? 5432;
             var user = Username ?? "postgres";
             var pass = Password ?? string.Empty;
-            return $"Host={host};Port={port};Database={database};Username={user};Password={pass};Timeout={ConnectionTimeoutSeconds};Command Timeout={CommandTimeout};";
+            var sslMode = Encrypt ? "Require" : "Prefer";
+            var poolingStr = Pooling ? $"Pooling=true;Minimum Pool Size={MinPoolSize};Maximum Pool Size={MaxPoolSize};" : "Pooling=false;";
+            return $"Host={host};Port={port};Database={database};Username={user};Password={pass};Timeout={ConnectionTimeoutSeconds};Command Timeout={CommandTimeout};SSL Mode={sslMode};{poolingStr}Application Name={BprDevKit.Utility.Constants.ApplicationName};";
         }
 
         private string BuildMySqlConnectionString(string database)
@@ -247,7 +262,9 @@ namespace BprDevKit.Config
             var port = Port ?? 3306;
             var user = Username ?? "root";
             var pass = Password ?? string.Empty;
-            return $"Server={host};Port={port};Database={database};User ID={user};Password={pass};ConnectionTimeout={ConnectionTimeoutSeconds};DefaultCommandTimeout={CommandTimeout};";
+            var sslMode = Encrypt ? "Required" : "Preferred";
+            var poolingStr = Pooling ? $"Pooling=true;Min Pool Size={MinPoolSize};Max Pool Size={MaxPoolSize};" : "Pooling=false;";
+            return $"Server={host};Port={port};Database={database};User ID={user};Password={pass};ConnectionTimeout={ConnectionTimeoutSeconds};DefaultCommandTimeout={CommandTimeout};SslMode={sslMode};{poolingStr}";
         }
 
         private string BuildOracleConnectionString(string database)

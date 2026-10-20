@@ -21,12 +21,18 @@ namespace BprDevKit.DatabaseManagement.Services
         private readonly ISqlGenerator _sqlGenerator;
         private readonly ServerConfiguration _config;
         private readonly IDatabaseConnectionFactory _connectionFactory;
+        private readonly ISqlObjectDecryptor _decryptor;
 
-        public DatabaseManager(ISqlGenerator sqlGenerator, ServerConfiguration config, IDatabaseConnectionFactory? connectionFactory = null)
+        public DatabaseManager(
+            ISqlGenerator sqlGenerator,
+            ServerConfiguration config,
+            IDatabaseConnectionFactory? connectionFactory = null,
+            ISqlObjectDecryptor? decryptor = null)
         {
             _sqlGenerator = sqlGenerator ?? throw new ArgumentNullException(nameof(sqlGenerator));
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _connectionFactory = connectionFactory ?? new DatabaseConnectionFactory();
+            _decryptor = decryptor ?? new SqlObjectDecryptor(_connectionFactory);
         }
 
         #region Database Operations
@@ -1008,7 +1014,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<(OperationResult operationResult, List<string> views)> GetViews(string databaseName)
+        public async Task<(OperationResult operationResult, List<string> views)> GetViewNames(string databaseName)
         {
             try
             {
@@ -1026,30 +1032,6 @@ namespace BprDevKit.DatabaseManagement.Services
             catch (Exception ex)
             {
                 return (OperationResult.ErrorResult($"Error retrieving views: {ex.Message}"), new List<string>());
-            }
-        }
-
-        public async Task<(OperationResult operationResult, DataTable? viewTestResult)> TestView(string databaseName, string selectStatement)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(databaseName))
-                    return (OperationResult.ErrorResult("Database name cannot be empty"), null);
-
-                if (string.IsNullOrWhiteSpace(selectStatement))
-                    return (OperationResult.ErrorResult("View definition cannot be empty"), null);
-
-                var sql = _sqlGenerator.GenerateTestViewScript(databaseName, selectStatement);
-                var results = await ExecuteQuery(sql);
-
-                if (results == null)
-                    return (OperationResult.ErrorResult("No results for view test"), null);
-
-                return (OperationResult.SuccessResult("View test executed successfully"), results);
-            }
-            catch (Exception ex)
-            {
-                return (OperationResult.ErrorResult($"Error testing view: {ex.Message}"), null);
             }
         }
         #endregion
@@ -1327,7 +1309,7 @@ namespace BprDevKit.DatabaseManagement.Services
             }
         }
 
-        public async Task<(OperationResult operationResult, List<string> functions)> GetFunctions(string databaseName)
+        public async Task<(OperationResult operationResult, List<string> functions)> GetFunctionNames(string databaseName)
         {
             try
             {
@@ -1547,6 +1529,345 @@ WHERE s.name = @schemaName AND t.name = @tableName AND fk.name = @foreignKeyName
 
             return await command.ExecuteScalarAsync() is not null;
         }
+
+        #region View Operations
+        public async Task<OperationResult> CreateView(ViewOperation.Create config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateCreateViewScript(config.DatabaseName, config.SchemaName, config.ViewName, config.SelectStatement, config.WithEncryption);
+                return await ExecuteDatabaseCommand(script, $"View '{config.SchemaName}.{config.ViewName}' created successfully.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error creating view: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<OperationResult> AlterView(ViewOperation.Alter config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateAlterViewScript(config.DatabaseName, config.SchemaName, config.ViewName, config.SelectStatement, config.WithEncryption);
+                return await ExecuteDatabaseCommand(script, $"View '{config.SchemaName}.{config.ViewName}' updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error updating view: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<OperationResult> DropView(ViewOperation.Drop config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateDropViewScript(config.DatabaseName, config.SchemaName, config.ViewName);
+                return await ExecuteDatabaseCommand(script, $"View '{config.SchemaName}.{config.ViewName}' dropped successfully.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error dropping view: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<(OperationResult operationResult, List<ViewOperation.Information> views)> GetViews(string databaseName)
+        {
+            try
+            {
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetViewsScript(databaseName));
+                var views = table.Rows.Cast<DataRow>().Select(row =>
+                {
+                    var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
+                    return new ViewOperation.Information
+                    {
+                        DatabaseName = databaseName,
+                        SchemaName = Convert.ToString(row["SchemaName"]) ?? "dbo",
+                        ViewName = Convert.ToString(row["ViewName"]) ?? string.Empty,
+                        CreateDate = row.Table.Columns.Contains("CreateDate") && row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
+                        ModifyDate = row.Table.Columns.Contains("ModifyDate") && row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                        IsEncrypted = isEncrypted,
+                        WithEncryption = isEncrypted
+                    };
+                }).ToList();
+
+                return (OperationResult.SuccessResult($"Retrieved {views.Count} view(s)"), views);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving views: {ex.Message}", ex), new List<ViewOperation.Information>());
+            }
+        }
+
+        public async Task<(OperationResult operationResult, ViewOperation.Information? view)> GetViewInformation(string databaseName, string schemaName, string viewName)
+        {
+            try
+            {
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetViewInfoScript(databaseName, schemaName, viewName));
+                if (table.Rows.Count == 0)
+                    return (OperationResult.ErrorResult($"View '{schemaName}.{viewName}' not found."), null);
+
+                var row = table.Rows[0];
+                var definition = Convert.ToString(row["ViewDefinition"]) ?? string.Empty;
+                var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
+                var view = new ViewOperation.Information
+                {
+                    DatabaseName = databaseName,
+                    SchemaName = schemaName,
+                    ViewName = viewName,
+                    Definition = definition,
+                    CreateDate = row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
+                    ModifyDate = row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                    IsEncrypted = isEncrypted,
+                    WithEncryption = isEncrypted || definition.Contains("WITH ENCRYPTION", StringComparison.OrdinalIgnoreCase)
+                };
+
+                return (OperationResult.SuccessResult($"Retrieved view '{schemaName}.{viewName}'"), view);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving view information: {ex.Message}", ex), null);
+            }
+        }
+
+        public async Task<(OperationResult operationResult, DataTable? testResult)> TestView(string databaseName, string selectStatement)
+        {
+            try
+            {
+                var table = await ExecuteQuery(_sqlGenerator.GenerateTestViewScript(databaseName, selectStatement));
+                return (OperationResult.SuccessResult($"Query executed successfully ({table.Rows.Count} rows returned)."), table);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error executing view query: {ex.Message}", ex), null);
+            }
+        }
+        #endregion
+
+        #region Stored Procedure Operations
+        public async Task<OperationResult> CreateProcedure(StoredProcedureOperation.Create config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateCreateProcedureScript(config.DatabaseName, config.SchemaName, config.ProcedureName, config.Body, config.WithEncryption);
+                return await ExecuteDatabaseCommand(script, $"Stored procedure '{config.SchemaName}.{config.ProcedureName}' created successfully.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error creating stored procedure: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<OperationResult> AlterProcedure(StoredProcedureOperation.Alter config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateAlterProcedureScript(config.DatabaseName, config.SchemaName, config.ProcedureName, config.Body, config.WithEncryption);
+                return await ExecuteDatabaseCommand(script, $"Stored procedure '{config.SchemaName}.{config.ProcedureName}' updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error updating stored procedure: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<OperationResult> DropProcedure(StoredProcedureOperation.Drop config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateDropProcedureScript(config.DatabaseName, config.SchemaName, config.ProcedureName);
+                return await ExecuteDatabaseCommand(script, $"Stored procedure '{config.SchemaName}.{config.ProcedureName}' dropped successfully.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error dropping stored procedure: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<(OperationResult operationResult, List<StoredProcedureOperation.Information> procedures)> GetProcedures(string databaseName)
+        {
+            try
+            {
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetProceduresScript(databaseName));
+                var procs = table.Rows.Cast<DataRow>().Select(row =>
+                {
+                    var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
+                    return new StoredProcedureOperation.Information
+                    {
+                        DatabaseName = databaseName,
+                        SchemaName = Convert.ToString(row["SchemaName"]) ?? "dbo",
+                        ProcedureName = Convert.ToString(row["ProcedureName"]) ?? string.Empty,
+                        CreateDate = row.Table.Columns.Contains("CreateDate") && row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
+                        ModifyDate = row.Table.Columns.Contains("ModifyDate") && row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                        IsEncrypted = isEncrypted,
+                        WithEncryption = isEncrypted
+                    };
+                }).ToList();
+
+                return (OperationResult.SuccessResult($"Retrieved {procs.Count} stored procedure(s)"), procs);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving stored procedures: {ex.Message}", ex), new List<StoredProcedureOperation.Information>());
+            }
+        }
+
+        public async Task<(OperationResult operationResult, StoredProcedureOperation.Information? procedure)> GetProcedureInformation(string databaseName, string schemaName, string procName)
+        {
+            try
+            {
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetProcedureInfoScript(databaseName, schemaName, procName));
+                if (table.Rows.Count == 0)
+                    return (OperationResult.ErrorResult($"Stored procedure '{schemaName}.{procName}' not found."), null);
+
+                var row = table.Rows[0];
+                var definition = Convert.ToString(row["ProcedureDefinition"]) ?? string.Empty;
+                var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
+                var proc = new StoredProcedureOperation.Information
+                {
+                    DatabaseName = databaseName,
+                    SchemaName = schemaName,
+                    ProcedureName = procName,
+                    Definition = definition,
+                    CreateDate = row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
+                    ModifyDate = row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                    IsEncrypted = isEncrypted,
+                    WithEncryption = isEncrypted || definition.Contains("WITH ENCRYPTION", StringComparison.OrdinalIgnoreCase)
+                };
+
+                return (OperationResult.SuccessResult($"Retrieved stored procedure '{schemaName}.{procName}'"), proc);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving stored procedure information: {ex.Message}", ex), null);
+            }
+        }
+        #endregion
+
+        #region Function Operations
+        public async Task<OperationResult> CreateFunction(FunctionOperation.Create config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateCreateFunctionScript(config.DatabaseName, config.SchemaName, config.FunctionName, config.Body, config.WithEncryption);
+                return await ExecuteDatabaseCommand(script, $"Function '{config.SchemaName}.{config.FunctionName}' created successfully.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error creating function: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<OperationResult> AlterFunction(FunctionOperation.Alter config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateAlterFunctionScript(config.DatabaseName, config.SchemaName, config.FunctionName, config.Body, config.WithEncryption);
+                return await ExecuteDatabaseCommand(script, $"Function '{config.SchemaName}.{config.FunctionName}' updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error updating function: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<OperationResult> DropFunction(FunctionOperation.Drop config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateDropFunctionScript(config.DatabaseName, config.SchemaName, config.FunctionName);
+                return await ExecuteDatabaseCommand(script, $"Function '{config.SchemaName}.{config.FunctionName}' dropped successfully.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error dropping function: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<(OperationResult operationResult, List<FunctionOperation.Information> functions)> GetFunctions(string databaseName)
+        {
+            try
+            {
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetFunctionsScript(databaseName));
+                var funcs = table.Rows.Cast<DataRow>().Select(row =>
+                {
+                    var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
+                    var funcType = row.Table.Columns.Contains("FunctionType") ? Convert.ToString(row["FunctionType"])?.Trim() ?? "FN" : "FN";
+                    return new FunctionOperation.Information
+                    {
+                        DatabaseName = databaseName,
+                        SchemaName = Convert.ToString(row["SchemaName"]) ?? "dbo",
+                        FunctionName = Convert.ToString(row["FunctionName"]) ?? string.Empty,
+                        CreateDate = row.Table.Columns.Contains("CreateDate") && row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
+                        ModifyDate = row.Table.Columns.Contains("ModifyDate") && row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                        IsEncrypted = isEncrypted,
+                        WithEncryption = isEncrypted,
+                        FunctionType = funcType
+                    };
+                }).ToList();
+
+                return (OperationResult.SuccessResult($"Retrieved {funcs.Count} function(s)"), funcs);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving functions: {ex.Message}", ex), new List<FunctionOperation.Information>());
+            }
+        }
+
+        public async Task<(OperationResult operationResult, FunctionOperation.Information? function)> GetFunctionInformation(string databaseName, string schemaName, string funcName)
+        {
+            try
+            {
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetFunctionInfoScript(databaseName, schemaName, funcName));
+                if (table.Rows.Count == 0)
+                    return (OperationResult.ErrorResult($"Function '{schemaName}.{funcName}' not found."), null);
+
+                var row = table.Rows[0];
+                var definition = Convert.ToString(row["FunctionDefinition"]) ?? string.Empty;
+                var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
+                var funcType = row.Table.Columns.Contains("FunctionType") ? Convert.ToString(row["FunctionType"])?.Trim() ?? "FN" : "FN";
+                var func = new FunctionOperation.Information
+                {
+                    DatabaseName = databaseName,
+                    SchemaName = schemaName,
+                    FunctionName = funcName,
+                    Definition = definition,
+                    CreateDate = row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
+                    ModifyDate = row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                    IsEncrypted = isEncrypted,
+                    WithEncryption = isEncrypted || definition.Contains("WITH ENCRYPTION", StringComparison.OrdinalIgnoreCase),
+                    FunctionType = funcType
+                };
+
+                return (OperationResult.SuccessResult($"Retrieved function '{schemaName}.{funcName}'"), func);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving function information: {ex.Message}", ex), null);
+            }
+        }
+        #endregion
+
+        #region Object Decryption Operations
+        public async Task<DecryptionResult> DecryptView(string databaseName, string schemaName, string viewName, CancellationToken cancellationToken = default)
+        {
+            return await _decryptor.DecryptObjectAsync(_config, databaseName, schemaName, viewName, "V", cancellationToken);
+        }
+
+        public async Task<DecryptionResult> DecryptProcedure(string databaseName, string schemaName, string procName, CancellationToken cancellationToken = default)
+        {
+            return await _decryptor.DecryptObjectAsync(_config, databaseName, schemaName, procName, "P", cancellationToken);
+        }
+
+        public async Task<DecryptionResult> DecryptFunction(string databaseName, string schemaName, string funcName, string funcType = "FN", CancellationToken cancellationToken = default)
+        {
+            return await _decryptor.DecryptObjectAsync(_config, databaseName, schemaName, funcName, funcType, cancellationToken);
+        }
+
+        public async Task<OperationResult> EnableRemoteDac(CancellationToken cancellationToken = default)
+        {
+            return await _decryptor.EnableRemoteDacAsync(_config, cancellationToken);
+        }
+        #endregion
 
         private static bool HasDatabaseChanges(DatabaseOperation.Alter config)
         {

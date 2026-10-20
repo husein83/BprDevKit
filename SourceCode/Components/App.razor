@@ -18,6 +18,31 @@
     <Routes />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script>
+        window.copyTextToClipboard = async function (text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (e) { }
+            }
+            try {
+                var textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                textArea.style.top = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                var success = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                return success;
+            } catch (err) {
+                return false;
+            }
+        };
+    </script>
 </body>
 
 </html>

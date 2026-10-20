@@ -129,6 +129,17 @@ namespace BprDevKit.Localization
         public const string PersianFont = "Server.PersianFont";
         public const string EnglishFont = "Server.EnglishFont";
         public const string FontSettingsHelp = "Server.FontSettingsHelp";
+        public const string ServerAdvancedSettings = "Server.AdvancedSettings";
+        public const string ServerPooling = "Server.Pooling";
+        public const string ServerMinPoolSize = "Server.MinPoolSize";
+        public const string ServerMaxPoolSize = "Server.MaxPoolSize";
+        public const string ServerEncryptConnection = "Server.EncryptConnection";
+        public const string ServerApplicationName = "Server.ApplicationName";
+        public const string ServerTestingConnection = "Server.TestingConnection";
+        public const string ServerTestConnectionSuccess = "Server.TestConnectionSuccess";
+        public const string ServerTestConnectionFailed = "Server.TestConnectionFailed";
+        public const string ServerLatency = "Server.Latency";
+        public const string ServerVersion = "Server.Version";
 
         // Home Page
         public const string HomeEyebrow = "Home.Eyebrow";
@@ -324,5 +335,64 @@ namespace BprDevKit.Localization
         public const string FkPanelIncoming = "FkPanel.Incoming";
         public const string FkPanelEnable = "FkPanel.Enable";
         public const string FkPanelDisable = "FkPanel.Disable";
+
+        // View Management Tab
+        public const string ViewTabSubtitle = "ViewTab.Subtitle";
+        public const string ViewTabCreateView = "ViewTab.CreateView";
+        public const string ViewTabSelectDbToManage = "ViewTab.SelectDbToManage";
+        public const string ViewTabLoadingViews = "ViewTab.LoadingViews";
+        public const string ViewTabNoViewsFound = "ViewTab.NoViewsFound";
+        public const string ViewTabNoMatchFilter = "ViewTab.NoMatchFilter";
+        public const string ViewTabDefinition = "ViewTab.Definition";
+        public const string ViewTabWithEncryption = "ViewTab.WithEncryption";
+        public const string ViewTabTestQuery = "ViewTab.TestQuery";
+        public const string ViewTabEditTitle = "ViewTab.EditTitle";
+        public const string ViewTabDropTitle = "ViewTab.DropTitle";
+        public const string ViewTabDropConfirm = "ViewTab.DropConfirm";
+        public const string ViewTabTesting = "ViewTab.Testing";
+        public const string ViewTabTestResults = "ViewTab.TestResults";
+
+        // Stored Procedure Management Tab
+        public const string ProcTabSubtitle = "ProcTab.Subtitle";
+        public const string ProcTabCreateProc = "ProcTab.CreateProc";
+        public const string ProcTabSelectDbToManage = "ProcTab.SelectDbToManage";
+        public const string ProcTabLoadingProcs = "ProcTab.LoadingProcs";
+        public const string ProcTabNoProcsFound = "ProcTab.NoProcsFound";
+        public const string ProcTabNoMatchFilter = "ProcTab.NoMatchFilter";
+        public const string ProcTabBody = "ProcTab.Body";
+        public const string ProcTabWithEncryption = "ProcTab.WithEncryption";
+        public const string ProcTabEditTitle = "ProcTab.EditTitle";
+        public const string ProcTabDropTitle = "ProcTab.DropTitle";
+        public const string ProcTabDropConfirm = "ProcTab.DropConfirm";
+
+        // Function Management Tab
+        public const string FuncTabSubtitle = "FuncTab.Subtitle";
+        public const string FuncTabCreateFunc = "FuncTab.CreateFunc";
+        public const string FuncTabSelectDbToManage = "FuncTab.SelectDbToManage";
+        public const string FuncTabLoadingFuncs = "FuncTab.LoadingFuncs";
+        public const string FuncTabNoFuncsFound = "FuncTab.NoFuncsFound";
+        public const string FuncTabNoMatchFilter = "FuncTab.NoMatchFilter";
+        public const string FuncTabBody = "FuncTab.Body";
+        public const string FuncTabWithEncryption = "FuncTab.WithEncryption";
+        public const string FuncTabEditTitle = "FuncTab.EditTitle";
+        public const string FuncTabDropTitle = "FuncTab.DropTitle";
+        public const string FuncTabDropConfirm = "FuncTab.DropConfirm";
+
+        // Decryption & Encryption
+        public const string CommonEncrypted = "Common.Encrypted";
+        public const string CommonDecrypted = "Common.Decrypted";
+        public const string CommonEncryptedNotice = "Common.EncryptedNotice";
+        public const string CommonDecryptObject = "Common.DecryptObject";
+        public const string CommonDecrypting = "Common.Decrypting";
+        public const string CommonDecryptedSuccess = "Common.DecryptedSuccess";
+        public const string CommonDecryptionFailed = "Common.DecryptionFailed";
+        public const string CommonDacRequiredPrompt = "Common.DacRequiredPrompt";
+        public const string CommonEnableRemoteDac = "Common.EnableRemoteDac";
+        public const string CommonEnablingRemoteDac = "Common.EnablingRemoteDac";
+        public const string CommonRemoteDacEnabled = "Common.RemoteDacEnabled";
+        public const string CommonCannotSaveEncryptedEmpty = "Common.CannotSaveEncryptedEmpty";
+        public const string CommonType = "Common.Type";
+        public const string CommonCopy = "Common.Copy";
+        public const string CommonCopied = "Common.Copied";
     }
 }

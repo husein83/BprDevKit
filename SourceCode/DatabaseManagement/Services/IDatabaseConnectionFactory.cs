@@ -9,12 +9,27 @@ using BprDevKit.Utility;
 namespace BprDevKit.DatabaseManagement.Services
 {
     /// <summary>
+    /// Diagnostics result for database connection test.
+    /// </summary>
+    public sealed class ConnectionTestResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public long LatencyMs { get; set; }
+        public string? ServerVersion { get; set; }
+        public string? Database { get; set; }
+        public string? Provider { get; set; }
+        public string? ErrorDetails { get; set; }
+    }
+
+    /// <summary>
     /// Factory for creating and opening database connections based on server configuration.
     /// </summary>
     public interface IDatabaseConnectionFactory
     {
         DbConnection CreateConnection(ServerConfiguration config, string? databaseName = null);
         Task<DbConnection> OpenConnectionAsync(ServerConfiguration config, string? databaseName = null, CancellationToken cancellationToken = default);
+        Task<ConnectionTestResult> TestConnectionAsync(ServerConfiguration config, CancellationToken cancellationToken = default);
     }
 
     /// <summary>
@@ -52,6 +67,78 @@ namespace BprDevKit.DatabaseManagement.Services
             {
                 await connection.DisposeAsync();
                 throw;
+            }
+        }
+
+        public virtual async Task<ConnectionTestResult> TestConnectionAsync(ServerConfiguration config, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var serverType = config.Server.DatabaseServerType;
+            var caps = DatabaseProviderMetadata.GetCapabilities(serverType);
+
+            try
+            {
+                if (serverType != DatabaseServerType.SqlServer)
+                {
+                    return new ConnectionTestResult
+                    {
+                        Success = false,
+                        LatencyMs = 0,
+                        Provider = caps.DisplayName,
+                        Message = $"Provider '{caps.DisplayName}' configuration is valid, but native ADO.NET driver is not registered yet.",
+                        ErrorDetails = $"Constructed Connection String: {config.Server.BuildConnectionString()}"
+                    };
+                }
+
+                await using var connection = await OpenConnectionAsync(config, cancellationToken: cancellationToken);
+                stopwatch.Stop();
+
+                string serverVersion = connection.ServerVersion;
+                string database = connection.Database;
+
+                // Query @@VERSION for detailed edition/version information
+                try
+                {
+                    await using var cmd = connection.CreateCommand();
+                    cmd.CommandText = "SELECT @@VERSION";
+                    cmd.CommandTimeout = Math.Min(10, Math.Max(5, config.Server.CommandTimeout));
+                    var scalar = await cmd.ExecuteScalarAsync(cancellationToken);
+                    if (scalar is string fullVer && !string.IsNullOrWhiteSpace(fullVer))
+                    {
+                        var firstLine = fullVer.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                        if (!string.IsNullOrWhiteSpace(firstLine))
+                        {
+                            serverVersion = firstLine.Trim();
+                        }
+                    }
+                }
+                catch
+                {
+                    // If @@VERSION query fails, retain connection.ServerVersion
+                }
+
+                return new ConnectionTestResult
+                {
+                    Success = true,
+                    LatencyMs = stopwatch.ElapsedMilliseconds,
+                    ServerVersion = serverVersion,
+                    Database = database,
+                    Provider = caps.DisplayName,
+                    Message = $"Successfully connected to '{database}' on '{config.Server.ServerName}' ({stopwatch.ElapsedMilliseconds} ms)."
+                };
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                return new ConnectionTestResult
+                {
+                    Success = false,
+                    LatencyMs = stopwatch.ElapsedMilliseconds,
+                    Provider = caps.DisplayName,
+                    Message = ex.Message,
+                    ErrorDetails = ex.ToString()
+                };
             }
         }
     }

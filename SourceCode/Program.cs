@@ -17,6 +17,7 @@ builder.Services.AddSingleton<IDatabaseConnectionFactory, DatabaseConnectionFact
 builder.Services.AddSingleton<ISqlGeneratorFactory, SqlGeneratorFactory>();
 builder.Services.AddSingleton<SqlServerGenerator>();
 builder.Services.AddSingleton<ISqlGenerator, SqlServerGenerator>();
+builder.Services.AddSingleton<ISqlObjectDecryptor, SqlObjectDecryptor>();
 builder.Services.AddScoped<DatabaseManager>();
 builder.Services.AddSingleton<DatabaseManagerFactory>();
 

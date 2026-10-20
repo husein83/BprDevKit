@@ -2,9 +2,11 @@
 @using BprDevKit.Config
 @using BprDevKit.Utility
 @using BprDevKit.Localization
+@using BprDevKit.DatabaseManagement.Services
 @using System.IO
 @inject NavigationManager NavigationManager
 @inject ITranslationFactory TranslationFactory
+@inject IDatabaseConnectionFactory ConnectionFactory
 @implements IDisposable
 @rendermode InteractiveServer
 
@@ -366,6 +368,41 @@
                                         </div>
                                     </div>
                                 }
+
+                                <div class="col-12 mt-3">
+                                    <div class="card bg-light-subtle border rounded-3 p-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6 class="fw-bold mb-0 text-primary">
+                                                <i class="bi bi-gear-wide-connected me-2"></i>@t[TranslationKeys.ServerAdvancedSettings]
+                                            </h6>
+                                        </div>
+                                        <div class="row g-3 mt-1">
+                                            <div class="col-md-6">
+                                                <div class="form-check form-switch pt-2">
+                                                    <input type="checkbox" class="form-check-input" id="enablePooling" @bind="_currentConfig.Server.Pooling" />
+                                                    <label class="form-check-label fw-semibold" for="enablePooling">@t[TranslationKeys.ServerPooling]</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-check form-switch pt-2">
+                                                    <input type="checkbox" class="form-check-input" id="encryptConn" @bind="_currentConfig.Server.Encrypt" />
+                                                    <label class="form-check-label fw-semibold" for="encryptConn">@t[TranslationKeys.ServerEncryptConnection]</label>
+                                                </div>
+                                            </div>
+                                            @if (_currentConfig.Server.Pooling)
+                                            {
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">@t[TranslationKeys.ServerMinPoolSize]</label>
+                                                    <input type="number" class="form-control form-control-sm" @bind="_currentConfig.Server.MinPoolSize" min="0" max="1000" />
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">@t[TranslationKeys.ServerMaxPoolSize]</label>
+                                                    <input type="number" class="form-control form-control-sm" @bind="_currentConfig.Server.MaxPoolSize" min="1" max="10000" />
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         }
                         else if (_activeTab == "database")
@@ -413,12 +450,61 @@
                             </div>
                         }
 
+                        @if (_connectionTestResult is not null)
+                        {
+                            <div class="alert @(_connectionTestResult.Success ? "alert-success" : "alert-danger") d-flex align-items-start gap-2 mt-4 mb-0" role="alert">
+                                <i class="bi @(_connectionTestResult.Success ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") fs-5 mt-1"></i>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex flex-wrap align-items-center gap-2 justify-content-between">
+                                        <div class="fw-bold">@_connectionTestResult.Message</div>
+                                        @if (_connectionTestResult.Success)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                                <i class="bi bi-stopwatch me-1"></i>@_connectionTestResult.LatencyMs ms
+                                            </span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(_connectionTestResult.ServerVersion))
+                                    {
+                                        <div class="small mt-1 text-muted">
+                                            <strong>@t[TranslationKeys.ServerVersion]:</strong> @_connectionTestResult.ServerVersion
+                                        </div>
+                                    }
+                                    @if (!_connectionTestResult.Success && !string.IsNullOrWhiteSpace(_connectionTestResult.ErrorDetails))
+                                    {
+                                        <div class="mt-2">
+                                            <button class="btn btn-link btn-sm p-0 text-decoration-none text-danger" type="button" @onclick="() => _showTestErrorDetails = !_showTestErrorDetails">
+                                                <i class="bi @(_showTestErrorDetails ? "bi-chevron-up" : "bi-chevron-down") me-1"></i>@(_showTestErrorDetails ? "Hide Error Details" : "Show Error Details")
+                                            </button>
+                                            @if (_showTestErrorDetails)
+                                            {
+                                                <pre class="bg-dark text-light p-2 rounded small font-monospace mt-1 mb-0" style="max-height: 200px; overflow-y: auto; font-size: 0.75rem;">@_connectionTestResult.ErrorDetails</pre>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                                <button type="button" class="btn-close ms-auto" @onclick="() => _connectionTestResult = null"></button>
+                            </div>
+                        }
+
                         <!-- Action Buttons for Server Configuration -->
-                        <div class="d-flex justify-content-end gap-2 border-top mt-4 pt-4">
-                            <button class="btn btn-outline-secondary px-4 py-2" @onclick="CancelForm">@t[TranslationKeys.Cancel]</button>
-                            <button class="btn btn-success px-5 py-2 shadow-sm" @onclick="SaveServerConfig">
-                                <i class="bi bi-check-lg me-1"></i> @t[TranslationKeys.SaveServerConfig]
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-top mt-4 pt-4">
+                            <button class="btn btn-outline-info px-4 py-2" type="button" @onclick="TestCurrentConnection" disabled="@(_isTestingConnection || string.IsNullOrWhiteSpace(_currentConfig.Server.ServerName))">
+                                @if (_isTestingConnection)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>@t[TranslationKeys.ServerTestingConnection]
+                                }
+                                else
+                                {
+                                    <i class="bi bi-activity me-1"></i>@t[TranslationKeys.TestConnection]
+                                }
                             </button>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-secondary px-4 py-2" type="button" @onclick="CancelForm">@t[TranslationKeys.Cancel]</button>
+                                <button class="btn btn-success px-5 py-2 shadow-sm" type="button" @onclick="SaveServerConfig">
+                                    <i class="bi bi-check-lg me-1"></i> @t[TranslationKeys.SaveServerConfig]
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -444,6 +530,11 @@
     private bool _showAppAddForm = false;
     private string _appActiveTab = "logging";
     private ApplicationConfiguration _appConfig = new();
+
+    // Connection testing
+    private bool _isTestingConnection = false;
+    private ConnectionTestResult? _connectionTestResult;
+    private bool _showTestErrorDetails = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -532,11 +623,46 @@
         _currentConfig.Database.DefaultLogFileSizeMB = Constants.DefaultInitialLogSizeMB;
         _currentConfig.Database.DefaultFileGrowthMB = Constants.DefaultFileGrowthMB;
         _currentConfig.Database.DefaultLogFileGrowthMB = Constants.DefaultLogFileGrowthMB;
+        _currentConfig.Server.Pooling = Constants.DefaultPooling;
+        _currentConfig.Server.MinPoolSize = Constants.DefaultMinPoolSize;
+        _currentConfig.Server.MaxPoolSize = Constants.DefaultMaxPoolSize;
+        _currentConfig.Server.Encrypt = false;
 
+        _connectionTestResult = null;
+        _showTestErrorDetails = false;
         _isEditMode = false;
         _showAddForm = true;
         _activeTab = "connection";
         StateHasChanged();
+    }
+
+    private async Task TestCurrentConnection()
+    {
+        if (string.IsNullOrWhiteSpace(_currentConfig.Server.ServerName))
+            return;
+
+        _isTestingConnection = true;
+        _connectionTestResult = null;
+        _showTestErrorDetails = false;
+        StateHasChanged();
+        try
+        {
+            _connectionTestResult = await ConnectionFactory.TestConnectionAsync(_currentConfig);
+        }
+        catch (Exception ex)
+        {
+            _connectionTestResult = new ConnectionTestResult
+            {
+                Success = false,
+                Message = ex.Message,
+                ErrorDetails = ex.ToString()
+            };
+        }
+        finally
+        {
+            _isTestingConnection = false;
+            StateHasChanged();
+        }
     }
 
     private void OnServerTypeChanged(ChangeEventArgs e)
@@ -544,6 +670,7 @@
         if (Enum.TryParse<DatabaseServerType>(e.Value?.ToString(), out var type))
         {
             DatabaseProviderMetadata.ApplyDefaultsOnTypeChange(_currentConfig.Server, type);
+            _connectionTestResult = null;
             StateHasChanged();
         }
     }
@@ -559,6 +686,8 @@
     private void EditServer(ServerConfiguration config)
     {
         _currentConfig = config;
+        _connectionTestResult = null;
+        _showTestErrorDetails = false;
         _isEditMode = true;
         _showAddForm = true;
         _activeTab = "connection";
@@ -571,6 +700,8 @@
         _isEditMode = false;
         _currentConfig = new ServerConfiguration();
         _selectedConfigPath = string.Empty;
+        _connectionTestResult = null;
+        _showTestErrorDetails = false;
         StateHasChanged();
     }
 

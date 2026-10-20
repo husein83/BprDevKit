@@ -138,6 +138,17 @@ namespace BprDevKit.Localization
             [TranslationKeys.PersianFont] = "فونت فارسی",
             [TranslationKeys.EnglishFont] = "فونت انگلیسی",
             [TranslationKeys.FontSettingsHelp] = "فونت‌ها بر اساس زبان انتخابی برنامه به صورت مجزا اعمال می‌شوند. فایل‌های موجود در پوشه wwwroot/fonts به صورت خودکار بارگذاری می‌شوند.",
+            [TranslationKeys.ServerAdvancedSettings] = "تنظیمات پیشرفته اتصال",
+            [TranslationKeys.ServerPooling] = "استخر اتصالات (Connection Pooling)",
+            [TranslationKeys.ServerMinPoolSize] = "حداقل اندازه استخر (Min Pool)",
+            [TranslationKeys.ServerMaxPoolSize] = "حداکثر اندازه استخر (Max Pool)",
+            [TranslationKeys.ServerEncryptConnection] = "رمزنگاری اتصال (SSL/TLS)",
+            [TranslationKeys.ServerApplicationName] = "نام برنامه (Application Name)",
+            [TranslationKeys.ServerTestingConnection] = "در حال بررسی اتصال...",
+            [TranslationKeys.ServerTestConnectionSuccess] = "اتصال با موفقیت برقرار شد! زمان پاسخ: {0} میلی‌ثانیه",
+            [TranslationKeys.ServerTestConnectionFailed] = "خطا در برقراری اتصال: {0}",
+            [TranslationKeys.ServerLatency] = "تاخیر پاسخ",
+            [TranslationKeys.ServerVersion] = "نسخه سرور",
 
             // Home Page
             [TranslationKeys.HomeEyebrow] = "محیط کاری BprDevKit",
@@ -333,7 +344,66 @@ namespace BprDevKit.Localization
             [TranslationKeys.FkPanelOutgoing] = "خروجی",
             [TranslationKeys.FkPanelIncoming] = "ورودی",
             [TranslationKeys.FkPanelEnable] = "فعال‌سازی",
-            [TranslationKeys.FkPanelDisable] = "غیرفعال‌سازی"
+            [TranslationKeys.FkPanelDisable] = "غیرفعال‌سازی",
+
+            // View Management Tab
+            [TranslationKeys.ViewTabSubtitle] = "ایجاد، مشاهده، تست، ویرایش و حذف نماهای پایگاه داده (Views).",
+            [TranslationKeys.ViewTabCreateView] = "ایجاد نمای جدید",
+            [TranslationKeys.ViewTabSelectDbToManage] = "برای مدیریت نماها، یک پایگاه داده انتخاب کنید.",
+            [TranslationKeys.ViewTabLoadingViews] = "در حال بارگذاری نماها…",
+            [TranslationKeys.ViewTabNoViewsFound] = "هیچ نمایی در این پایگاه داده یافت نشد.",
+            [TranslationKeys.ViewTabNoMatchFilter] = "نمایی با فیلتر فعلی همخوانی ندارد.",
+            [TranslationKeys.ViewTabDefinition] = "تعریف SQL (کوئری SELECT)",
+            [TranslationKeys.ViewTabWithEncryption] = "رمزنگاری نما (WITH ENCRYPTION)",
+            [TranslationKeys.ViewTabTestQuery] = "تست اجرای کوئری",
+            [TranslationKeys.ViewTabEditTitle] = "ویرایش نمای {0}",
+            [TranslationKeys.ViewTabDropTitle] = "حذف نمای {0}",
+            [TranslationKeys.ViewTabDropConfirm] = "آیا از حذف نمای {0} اطمینان دارید؟ این عملیات غیرقابل بازگشت است.",
+            [TranslationKeys.ViewTabTesting] = "در حال اجرای آزمایشی کوئری…",
+            [TranslationKeys.ViewTabTestResults] = "نتایج نمونه کوئری",
+
+            // Stored Procedure Management Tab
+            [TranslationKeys.ProcTabSubtitle] = "ایجاد، مشاهده، ویرایش و حذف روال‌های ذخیره‌شده (Stored Procedures).",
+            [TranslationKeys.ProcTabCreateProc] = "ایجاد روال ذخیره‌شده",
+            [TranslationKeys.ProcTabSelectDbToManage] = "برای مدیریت روال‌های ذخیره‌شده، یک پایگاه داده انتخاب کنید.",
+            [TranslationKeys.ProcTabLoadingProcs] = "در حال بارگذاری روال‌های ذخیره‌شده…",
+            [TranslationKeys.ProcTabNoProcsFound] = "هیچ روال ذخیره‌شده‌ای در این پایگاه داده یافت نشد.",
+            [TranslationKeys.ProcTabNoMatchFilter] = "روالی با فیلتر فعلی همخوانی ندارد.",
+            [TranslationKeys.ProcTabBody] = "بدنه روال ذخیره‌شده (BEGIN ... END)",
+            [TranslationKeys.ProcTabWithEncryption] = "رمزنگاری روال (WITH ENCRYPTION)",
+            [TranslationKeys.ProcTabEditTitle] = "ویرایش روال {0}",
+            [TranslationKeys.ProcTabDropTitle] = "حذف روال {0}",
+            [TranslationKeys.ProcTabDropConfirm] = "آیا از حذف روال ذخیره‌شده {0} اطمینان دارید؟ این عملیات غیرقابل بازگشت است.",
+
+            // Function Management Tab
+            [TranslationKeys.FuncTabSubtitle] = "ایجاد، مشاهده، ویرایش و حذف توابع کاربری (Functions).",
+            [TranslationKeys.FuncTabCreateFunc] = "ایجاد تابع جدید",
+            [TranslationKeys.FuncTabSelectDbToManage] = "برای مدیریت توابع، یک پایگاه داده انتخاب کنید.",
+            [TranslationKeys.FuncTabLoadingFuncs] = "در حال بارگذاری توابع…",
+            [TranslationKeys.FuncTabNoFuncsFound] = "هیچ تابعی در این پایگاه داده یافت نشد.",
+            [TranslationKeys.FuncTabNoMatchFilter] = "تابعی با فیلتر فعلی همخوانی ندارد.",
+            [TranslationKeys.FuncTabBody] = "بدنه تابع",
+            [TranslationKeys.FuncTabWithEncryption] = "رمزنگاری تابع (WITH ENCRYPTION)",
+            [TranslationKeys.FuncTabEditTitle] = "ویرایش تابع {0}",
+            [TranslationKeys.FuncTabDropTitle] = "حذف تابع {0}",
+            [TranslationKeys.FuncTabDropConfirm] = "آیا از حذف تابع {0} اطمینان دارید؟ این عملیات غیرقابل بازگشت است.",
+
+            // Decryption & Encryption
+            [TranslationKeys.CommonEncrypted] = "رمزنگاری‌شده",
+            [TranslationKeys.CommonDecrypted] = "رمزگشایی‌شده",
+            [TranslationKeys.CommonEncryptedNotice] = "این آبجکت با استفاده از 'WITH ENCRYPTION' رمزنگاری شده است و متن آن مستقیماً در دسترس نیست. می‌توانید با دکمه رمزگشایی زیر، سورس کد اصلی را بازیابی و مشاهده کنید.",
+            [TranslationKeys.CommonDecryptObject] = "رمزگشایی اسکریپت",
+            [TranslationKeys.CommonDecrypting] = "در حال رمزگشایی اسکریپت از طریق اتصال مدیر (DAC)…",
+            [TranslationKeys.CommonDecryptedSuccess] = "اسکریپت با موفقیت رمزگشایی و بازیابی شد!",
+            [TranslationKeys.CommonDecryptionFailed] = "خطا در رمزگشایی آبجکت: {0}",
+            [TranslationKeys.CommonDacRequiredPrompt] = "برای خواندن متادیتای باینری رمزنگاری‌شده نیاز به اتصال اختصاصی مدیر (DAC) است. ممکن است تنظیمات اتصال از راه دور DAC در سرور فعال نباشد.",
+            [TranslationKeys.CommonEnableRemoteDac] = "فعال‌سازی اتصال Remote DAC",
+            [TranslationKeys.CommonEnablingRemoteDac] = "در حال فعال‌سازی Remote DAC روی SQL Server…",
+            [TranslationKeys.CommonRemoteDacEnabled] = "اتصال Remote DAC با موفقیت فعال شد! اکنون می‌توانید مجدداً اقدام به رمزگشایی نمایید.",
+            [TranslationKeys.CommonCannotSaveEncryptedEmpty] = "ذخیره کردن تعریف خالی برای یک آبجکت رمزنگاری‌شده امکان‌پذیر نیست.",
+            [TranslationKeys.CommonType] = "نوع",
+            [TranslationKeys.CommonCopy] = "کپی اسکریپت",
+            [TranslationKeys.CommonCopied] = "کپی شد!"
         };
 
         public string this[string key]

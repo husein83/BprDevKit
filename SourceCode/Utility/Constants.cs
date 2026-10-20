@@ -43,6 +43,15 @@ namespace BprDevKit.Utility
         /// <summary>Database command timeout in seconds</summary>
         public const int DatabaseCommandTimeoutSeconds = 30;
 
+        /// <summary>Default connection pooling setting</summary>
+        public const bool DefaultPooling = true;
+
+        /// <summary>Default minimum connection pool size</summary>
+        public const int DefaultMinPoolSize = 0;
+
+        /// <summary>Default maximum connection pool size</summary>
+        public const int DefaultMaxPoolSize = 100;
+
         /// <summary>Maximum database name length</summary>
         public const int MaxDatabaseNameLength = 128;
 

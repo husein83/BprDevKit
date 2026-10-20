@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 using BprDevKit.DatabaseManagement.Models.Metadata;
 using BprDevKit.DatabaseManagement.Models.Operations;
 using BprDevKit.Utility;
@@ -1098,6 +1099,13 @@ WHERE s.name = {SQLLiteral(config.SchemaName)} AND t.name = {SQLLiteral(config.T
 
         public override string GenerateAlterViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true)
         {
+            var trimmed = selectStatement.Trim();
+            if (Regex.IsMatch(trimmed, @"^(CREATE\s+OR\s+ALTER|CREATE|ALTER)\s+VIEW\b", RegexOptions.IgnoreCase))
+            {
+                var modified = Regex.Replace(trimmed, @"^CREATE\s+VIEW\b", "ALTER VIEW", RegexOptions.IgnoreCase);
+                return $"USE {QUOTENAME(databaseName)};\r\nGO\r\n\r\n{modified};\r\nGO\r\n\r\nPRINT N'[BprDevKit] Operation completed successfully.';\r\nGO";
+            }
+
             var sb = new StringBuilder();
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
                 .AppendLine("GO")
@@ -1137,7 +1145,8 @@ SELECT
     s.name AS SchemaName,
     v.create_date AS CreateDate,
     v.modify_date AS ModifyDate,
-    m.definition AS ViewDefinition
+    m.definition AS ViewDefinition,
+    CAST(ISNULL(OBJECTPROPERTY(v.object_id, 'IsEncrypted'), 0) AS BIT) AS IsEncrypted
 FROM sys.views v
 INNER JOIN sys.schemas s ON v.schema_id = s.schema_id
 LEFT JOIN sys.sql_modules m ON v.object_id = m.object_id
@@ -1146,7 +1155,7 @@ WHERE s.name = {SQLLiteral(schemaName)} AND v.name = {SQLLiteral(viewName)};";
 
         public override string GenerateGetViewsScript(string databaseName)
         {
-            return $"USE {QUOTENAME(databaseName)}; SELECT v.name AS ViewName, s.name AS SchemaName FROM sys.views v INNER JOIN sys.schemas s ON v.schema_id = s.schema_id ORDER BY s.name, v.name;";
+            return $"USE {QUOTENAME(databaseName)}; SELECT v.name AS ViewName, s.name AS SchemaName, v.create_date AS CreateDate, v.modify_date AS ModifyDate, CAST(ISNULL(OBJECTPROPERTY(v.object_id, 'IsEncrypted'), 0) AS BIT) AS IsEncrypted FROM sys.views v INNER JOIN sys.schemas s ON v.schema_id = s.schema_id ORDER BY s.name, v.name;";
         }
 
         public override string GenerateTestViewScript(string databaseName, string selectStatement)
@@ -1156,23 +1165,49 @@ WHERE s.name = {SQLLiteral(schemaName)} AND v.name = {SQLLiteral(viewName)};";
         #endregion
 
         #region Stored Procedure Operations
+        private static readonly Regex AsKeywordRegex = new(@"\bAS\b", RegexOptions.IgnoreCase);
+
+        private static string InjectWithEncryptionBeforeAs(string sql)
+        {
+            if (!Regex.IsMatch(sql, @"\bWITH\s+ENCRYPTION\b", RegexOptions.IgnoreCase))
+            {
+                return AsKeywordRegex.Replace(sql, "WITH ENCRYPTION AS", 1);
+            }
+            return sql;
+        }
+
         public override string GenerateCreateProcedureScript(string databaseName, string schemaName, string procName, string body, bool withEncryption = true)
         {
+            var trimmed = body.Trim();
+            if (Regex.IsMatch(trimmed, @"^(CREATE\s+OR\s+ALTER|CREATE)\s+PROC(EDURE)?\b", RegexOptions.IgnoreCase))
+            {
+                var fullScript = withEncryption ? InjectWithEncryptionBeforeAs(trimmed) : trimmed;
+                return $"USE {QUOTENAME(databaseName)};\r\nGO\r\n\r\n{fullScript};\r\nGO\r\n\r\nPRINT N'[BprDevKit] Operation completed successfully.';\r\nGO";
+            }
+
             var sb = new StringBuilder();
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
                 .AppendLine("GO")
-                .AppendLine()
-                .Append("CREATE PROCEDURE " + QUOTENAME(schemaName) + "." + QUOTENAME(procName));
-            if (withEncryption)
-                sb.Append(" WITH ENCRYPTION");
-            sb.AppendLine(" AS");
+                .AppendLine();
 
-            // Add indentation to body
-            string indentBody = "    ";
-            string[] lines = body.Split('\n');
-            for (int i = 0; i < lines.Length; i++)
+            if (Regex.IsMatch(trimmed, @"\bAS\b", RegexOptions.IgnoreCase))
             {
-                sb.AppendLine(indentBody + lines[i]);
+                var procBody = withEncryption ? InjectWithEncryptionBeforeAs(trimmed) : trimmed;
+                sb.AppendLine($"CREATE PROCEDURE {QUOTENAME(schemaName)}.{QUOTENAME(procName)} {procBody}");
+            }
+            else
+            {
+                sb.Append("CREATE PROCEDURE " + QUOTENAME(schemaName) + "." + QUOTENAME(procName));
+                if (withEncryption)
+                    sb.Append(" WITH ENCRYPTION");
+                sb.AppendLine(" AS");
+
+                string indentBody = "    ";
+                string[] lines = body.Split('\n');
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    sb.AppendLine(indentBody + lines[i]);
+                }
             }
 
             sb.AppendLine(";")
@@ -1186,21 +1221,36 @@ WHERE s.name = {SQLLiteral(schemaName)} AND v.name = {SQLLiteral(viewName)};";
 
         public override string GenerateAlterProcedureScript(string databaseName, string schemaName, string procName, string body, bool withEncryption = true)
         {
+            var trimmed = body.Trim();
+            if (Regex.IsMatch(trimmed, @"^(CREATE\s+OR\s+ALTER|CREATE|ALTER)\s+PROC(EDURE)?\b", RegexOptions.IgnoreCase))
+            {
+                var modified = Regex.Replace(trimmed, @"^CREATE\s+PROC(EDURE)?\b", "ALTER PROCEDURE", RegexOptions.IgnoreCase);
+                return $"USE {QUOTENAME(databaseName)};\r\nGO\r\n\r\n{modified};\r\nGO\r\n\r\nPRINT N'[BprDevKit] Operation completed successfully.';\r\nGO";
+            }
+
             var sb = new StringBuilder();
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
                 .AppendLine("GO")
-                .AppendLine()
-                .Append("ALTER PROCEDURE " + QUOTENAME(schemaName) + "." + QUOTENAME(procName));
-            if (withEncryption)
-                sb.Append(" WITH ENCRYPTION");
-            sb.AppendLine(" AS");
+                .AppendLine();
 
-            // Add indentation to body
-            string indentBody = "    ";
-            string[] lines = body.Split('\n');
-            for (int i = 0; i < lines.Length; i++)
+            if (Regex.IsMatch(trimmed, @"\bAS\b", RegexOptions.IgnoreCase))
             {
-                sb.AppendLine(indentBody + lines[i]);
+                var procBody = withEncryption ? InjectWithEncryptionBeforeAs(trimmed) : trimmed;
+                sb.AppendLine($"ALTER PROCEDURE {QUOTENAME(schemaName)}.{QUOTENAME(procName)} {procBody}");
+            }
+            else
+            {
+                sb.Append("ALTER PROCEDURE " + QUOTENAME(schemaName) + "." + QUOTENAME(procName));
+                if (withEncryption)
+                    sb.Append(" WITH ENCRYPTION");
+                sb.AppendLine(" AS");
+
+                string indentBody = "    ";
+                string[] lines = body.Split('\n');
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    sb.AppendLine(indentBody + lines[i]);
+                }
             }
 
             sb.AppendLine(";")
@@ -1225,7 +1275,8 @@ SELECT
     s.name AS SchemaName,
     p.create_date AS CreateDate,
     p.modify_date AS ModifyDate,
-    m.definition AS ProcedureDefinition
+    m.definition AS ProcedureDefinition,
+    CAST(ISNULL(OBJECTPROPERTY(p.object_id, 'IsEncrypted'), 0) AS BIT) AS IsEncrypted
 FROM sys.procedures p
 INNER JOIN sys.schemas s ON p.schema_id = s.schema_id
 LEFT JOIN sys.sql_modules m ON p.object_id = m.object_id
@@ -1234,7 +1285,7 @@ WHERE s.name = {SQLLiteral(schemaName)} AND p.name = {SQLLiteral(procName)};";
 
         public override string GenerateGetProceduresScript(string databaseName)
         {
-            return $"USE {QUOTENAME(databaseName)}; SELECT p.name AS ProcedureName, s.name AS SchemaName FROM sys.procedures p INNER JOIN sys.schemas s ON p.schema_id = s.schema_id ORDER BY s.name, p.name;";
+            return $"USE {QUOTENAME(databaseName)}; SELECT p.name AS ProcedureName, s.name AS SchemaName, p.create_date AS CreateDate, p.modify_date AS ModifyDate, CAST(ISNULL(OBJECTPROPERTY(p.object_id, 'IsEncrypted'), 0) AS BIT) AS IsEncrypted FROM sys.procedures p INNER JOIN sys.schemas s ON p.schema_id = s.schema_id ORDER BY s.name, p.name;";
         }
 
         public override string GenerateTestProcedureScript(string databaseName, string procName, string body)
@@ -1246,21 +1297,36 @@ WHERE s.name = {SQLLiteral(schemaName)} AND p.name = {SQLLiteral(procName)};";
         #region Function Operations
         public override string GenerateCreateFunctionScript(string databaseName, string schemaName, string funcName, string body, bool withEncryption = true)
         {
+            var trimmed = body.Trim();
+            if (Regex.IsMatch(trimmed, @"^(CREATE\s+OR\s+ALTER|CREATE)\s+FUNCTION\b", RegexOptions.IgnoreCase))
+            {
+                var fullScript = withEncryption ? InjectWithEncryptionBeforeAs(trimmed) : trimmed;
+                return $"USE {QUOTENAME(databaseName)};\r\nGO\r\n\r\n{fullScript};\r\nGO\r\n\r\nPRINT N'[BprDevKit] Operation completed successfully.';\r\nGO";
+            }
+
             var sb = new StringBuilder();
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
                 .AppendLine("GO")
-                .AppendLine()
-                .Append("CREATE FUNCTION " + QUOTENAME(schemaName) + "." + QUOTENAME(funcName));
-            if (withEncryption)
-                sb.Append(" WITH ENCRYPTION");
-            sb.AppendLine(" AS");
+                .AppendLine();
 
-            // Add indentation to body
-            string indentBody = "    ";
-            string[] lines = body.Split('\n');
-            for (int i = 0; i < lines.Length; i++)
+            if (Regex.IsMatch(trimmed, @"\bAS\b", RegexOptions.IgnoreCase))
             {
-                sb.AppendLine(indentBody + lines[i]);
+                var funcBody = withEncryption ? InjectWithEncryptionBeforeAs(trimmed) : trimmed;
+                sb.AppendLine($"CREATE FUNCTION {QUOTENAME(schemaName)}.{QUOTENAME(funcName)} {funcBody}");
+            }
+            else
+            {
+                sb.Append("CREATE FUNCTION " + QUOTENAME(schemaName) + "." + QUOTENAME(funcName));
+                if (withEncryption)
+                    sb.Append(" WITH ENCRYPTION");
+                sb.AppendLine(" AS");
+
+                string indentBody = "    ";
+                string[] lines = body.Split('\n');
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    sb.AppendLine(indentBody + lines[i]);
+                }
             }
 
             sb.AppendLine(";")
@@ -1274,21 +1340,36 @@ WHERE s.name = {SQLLiteral(schemaName)} AND p.name = {SQLLiteral(procName)};";
 
         public override string GenerateAlterFunctionScript(string databaseName, string schemaName, string funcName, string body, bool withEncryption = true)
         {
+            var trimmed = body.Trim();
+            if (Regex.IsMatch(trimmed, @"^(CREATE\s+OR\s+ALTER|CREATE|ALTER)\s+FUNCTION\b", RegexOptions.IgnoreCase))
+            {
+                var modified = Regex.Replace(trimmed, @"^CREATE\s+FUNCTION\b", "ALTER FUNCTION", RegexOptions.IgnoreCase);
+                return $"USE {QUOTENAME(databaseName)};\r\nGO\r\n\r\n{modified};\r\nGO\r\n\r\nPRINT N'[BprDevKit] Operation completed successfully.';\r\nGO";
+            }
+
             var sb = new StringBuilder();
             sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
                 .AppendLine("GO")
-                .AppendLine()
-                .Append("ALTER FUNCTION " + QUOTENAME(schemaName) + "." + QUOTENAME(funcName));
-            if (withEncryption)
-                sb.Append(" WITH ENCRYPTION");
-            sb.AppendLine(" AS");
+                .AppendLine();
 
-            // Add indentation to body
-            string indentBody = "    ";
-            string[] lines = body.Split('\n');
-            for (int i = 0; i < lines.Length; i++)
+            if (Regex.IsMatch(trimmed, @"\bAS\b", RegexOptions.IgnoreCase))
             {
-                sb.AppendLine(indentBody + lines[i]);
+                var funcBody = withEncryption ? InjectWithEncryptionBeforeAs(trimmed) : trimmed;
+                sb.AppendLine($"ALTER FUNCTION {QUOTENAME(schemaName)}.{QUOTENAME(funcName)} {funcBody}");
+            }
+            else
+            {
+                sb.Append("ALTER FUNCTION " + QUOTENAME(schemaName) + "." + QUOTENAME(funcName));
+                if (withEncryption)
+                    sb.Append(" WITH ENCRYPTION");
+                sb.AppendLine(" AS");
+
+                string indentBody = "    ";
+                string[] lines = body.Split('\n');
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    sb.AppendLine(indentBody + lines[i]);
+                }
             }
 
             sb.AppendLine(";")
@@ -1311,18 +1392,20 @@ WHERE s.name = {SQLLiteral(schemaName)} AND p.name = {SQLLiteral(procName)};";
 SELECT
     f.name AS FunctionName,
     s.name AS SchemaName,
+    f.type AS FunctionType,
     f.create_date AS CreateDate,
     f.modify_date AS ModifyDate,
-    m.definition AS FunctionDefinition
+    m.definition AS FunctionDefinition,
+    CAST(ISNULL(OBJECTPROPERTY(f.object_id, 'IsEncrypted'), 0) AS BIT) AS IsEncrypted
 FROM sys.objects f
 INNER JOIN sys.schemas s ON f.schema_id = s.schema_id
 LEFT JOIN sys.sql_modules m ON f.object_id = m.object_id
-WHERE s.name = {SQLLiteral(schemaName)} AND f.name = {SQLLiteral(funcName)} AND f.type = 'FN';";
+WHERE s.name = {SQLLiteral(schemaName)} AND f.name = {SQLLiteral(funcName)} AND f.type IN ('FN', 'IF', 'TF', 'FS', 'FT');";
         }
 
         public override string GenerateGetFunctionsScript(string databaseName)
         {
-            return $"USE {QUOTENAME(databaseName)}; SELECT f.name AS FunctionName, s.name AS SchemaName FROM sys.objects f INNER JOIN sys.schemas s ON f.schema_id = s.schema_id WHERE f.type = 'FN' ORDER BY s.name, f.name;";
+            return $"USE {QUOTENAME(databaseName)}; SELECT f.name AS FunctionName, s.name AS SchemaName, f.type AS FunctionType, f.create_date AS CreateDate, f.modify_date AS ModifyDate, CAST(ISNULL(OBJECTPROPERTY(f.object_id, 'IsEncrypted'), 0) AS BIT) AS IsEncrypted FROM sys.objects f INNER JOIN sys.schemas s ON f.schema_id = s.schema_id WHERE f.type IN ('FN', 'IF', 'TF', 'FS', 'FT') ORDER BY s.name, f.name;";
         }
 
         public override string GenerateTestFunctionScript(string databaseName, string funcName, string body)

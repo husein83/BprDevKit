@@ -40,22 +40,22 @@
 
                     <div class="tab-content mt-3" id="managementTabContent">
                         <div class="tab-pane fade show active" id="databases-tab-pane" role="tabpanel">
-                            <DatabaseManagementTab />
+                            <DatabaseManagementTab ServerConfig="DatabaseConfig" />
                         </div>
                         <div class="tab-pane fade" id="tables-tab-pane" role="tabpanel">
-                            <TableManagementTab />
+                            <TableManagementTab ServerConfig="DatabaseConfig" />
                         </div>
                         <div class="tab-pane fade" id="schemas-tab-pane" role="tabpanel">
-                            <SchemaManagementTab />
+                            <SchemaManagementTab ServerConfig="DatabaseConfig" />
                         </div>
                         <div class="tab-pane fade" id="views-tab-pane" role="tabpanel">
-                            <ViewManagementTab />
+                            <ViewManagementTab ServerConfig="DatabaseConfig" />
                         </div>
                         <div class="tab-pane fade" id="procedures-tab-pane" role="tabpanel">
-                            <StoredProcedureManagementTab />
+                            <StoredProcedureManagementTab ServerConfig="DatabaseConfig" />
                         </div>
                         <div class="tab-pane fade" id="functions-tab-pane" role="tabpanel">
-                            <FunctionManagementTab />
+                            <FunctionManagementTab ServerConfig="DatabaseConfig" />
                         </div>
                     </div>
                 </div>

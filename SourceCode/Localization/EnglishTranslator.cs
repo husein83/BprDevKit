@@ -138,6 +138,17 @@ namespace BprDevKit.Localization
             [TranslationKeys.PersianFont] = "Persian Font Family",
             [TranslationKeys.EnglishFont] = "English Font Family",
             [TranslationKeys.FontSettingsHelp] = "Fonts are loaded per language. Custom files (e.g. AppFontFa.ttf, AppFontEn.ttf, or AppFont.ttf) in wwwroot/fonts are loaded automatically.",
+            [TranslationKeys.ServerAdvancedSettings] = "Advanced Connection Settings",
+            [TranslationKeys.ServerPooling] = "Connection Pooling",
+            [TranslationKeys.ServerMinPoolSize] = "Min Pool Size",
+            [TranslationKeys.ServerMaxPoolSize] = "Max Pool Size",
+            [TranslationKeys.ServerEncryptConnection] = "Encrypt Connection (SSL/TLS)",
+            [TranslationKeys.ServerApplicationName] = "Application Name",
+            [TranslationKeys.ServerTestingConnection] = "Testing Connection...",
+            [TranslationKeys.ServerTestConnectionSuccess] = "Connection established successfully! Latency: {0} ms",
+            [TranslationKeys.ServerTestConnectionFailed] = "Connection failed: {0}",
+            [TranslationKeys.ServerLatency] = "Latency",
+            [TranslationKeys.ServerVersion] = "Server Version",
 
             // Home Page
             [TranslationKeys.HomeEyebrow] = "BprDevKit workspace",
@@ -332,7 +343,66 @@ namespace BprDevKit.Localization
             [TranslationKeys.FkPanelOutgoing] = "Outgoing",
             [TranslationKeys.FkPanelIncoming] = "Incoming",
             [TranslationKeys.FkPanelEnable] = "Enable",
-            [TranslationKeys.FkPanelDisable] = "Disable"
+            [TranslationKeys.FkPanelDisable] = "Disable",
+
+            // View Management Tab
+            [TranslationKeys.ViewTabSubtitle] = "Create, inspect, test, alter and drop database views.",
+            [TranslationKeys.ViewTabCreateView] = "Create view",
+            [TranslationKeys.ViewTabSelectDbToManage] = "Select a database to manage its views.",
+            [TranslationKeys.ViewTabLoadingViews] = "Loading views…",
+            [TranslationKeys.ViewTabNoViewsFound] = "No views were found in this database.",
+            [TranslationKeys.ViewTabNoMatchFilter] = "No view matches the current filter.",
+            [TranslationKeys.ViewTabDefinition] = "SQL Definition (SELECT ...)",
+            [TranslationKeys.ViewTabWithEncryption] = "WITH ENCRYPTION",
+            [TranslationKeys.ViewTabTestQuery] = "Test Query",
+            [TranslationKeys.ViewTabEditTitle] = "Edit view {0}",
+            [TranslationKeys.ViewTabDropTitle] = "Drop view {0}",
+            [TranslationKeys.ViewTabDropConfirm] = "Are you sure you want to drop view {0}? This action cannot be undone.",
+            [TranslationKeys.ViewTabTesting] = "Testing query…",
+            [TranslationKeys.ViewTabTestResults] = "Test results",
+
+            // Stored Procedure Management Tab
+            [TranslationKeys.ProcTabSubtitle] = "Create, inspect, alter and drop stored procedures.",
+            [TranslationKeys.ProcTabCreateProc] = "Create stored procedure",
+            [TranslationKeys.ProcTabSelectDbToManage] = "Select a database to manage its stored procedures.",
+            [TranslationKeys.ProcTabLoadingProcs] = "Loading stored procedures…",
+            [TranslationKeys.ProcTabNoProcsFound] = "No stored procedures were found in this database.",
+            [TranslationKeys.ProcTabNoMatchFilter] = "No stored procedure matches the current filter.",
+            [TranslationKeys.ProcTabBody] = "Procedure Body",
+            [TranslationKeys.ProcTabWithEncryption] = "WITH ENCRYPTION",
+            [TranslationKeys.ProcTabEditTitle] = "Edit stored procedure {0}",
+            [TranslationKeys.ProcTabDropTitle] = "Drop stored procedure {0}",
+            [TranslationKeys.ProcTabDropConfirm] = "Are you sure you want to drop stored procedure {0}? This action cannot be undone.",
+
+            // Function Management Tab
+            [TranslationKeys.FuncTabSubtitle] = "Create, inspect, alter and drop user-defined functions.",
+            [TranslationKeys.FuncTabCreateFunc] = "Create function",
+            [TranslationKeys.FuncTabSelectDbToManage] = "Select a database to manage its functions.",
+            [TranslationKeys.FuncTabLoadingFuncs] = "Loading functions…",
+            [TranslationKeys.FuncTabNoFuncsFound] = "No functions were found in this database.",
+            [TranslationKeys.FuncTabNoMatchFilter] = "No function matches the current filter.",
+            [TranslationKeys.FuncTabBody] = "Function Body",
+            [TranslationKeys.FuncTabWithEncryption] = "WITH ENCRYPTION",
+            [TranslationKeys.FuncTabEditTitle] = "Edit function {0}",
+            [TranslationKeys.FuncTabDropTitle] = "Drop function {0}",
+            [TranslationKeys.FuncTabDropConfirm] = "Are you sure you want to drop function {0}? This action cannot be undone.",
+
+            // Decryption & Encryption
+            [TranslationKeys.CommonEncrypted] = "Encrypted",
+            [TranslationKeys.CommonDecrypted] = "Decrypted",
+            [TranslationKeys.CommonEncryptedNotice] = "This object is encrypted with 'WITH ENCRYPTION'. Its definition cannot be viewed directly via sys.sql_modules. Use 1-Click Decrypt below to recover the original source code.",
+            [TranslationKeys.CommonDecryptObject] = "Decrypt Script",
+            [TranslationKeys.CommonDecrypting] = "Decrypting script via DAC…",
+            [TranslationKeys.CommonDecryptedSuccess] = "Script successfully decrypted!",
+            [TranslationKeys.CommonDecryptionFailed] = "Failed to decrypt object: {0}",
+            [TranslationKeys.CommonDacRequiredPrompt] = "Dedicated Administrator Connection (DAC) is required to inspect encrypted internal metadata. Remote admin connections may be disabled on this SQL Server instance.",
+            [TranslationKeys.CommonEnableRemoteDac] = "Enable Remote DAC",
+            [TranslationKeys.CommonEnablingRemoteDac] = "Enabling Remote DAC on SQL Server…",
+            [TranslationKeys.CommonRemoteDacEnabled] = "Remote DAC enabled successfully! You can now decrypt the script.",
+            [TranslationKeys.CommonCannotSaveEncryptedEmpty] = "Cannot save an empty definition for an encrypted object.",
+            [TranslationKeys.CommonType] = "Type",
+            [TranslationKeys.CommonCopy] = "Copy Script",
+            [TranslationKeys.CommonCopied] = "Copied!"
         };
 
         public string this[string key]
