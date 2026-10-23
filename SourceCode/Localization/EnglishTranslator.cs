@@ -168,8 +168,8 @@ namespace BprDevKit.Localization
             [TranslationKeys.DbNoServersWarning] = "No server configuration is available. Create one in Settings first.",
             [TranslationKeys.DbSelectServerToBegin] = "Select a server to begin",
             [TranslationKeys.DbTabsUnavailableNotice] = "Database tabs are unavailable until a server configuration is selected.",
-            [TranslationKeys.DbAreaUnderDevelopment] = "{0} is next",
-            [TranslationKeys.DbAreaUnderDevelopmentDesc] = "The selected server is preserved; this area will be implemented in the next phase.",
+            [TranslationKeys.DbAreaUnderDevelopment] = "{0} is under development",
+            [TranslationKeys.DbAreaUnderDevelopmentDesc] = "The selected server is preserved; this area is currently under development.",
 
             // Database Management Tab
             [TranslationKeys.DbTabSubtitle] = "Create, update, inspect, and remove databases on the selected server.",
@@ -437,7 +437,30 @@ namespace BprDevKit.Localization
             [TranslationKeys.TriggerTabConfirmDrop] = "Are you sure you want to drop trigger '{0}'?",
             [TranslationKeys.TriggerTabBody] = "Trigger Body",
             [TranslationKeys.TriggerTabWithEncryption] = "Encrypt trigger (WITH ENCRYPTION)",
-            [TranslationKeys.TriggerTabDropTitle] = "Drop Trigger"
+            [TranslationKeys.TriggerTabDropTitle] = "Drop Trigger",
+
+            // Logs & Audit
+            [TranslationKeys.Logs] = "Logs & Audit",
+            [TranslationKeys.LogsTitle] = "System Logs & Audit Trail",
+            [TranslationKeys.LogsSubtitle] = "Real-time query execution monitoring, diagnostic logs, and activity audit",
+            [TranslationKeys.LogsLiveStream] = "Live Stream",
+            [TranslationKeys.LogsAutoScroll] = "Auto-scroll",
+            [TranslationKeys.LogsPause] = "Pause",
+            [TranslationKeys.LogsResume] = "Resume",
+            [TranslationKeys.LogsClear] = "Clear Buffer",
+            [TranslationKeys.LogsOpenFolder] = "Open Log Folder",
+            [TranslationKeys.LogsAllLevels] = "All Levels",
+            [TranslationKeys.LogsLevel] = "Level",
+            [TranslationKeys.LogsSource] = "Source",
+            [TranslationKeys.LogsMessage] = "Message",
+            [TranslationKeys.LogsTime] = "Time",
+            [TranslationKeys.LogsServer] = "Server",
+            [TranslationKeys.LogsDatabase] = "Database",
+            [TranslationKeys.LogsDuration] = "Duration",
+            [TranslationKeys.LogsDetails] = "Log Details",
+            [TranslationKeys.LogsNoLogs] = "No log entries captured yet.",
+            [TranslationKeys.LogsTotalCount] = "Total Entries",
+            [TranslationKeys.LogsExport] = "Export Logs"
         };
 
         public string this[string key]

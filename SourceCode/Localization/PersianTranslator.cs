@@ -168,8 +168,8 @@ namespace BprDevKit.Localization
             [TranslationKeys.DbNoServersWarning] = "هیچ تنظیمات سروری یافت نشد. ابتدا یک سرور در تنظیمات ایجاد کنید.",
             [TranslationKeys.DbSelectServerToBegin] = "برای شروع یک سرور انتخاب کنید",
             [TranslationKeys.DbTabsUnavailableNotice] = "تب‌های پایگاه داده تا زمان انتخاب یک سرور در دسترس نیستند.",
-            [TranslationKeys.DbAreaUnderDevelopment] = "بخش {0} در مرحله بعدی توسعه است",
-            [TranslationKeys.DbAreaUnderDevelopmentDesc] = "سرور انتخاب‌شده حفظ شده است؛ این بخش در فاز بعدی پیاده‌سازی خواهد شد.",
+            [TranslationKeys.DbAreaUnderDevelopment] = "بخش {0} در حال توسعه است",
+            [TranslationKeys.DbAreaUnderDevelopmentDesc] = "سرور انتخاب‌شده حفظ شده است؛ این بخش در حال توسعه می‌باشد.",
 
             // Database Management Tab
             [TranslationKeys.DbTabSubtitle] = "ایجاد، ویرایش، بررسی و حذف پایگاه‌های داده در سرور انتخابی.",
@@ -438,7 +438,30 @@ namespace BprDevKit.Localization
             [TranslationKeys.TriggerTabConfirmDrop] = "آیا از حذف تریگر '{0}' اطمینان دارید؟",
             [TranslationKeys.TriggerTabBody] = "بدنه تریگر",
             [TranslationKeys.TriggerTabWithEncryption] = "رمزنگاری تریگر (WITH ENCRYPTION)",
-            [TranslationKeys.TriggerTabDropTitle] = "حذف تریگر"
+            [TranslationKeys.TriggerTabDropTitle] = "حذف تریگر",
+
+            // Logs & Audit
+            [TranslationKeys.Logs] = "لاگ‌ها و ردگیری",
+            [TranslationKeys.LogsTitle] = "لاگ‌های سیستم و ردگیری رویدادها",
+            [TranslationKeys.LogsSubtitle] = "مانیتورینگ بلادرنگ اجرای کوئری‌ها، خطایابی و گزارش ممیزی سیستم",
+            [TranslationKeys.LogsLiveStream] = "جریان زنده",
+            [TranslationKeys.LogsAutoScroll] = "پیمایش خودکار",
+            [TranslationKeys.LogsPause] = "توقف موقت",
+            [TranslationKeys.LogsResume] = "ادامه جریان",
+            [TranslationKeys.LogsClear] = "پاکسازی بافر",
+            [TranslationKeys.LogsOpenFolder] = "پوشه لاگ‌ها",
+            [TranslationKeys.LogsAllLevels] = "همه سطوح",
+            [TranslationKeys.LogsLevel] = "سطح",
+            [TranslationKeys.LogsSource] = "منبع",
+            [TranslationKeys.LogsMessage] = "پیام",
+            [TranslationKeys.LogsTime] = "زمان",
+            [TranslationKeys.LogsServer] = "سرور",
+            [TranslationKeys.LogsDatabase] = "دیتابیس",
+            [TranslationKeys.LogsDuration] = "مدت زمان",
+            [TranslationKeys.LogsDetails] = "جزئیات لاگ",
+            [TranslationKeys.LogsNoLogs] = "تاکنون هیچ لاگی در سیستم ثبت نشده است.",
+            [TranslationKeys.LogsTotalCount] = "تعداد کل رکوردها",
+            [TranslationKeys.LogsExport] = "خروجی لاگ‌ها"
         };
 
         public string this[string key]

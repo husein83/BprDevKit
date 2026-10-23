@@ -42,14 +42,7 @@
             </div>
         </div>
     </div>
-
-    @if (!string.IsNullOrWhiteSpace(_message))
-    {
-        <div class="schema-alert alert @_messageClass alert-dismissible fade show" role="alert">
-            <i class="bi @_messageIcon me-2"></i>@_message
-            <button class="btn-close" type="button" @onclick="ClearMessage"></button>
-        </div>
-    }
+    <BprAlert Message="@_bprMessage" OnDismiss="ClearMessage" CssClass="schema-alert mb-4" />
 
     @if (_showCreateForm)
     {
@@ -268,9 +261,7 @@
     private bool _isLoadingSchemas;
     private bool _isLoadingObjects;
     private bool _isSaving;
-    private string? _message;
-    private string _messageClass = "alert-info";
-    private string _messageIcon = "bi-info-circle-fill";
+    private BprMessage? _bprMessage;
 
     private bool HasDatabase => !string.IsNullOrWhiteSpace(_selectedDatabase);
     private bool IsRenameRequested => !string.IsNullOrWhiteSpace(_editNewName) && !string.Equals(_editNewName.Trim(), _dialogSchemaName, StringComparison.Ordinal);
@@ -524,19 +515,8 @@
             : _owners.Prepend(_editOriginalOwner);
     }
 
-    private void ShowResult(OperationResult result)
-    {
-        _message = result.Message;
-        _messageClass = result.Success ? "alert-success" : "alert-danger";
-        _messageIcon = result.Success ? "bi-check-circle-fill" : "bi-x-octagon-fill";
-    }
-
-    private void ShowError(string message)
-    {
-        _message = message;
-        _messageClass = "alert-danger";
-        _messageIcon = "bi-x-octagon-fill";
-    }
-
-    private void ClearMessage() => _message = null;
+    private void ShowResult(OperationResult result) => _bprMessage = result;
+    private void ShowError(string message) => _bprMessage = BprMessage.Error(message);
+    private void ShowMessage(BprMessage message) => _bprMessage = message;
+    private void ClearMessage() => _bprMessage = null;
 }

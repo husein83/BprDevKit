@@ -38,8 +38,8 @@
 
             @if (_bprMessage != null && !string.IsNullOrWhiteSpace(_bprMessage.Message))
             {
-                <div class="settings-alert alert @GetAlertClass(_bprMessage.MessageType) alert-dismissible fade show mb-4" role="alert">
-                    <i class="bi @GetAlertIcon(_bprMessage.MessageType) me-2"></i> @_bprMessage.Message
+                <div class="settings-alert alert @_bprMessage.AlertCssClass alert-dismissible fade show mb-4" role="alert">
+                    <i class="bi @_bprMessage.IconCssClass me-2"></i> @_bprMessage.Message
                     <button type="button" class="btn-close" @onclick="ClearMessage"></button>
                 </div>
             }
@@ -561,26 +561,6 @@
         StateHasChanged();
     }
 
-    private string GetAlertClass(MessageType type) => type switch
-    {
-        MessageType.Success => "alert-success",
-        MessageType.Error => "alert-danger",
-        MessageType.Warning => "alert-warning",
-        MessageType.Information => "alert-info",
-        MessageType.YesOrNo => "alert-primary",
-        _ => "alert-info"
-    };
-
-    private string GetAlertIcon(MessageType type) => type switch
-    {
-        MessageType.Success => "bi-check-circle-fill",
-        MessageType.Error => "bi-exclamation-octagon-fill",
-        MessageType.Warning => "bi-exclamation-triangle-fill",
-        MessageType.Information => "bi-info-circle-fill",
-        MessageType.YesOrNo => "bi-question-circle-fill",
-        _ => "bi-info-circle-fill"
-    };
-
     private void ClearMessage()
     {
         _bprMessage = null;
@@ -599,7 +579,7 @@
         }
         catch (Exception ex)
         {
-            _bprMessage = new BprMessage($"Error loading configurations: {ex.Message}", MessageType.Error);
+            _bprMessage = BprMessage.Error($"Error loading configurations: {ex.Message}");
         }
     }
 
@@ -718,7 +698,7 @@
         {
             if (string.IsNullOrWhiteSpace(_currentConfig.Server.ServerName))
             {
-                _bprMessage = new BprMessage("Server name/IP is required.", MessageType.Warning);
+                _bprMessage = BprMessage.Warning("Server name/IP is required.");
                 return;
             }
 
@@ -735,7 +715,7 @@
             ServerConfiguration.SaveChanges(_currentConfig);
 
             string serverTitle = string.IsNullOrWhiteSpace(_currentConfig.Server.Alias) ? _currentConfig.Server.ServerName : $"{_currentConfig.Server.Alias} ({_currentConfig.Server.ServerName})";
-            _bprMessage = new BprMessage($"Configuration for {serverTitle} saved successfully", MessageType.Success);
+            _bprMessage = BprMessage.Success($"Configuration for {serverTitle} saved successfully");
             _showAddForm = false;
             _isEditMode = false;
             LoadSavedServers();
@@ -743,7 +723,7 @@
         }
         catch (Exception ex)
         {
-            _bprMessage = new BprMessage($"Error saving configuration: {ex.Message}", MessageType.Error);
+            _bprMessage = BprMessage.Error($"Error saving configuration: {ex.Message}");
         }
     }
 
@@ -753,13 +733,13 @@
         {
             TranslationFactory.SetLanguage(_appConfig.Language);
             ApplicationConfiguration.SaveChanges(_appConfig);
-            _bprMessage = new BprMessage("Application configuration saved successfully", MessageType.Success);
+            _bprMessage = BprMessage.Success("Application configuration saved successfully");
             _showAppAddForm = false;
             NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
         }
         catch (Exception ex)
         {
-            _bprMessage = new BprMessage($"Error saving application configuration: {ex.Message}", MessageType.Error);
+            _bprMessage = BprMessage.Error($"Error saving application configuration: {ex.Message}");
         }
     }
 
@@ -775,19 +755,19 @@
         {
             if (config.HasAny() && config.Id.HasValue && ServerConfiguration.TryDeleteServerById(config.Id.Value))
             {
-                _bprMessage = new BprMessage($"Server configuration '{config.Server.ServerName}' deleted successfully.", MessageType.Success);
+                _bprMessage = BprMessage.Success($"Server configuration '{config.Server.ServerName}' deleted successfully.");
                 LoadSavedServers();
             }
             else
             {
-                _bprMessage = new BprMessage("Server configuration not found.");
+                _bprMessage = BprMessage.Warning("Server configuration not found.");
             }
 
             StateHasChanged();
         }
         catch (Exception ex)
         {
-            _bprMessage = new BprMessage($"Error deleting server configuration: {ex.Message}", MessageType.Error);
+            _bprMessage = BprMessage.Error($"Error deleting server configuration: {ex.Message}");
             StateHasChanged();
         }
     }

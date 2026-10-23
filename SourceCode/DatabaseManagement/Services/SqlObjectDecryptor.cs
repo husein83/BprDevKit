@@ -56,10 +56,12 @@ namespace BprDevKit.DatabaseManagement.Services
     public class SqlObjectDecryptor : ISqlObjectDecryptor
     {
         private readonly IDatabaseConnectionFactory _connectionFactory;
+        private readonly BprDevKit.Utility.Logging.IBprLogger _logger;
 
-        public SqlObjectDecryptor(IDatabaseConnectionFactory? connectionFactory = null)
+        public SqlObjectDecryptor(IDatabaseConnectionFactory? connectionFactory = null, BprDevKit.Utility.Logging.IBprLogger? logger = null)
         {
             _connectionFactory = connectionFactory ?? new DatabaseConnectionFactory();
+            _logger = logger ?? BprDevKit.Utility.Logging.BprLogger.Instance;
         }
 
         public async Task<DecryptionResult> DecryptObjectAsync(
@@ -89,6 +91,8 @@ namespace BprDevKit.DatabaseManagement.Services
 
             bool wasRemoteDacInitiallyDisabled = false;
             SqlConnection? dacConnection = null;
+
+            _logger.LogInformation("SqlDecryptor", $"Starting decryption for [{schemaName}].[{objectName}] ({objectType}) in [{databaseName}]...", serverName: config.Server.ServerName, databaseName: databaseName);
 
             try
             {
@@ -215,6 +219,8 @@ WHERE o.schema_id = SCHEMA_ID(@schemaName) AND o.name = @objectName;";
                 // 7. Post-process and normalize decrypted definition
                 string cleanDefinition = NormalizeDecryptedDefinition(decryptedSql, schemaName, objectName, resolvedType);
 
+                _logger.LogInformation("SqlDecryptor", $"Successfully decrypted [{schemaName}].[{objectName}]", serverName: config.Server.ServerName, databaseName: databaseName);
+
                 return new DecryptionResult
                 {
                     Success = true,
@@ -224,6 +230,8 @@ WHERE o.schema_id = SCHEMA_ID(@schemaName) AND o.name = @objectName;";
             }
             catch (Exception ex)
             {
+                _logger.LogError("SqlDecryptor", $"Decryption failed for [{schemaName}].[{objectName}]: {ex.Message}", ex, serverName: config.Server.ServerName, databaseName: databaseName);
+
                 return new DecryptionResult
                 {
                     Success = false,

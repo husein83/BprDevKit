@@ -15,7 +15,7 @@
     <button class="btn btn-sm btn-primary" type="button" @onclick="OpenAdd" disabled="@_isSaving"><i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.ColPanelAddColumn]</button>
 </div>
 
-<StatusAlert Message="@_message" Success="@_messageSuccess" OnDismiss="ClearMessage" />
+<BprAlert Message="@_bprMessage" OnDismiss="ClearMessage" />
 
 @if (_mode == PanelMode.Add || _mode == PanelMode.Edit)
 {
@@ -175,8 +175,7 @@
     private string _formDescription = string.Empty;
     private string _dropConfirmation = string.Empty;
     private bool _isSaving;
-    private string? _message;
-    private bool _messageSuccess;
+    private BprMessage? _bprMessage;
 
     private bool HasIdentityColumn => Table.Columns.Any(column => column.IsIdentity);
     private bool IsComputed => _original is not null && !string.IsNullOrWhiteSpace(_original.ComputedFormula);
@@ -319,13 +318,8 @@
         await OnChanged.InvokeAsync(result);
     }
 
-    private void ShowResult(OperationResult result)
-    {
-        _message = result.Message;
-        _messageSuccess = result.Success;
-    }
-
-    private void ClearMessage() => _message = null;
+    private void ShowResult(OperationResult result) => _bprMessage = result;
+    private void ClearMessage() => _bprMessage = null;
 
     /// <summary>SQL Server stores a default as "((0))" or "(getdate())"; the editor shows the expression without the outer pair.</summary>
     private static string StripOuterParentheses(string? definition)

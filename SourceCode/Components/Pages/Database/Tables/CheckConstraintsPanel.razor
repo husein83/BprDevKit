@@ -15,7 +15,7 @@
     <button class="btn btn-sm btn-primary" type="button" @onclick="OpenCreate" disabled="@_isSaving"><i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.CheckConstraintsCreate]</button>
 </div>
 
-<StatusAlert Message="@_message" Success="@_messageSuccess" OnDismiss="ClearMessage" />
+<BprAlert Message="@_bprMessage" OnDismiss="ClearMessage" />
 
 @if (_mode == PanelMode.Create)
 {
@@ -167,8 +167,7 @@ else
     private bool _autoGenerateName = true;
     private string _customConstraintName = string.Empty;
     private bool _isSaving;
-    private string? _message;
-    private bool _messageSuccess;
+    private BprMessage? _bprMessage;
 
     private bool CanCreate => !string.IsNullOrWhiteSpace(_form.CheckExpression);
 
@@ -261,17 +260,11 @@ else
         }
         catch (Exception exception)
         {
-            _message = $"Unable to complete the operation: {exception.Message}";
-            _messageSuccess = false;
+            _bprMessage = BprMessage.Error($"Unable to complete the operation: {exception.Message}");
         }
         finally { _isSaving = false; }
     }
 
-    private void ShowResult(OperationResult result)
-    {
-        _message = result.Message;
-        _messageSuccess = result.Success;
-    }
-
-    private void ClearMessage() => _message = null;
+    private void ShowResult(OperationResult result) => _bprMessage = result;
+    private void ClearMessage() => _bprMessage = null;
 }

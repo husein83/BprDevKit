@@ -429,5 +429,28 @@ namespace BprDevKit.Localization
         public const string TriggerTabBody = "TriggerTab.Body";
         public const string TriggerTabWithEncryption = "TriggerTab.WithEncryption";
         public const string TriggerTabDropTitle = "TriggerTab.DropTitle";
+
+        // Logs & Audit
+        public const string Logs = "Nav.Logs";
+        public const string LogsTitle = "Logs.Title";
+        public const string LogsSubtitle = "Logs.Subtitle";
+        public const string LogsLiveStream = "Logs.LiveStream";
+        public const string LogsAutoScroll = "Logs.AutoScroll";
+        public const string LogsPause = "Logs.Pause";
+        public const string LogsResume = "Logs.Resume";
+        public const string LogsClear = "Logs.Clear";
+        public const string LogsOpenFolder = "Logs.OpenFolder";
+        public const string LogsAllLevels = "Logs.AllLevels";
+        public const string LogsLevel = "Logs.Level";
+        public const string LogsSource = "Logs.Source";
+        public const string LogsMessage = "Logs.Message";
+        public const string LogsTime = "Logs.Time";
+        public const string LogsServer = "Logs.Server";
+        public const string LogsDatabase = "Logs.Database";
+        public const string LogsDuration = "Logs.Duration";
+        public const string LogsDetails = "Logs.Details";
+        public const string LogsNoLogs = "Logs.NoLogs";
+        public const string LogsTotalCount = "Logs.TotalCount";
+        public const string LogsExport = "Logs.Export";
     }
 }

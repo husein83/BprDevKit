@@ -67,7 +67,7 @@
         </div>
     </div>
 
-    <StatusAlert Message="@_message" Success="@_messageSuccess" OnDismiss="ClearMessage" />
+    <BprAlert Message="@_bprMessage" OnDismiss="ClearMessage" CssClass="mb-4" />
 
     @if (string.IsNullOrWhiteSpace(_selectedDatabase))
     {
@@ -163,6 +163,7 @@
                         <button type="button" class="btn-close" @onclick="CloseModals"></button>
                     </div>
                     <div class="modal-body">
+                        <BprAlert Message="@_modalBprMessage" OnDismiss="() => _modalBprMessage = null" CssClass="py-2 px-3 mb-3 small" />
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label small fw-semibold" for="new-func-schema">@t[TranslationKeys.SchemaName]</label>
@@ -251,14 +252,8 @@
                         </div>
                     </div>
                     <div class="modal-body">
-                        @if (!string.IsNullOrEmpty(_modalMessage))
-                        {
-                            <div class="alert @(_modalMessageSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show py-2 px-3 mb-3 small" role="alert">
-                                <i class="bi @(_modalMessageSuccess ? "bi-check-circle-fill text-success" : "bi-exclamation-triangle-fill text-danger") me-2"></i>
-                                <span>@_modalMessage</span>
-                                <button type="button" class="btn-close py-2" @onclick="() => _modalMessage = null"></button>
-                            </div>
-                        }
+                        <BprAlert Message="@_modalBprMessage" OnDismiss="() => _modalBprMessage = null" CssClass="py-2 px-3 mb-3 small" />
+
 
                         @if (_isLoadingDefinition)
                         {
@@ -405,10 +400,8 @@
     private bool _isDecrypted;
     private bool _isDacRequired;
     private bool _isEnablingDac;
-    private string? _message;
-    private bool _messageSuccess;
-    private string? _modalMessage;
-    private bool _modalMessageSuccess;
+    private BprMessage? _bprMessage;
+    private BprMessage? _modalBprMessage;
 
     private bool _showCreateModal;
     private bool _showDefinitionModal;
@@ -464,8 +457,7 @@
         }
         catch (Exception ex)
         {
-            _message = ex.Message;
-            _messageSuccess = false;
+            _bprMessage = BprMessage.Error(ex.Message);
         }
         finally
         {
@@ -507,8 +499,7 @@
         }
         catch (Exception ex)
         {
-            _message = ex.Message;
-            _messageSuccess = false;
+            _bprMessage = BprMessage.Error(ex.Message);
         }
         finally
         {
@@ -528,6 +519,7 @@
             Body = "(@param1 INT)\nRETURNS INT\nAS\nBEGIN\n    RETURN @param1 * 2;\nEND",
             WithEncryption = false
         };
+        _modalBprMessage = null;
         _showCreateModal = true;
     }
 
@@ -539,12 +531,16 @@
         {
             _createModel.DatabaseName = _selectedDatabase;
             var result = await _manager.CreateFunction(_createModel);
-            ShowMessage(result);
             if (result.Success)
             {
+                ShowMessage(result);
                 CloseModals();
                 await LoadSchemasAndFunctions();
                 await OnOperationComplete.InvokeAsync(result.Message);
+            }
+            else
+            {
+                _modalBprMessage = result;
             }
         }
         finally
@@ -561,8 +557,7 @@
         _showDefinitionModal = true;
         _editDefinition = string.Empty;
         _isDecrypted = false;
-        _isDacRequired = false;
-        _modalMessage = null;
+        _modalBprMessage = null;
         _isCopied = false;
 
         try
@@ -589,7 +584,7 @@
         if (_manager is null || _selectedFunction is null) return;
         _isDecrypting = true;
         _isDacRequired = false;
-        _modalMessage = null;
+        _modalBprMessage = null;
         try
         {
             var result = await _manager.DecryptFunction(_selectedDatabase, _selectedFunction.SchemaName, _selectedFunction.FunctionName, _selectedFunction.FunctionType);
@@ -598,9 +593,8 @@
                 _editDefinition = result.DecryptedDefinition;
                 _isDecrypted = true;
                 _isDacRequired = false;
-                _modalMessage = t[TranslationKeys.CommonDecryptedSuccess];
-                _modalMessageSuccess = true;
-                ShowMessage(OperationResult.SuccessResult(t[TranslationKeys.CommonDecryptedSuccess]));
+                _modalBprMessage = BprMessage.Success(t[TranslationKeys.CommonDecryptedSuccess]);
+                ShowMessage(_modalBprMessage);
             }
             else
             {
@@ -608,9 +602,8 @@
                 {
                     _isDacRequired = true;
                 }
-                _modalMessage = t.Get(TranslationKeys.CommonDecryptionFailed, result.Message);
-                _modalMessageSuccess = false;
-                ShowMessage(OperationResult.ErrorResult(t.Get(TranslationKeys.CommonDecryptionFailed, result.Message)));
+                _modalBprMessage = BprMessage.Error(t.Get(TranslationKeys.CommonDecryptionFailed, result.Message));
+                ShowMessage(_modalBprMessage);
             }
         }
         finally
@@ -623,21 +616,19 @@
     {
         if (_manager is null) return;
         _isEnablingDac = true;
-        _modalMessage = null;
+        _modalBprMessage = null;
         try
         {
             var result = await _manager.EnableRemoteDac();
             if (result.Success)
             {
                 _isDacRequired = false;
-                _modalMessage = t[TranslationKeys.CommonRemoteDacEnabled];
-                _modalMessageSuccess = true;
-                ShowMessage(OperationResult.SuccessResult(t[TranslationKeys.CommonRemoteDacEnabled]));
+                _modalBprMessage = BprMessage.Success(t[TranslationKeys.CommonRemoteDacEnabled]);
+                ShowMessage(_modalBprMessage);
             }
             else
             {
-                _modalMessage = result.Message;
-                _modalMessageSuccess = false;
+                _modalBprMessage = result;
                 ShowMessage(result);
             }
         }
@@ -717,7 +708,7 @@
         _selectedFunction = null;
         _isDecrypted = false;
         _isDacRequired = false;
-        _modalMessage = null;
+        _modalBprMessage = null;
         _isCopied = false;
         _isFullScreen = false;
     }
@@ -742,13 +733,9 @@
         }
     }
 
-    private void ShowMessage(OperationResult result)
-    {
-        _message = result.Message;
-        _messageSuccess = result.Success;
-    }
-
-    private void ClearMessage() => _message = null;
+    private void ShowMessage(OperationResult result) => _bprMessage = result;
+    private void ShowMessage(BprMessage? message) => _bprMessage = message;
+    private void ClearMessage() => _bprMessage = null;
 
     private static string FormatDate(DateTime date) =>
         date == DateTime.MinValue ? "—" : date.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);

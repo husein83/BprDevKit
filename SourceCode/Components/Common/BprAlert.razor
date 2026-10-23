@@ -1,0 +1,19 @@
+@using BprDevKit.Utility
+
+@if (Message != null && Message.HasMessage)
+{
+    <div class="alert @Message.AlertCssClass alert-dismissible fade show d-flex align-items-center @CssClass" role="alert">
+        <i class="bi @Message.IconCssClass me-2 fs-5"></i>
+        <div class="flex-grow-1 text-break">@Message.Message</div>
+        @if (OnDismiss.HasDelegate)
+        {
+            <button type="button" class="btn-close ms-2" @onclick="OnDismiss" aria-label="Close"></button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public BprMessage? Message { get; set; }
+    [Parameter] public EventCallback OnDismiss { get; set; }
+    [Parameter] public string? CssClass { get; set; }
+}

@@ -22,17 +22,20 @@ namespace BprDevKit.DatabaseManagement.Services
         private readonly ServerConfiguration _config;
         private readonly IDatabaseConnectionFactory _connectionFactory;
         private readonly ISqlObjectDecryptor _decryptor;
+        private readonly BprDevKit.Utility.Logging.IBprLogger _logger;
 
         public DatabaseManager(
             ISqlGenerator sqlGenerator,
             ServerConfiguration config,
             IDatabaseConnectionFactory? connectionFactory = null,
-            ISqlObjectDecryptor? decryptor = null)
+            ISqlObjectDecryptor? decryptor = null,
+            BprDevKit.Utility.Logging.IBprLogger? logger = null)
         {
             _sqlGenerator = sqlGenerator ?? throw new ArgumentNullException(nameof(sqlGenerator));
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _connectionFactory = connectionFactory ?? new DatabaseConnectionFactory();
             _decryptor = decryptor ?? new SqlObjectDecryptor(_connectionFactory);
+            _logger = logger ?? BprDevKit.Utility.Logging.BprLogger.Instance;
         }
 
         #region Database Operations
@@ -126,13 +129,13 @@ namespace BprDevKit.DatabaseManagement.Services
                 var alter = new DatabaseOperation.Alter
                 {
                     DatabaseName = config.DatabaseName,
-                    Collation = GetNullableString(row, "Collation"),
-                    RecoveryModel = GetNullableString(row, "RecoveryModel"),
-                    CompatibilityLevel = TryConvertToInt16(row["CompatibilityLevel"]),
-                    IsReadOnly = GetNullableBoolean(row, "IsReadOnly"),
-                    AutoShrink = GetNullableBoolean(row, "AutoShrink"),
-                    AutoClose = GetNullableBoolean(row, "AutoClose"),
-                    PageVerify = GetNullableString(row, "PageVerify")
+                    Collation = row.GetNullableString("Collation"),
+                    RecoveryModel = row.GetNullableString("RecoveryModel"),
+                    CompatibilityLevel = row.GetNullableInt16("CompatibilityLevel"),
+                    IsReadOnly = row.GetNullableBoolean("IsReadOnly"),
+                    AutoShrink = row.GetNullableBoolean("AutoShrink"),
+                    AutoClose = row.GetNullableBoolean("AutoClose"),
+                    PageVerify = row.GetNullableString("PageVerify")
                 };
 
                 return (OperationResult.SuccessResult($"Retrieved configuration for database '{config.DatabaseName}'."), alter);
@@ -141,31 +144,6 @@ namespace BprDevKit.DatabaseManagement.Services
             {
                 return (OperationResult.ErrorResult($"Error retrieving database configuration: {ex.Message}", ex), null);
             }
-        }
-
-        private static string? GetNullableString(DataRow row, string columnName)
-        {
-            var value = row[columnName];
-            return value == null || value == DBNull.Value ? null : value.ToString();
-        }
-
-        private static bool? GetNullableBoolean(DataRow row, string columnName)
-        {
-            var value = row[columnName];
-            if (value == null || value == DBNull.Value) return null;
-            return Convert.ToInt32(value) == 1;
-        }
-
-        private static short? TryConvertToInt16(object? value)
-        {
-            if (value == null || value == DBNull.Value) return null;
-            return value switch
-            {
-                short level => level,
-                byte byteLevel => (short)byteLevel,
-                int intLevel when intLevel >= short.MinValue && intLevel <= short.MaxValue => (short)intLevel,
-                _ => Convert.ToInt16(value)
-            };
         }
         #endregion
 
@@ -282,9 +260,9 @@ namespace BprDevKit.DatabaseManagement.Services
                 var objects = await ExecuteQuery(_sqlGenerator.GenerateGetSchemaInformationScript(config));
                 schema.Objects = objects.Rows.Cast<DataRow>()
                     .Select(row => (
-                        ObjectType: Convert.ToString(row["ObjectType"]) ?? string.Empty,
-                        ObjectName: Convert.ToString(row["ObjectName"]) ?? string.Empty,
-                        CreateDate: row["CreateDate"] is DateTime createDate ? createDate : (DateTime?)null))
+                        ObjectType: row.GetString("ObjectType"),
+                        ObjectName: row.GetString("ObjectName"),
+                        CreateDate: row.GetNullableDateTime("CreateDate")))
                     .ToList();
 
                 return (OperationResult.SuccessResult($"Retrieved schema '{config.SchemaName}' with {schema.Objects.Count} object(s)."), schema);
@@ -396,10 +374,10 @@ namespace BprDevKit.DatabaseManagement.Services
                     DatabaseName = config.DatabaseName,
                     SchemaName = config.SchemaName,
                     TableName = config.TableName,
-                    FileGroup = GetNullableString(headerRow, "FileGroup"),
-                    Description = GetNullableString(headerRow, "Description"),
-                    CreateDate = Convert.ToDateTime(headerRow["CreateDate"]),
-                    ModifyDate = Convert.ToDateTime(headerRow["ModifyDate"])
+                    FileGroup = headerRow.GetNullableString("FileGroup"),
+                    Description = headerRow.GetNullableString("Description"),
+                    CreateDate = headerRow.GetDateTime("CreateDate"),
+                    ModifyDate = headerRow.GetDateTime("ModifyDate")
                 };
 
                 var columns = await ExecuteQuery(_sqlGenerator.GenerateGetTableColumnsScript(config));
@@ -436,13 +414,13 @@ namespace BprDevKit.DatabaseManagement.Services
                     .Select(row => new TableOperation.Information
                     {
                         DatabaseName = databaseName,
-                        SchemaName = Convert.ToString(row["SchemaName"]) ?? string.Empty,
-                        TableName = Convert.ToString(row["TableName"]) ?? string.Empty,
-                        RowCount = Convert.ToInt64(row["RowCount"]),
-                        ColumnCount = Convert.ToInt32(row["ColumnCount"]),
-                        CreateDate = Convert.ToDateTime(row["CreateDate"]),
-                        ModifyDate = Convert.ToDateTime(row["ModifyDate"]),
-                        Description = GetNullableString(row, "Description")
+                        SchemaName = row.GetString("SchemaName"),
+                        TableName = row.GetString("TableName"),
+                        RowCount = row.GetInt64("RowCount"),
+                        ColumnCount = row.GetInt32("ColumnCount"),
+                        CreateDate = row.GetDateTime("CreateDate"),
+                        ModifyDate = row.GetDateTime("ModifyDate"),
+                        Description = row.GetNullableString("Description")
                     })
                     .ToList();
 
@@ -1505,17 +1483,17 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
             return new SchemaOperation.Information
             {
                 DatabaseName = databaseName,
-                SchemaName = Convert.ToString(row["SchemaName"]) ?? string.Empty,
-                OwnerName = Convert.ToString(row["OwnerName"]) ?? string.Empty,
-                ObjectCount = Convert.ToInt32(row["ObjectCount"])
+                SchemaName = row.GetString("SchemaName"),
+                OwnerName = row.GetString("OwnerName"),
+                ObjectCount = row.GetInt32("ObjectCount")
             };
         }
 
         private static ColumnOperation.Information MapColumn(TableOperation.Information table, DataRow row)
         {
-            var dataType = Convert.ToString(row["DataType"]) ?? string.Empty;
+            var dataType = row.GetString("DataType");
             var type = ColumnDataType.Find(dataType);
-            var maxLength = Convert.ToInt32(row["MaxLength"]);
+            var maxLength = row.GetInt32("MaxLength");
             var isUnicode = dataType.Equals("nchar", StringComparison.OrdinalIgnoreCase) || dataType.Equals("nvarchar", StringComparison.OrdinalIgnoreCase);
 
             return new ColumnOperation.Information
@@ -1523,23 +1501,23 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                 DatabaseName = table.DatabaseName,
                 SchemaName = table.SchemaName,
                 TableName = table.TableName,
-                ColumnName = Convert.ToString(row["ColumnName"]) ?? string.Empty,
-                OrdinalPosition = Convert.ToInt32(row["OrdinalPosition"]),
+                ColumnName = row.GetString("ColumnName"),
+                OrdinalPosition = row.GetInt32("OrdinalPosition"),
                 DataType = dataType,
                 // max_length is in bytes; -1 means MAX.
                 Length = type?.Kind == ColumnDataTypeKind.Length ? (isUnicode && maxLength > 0 ? maxLength / 2 : maxLength) : null,
-                Precision = type?.Kind == ColumnDataTypeKind.PrecisionScale ? Convert.ToInt32(row["Precision"]) : null,
-                Scale = (type?.Kind is ColumnDataTypeKind.PrecisionScale or ColumnDataTypeKind.FractionalSeconds) ? Convert.ToInt32(row["Scale"]) : null,
-                IsNullable = Convert.ToBoolean(row["IsNullable"]),
-                IsIdentity = Convert.ToBoolean(row["IsIdentity"]),
-                IdentitySeed = row["IdentitySeed"] is DBNull ? 0 : Convert.ToInt32(row["IdentitySeed"]),
-                IdentityIncrement = row["IdentityIncrement"] is DBNull ? 0 : Convert.ToInt32(row["IdentityIncrement"]),
-                IsPrimaryKey = Convert.ToBoolean(row["IsPrimaryKey"]),
-                Collation = GetNullableString(row, "Collation"),
-                DefaultValue = GetNullableString(row, "DefaultValue"),
-                ComputedFormula = GetNullableString(row, "ComputedFormula"),
-                IsPersisted = Convert.ToBoolean(row["IsPersisted"]),
-                Description = GetNullableString(row, "Description")
+                Precision = type?.Kind == ColumnDataTypeKind.PrecisionScale ? row.GetInt32("Precision") : null,
+                Scale = (type?.Kind is ColumnDataTypeKind.PrecisionScale or ColumnDataTypeKind.FractionalSeconds) ? row.GetInt32("Scale") : null,
+                IsNullable = row.GetBoolean("IsNullable"),
+                IsIdentity = row.GetBoolean("IsIdentity"),
+                IdentitySeed = row.GetInt32("IdentitySeed"),
+                IdentityIncrement = row.GetInt32("IdentityIncrement"),
+                IsPrimaryKey = row.GetBoolean("IsPrimaryKey"),
+                Collation = row.GetNullableString("Collation"),
+                DefaultValue = row.GetNullableString("DefaultValue"),
+                ComputedFormula = row.GetNullableString("ComputedFormula"),
+                IsPersisted = row.GetBoolean("IsPersisted"),
+                Description = row.GetNullableString("Description")
             };
         }
 
@@ -1550,19 +1528,19 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                 DatabaseName = table.DatabaseName,
                 SchemaName = table.SchemaName,
                 TableName = table.TableName,
-                IndexName = Convert.ToString(row["IndexName"]) ?? string.Empty,
-                IndexType = Convert.ToString(row["IndexType"]) ?? string.Empty,
-                Columns = GetNullableString(row, "KeyColumns") ?? string.Empty,
-                IncludeColumns = GetNullableString(row, "IncludeColumns"),
-                IsUnique = Convert.ToBoolean(row["IsUnique"]),
-                IsPrimaryKey = Convert.ToBoolean(row["IsPrimaryKey"]),
-                IsUniqueConstraint = Convert.ToBoolean(row["IsUniqueConstraint"]),
-                FillFactor = Convert.ToInt16(row["FillFactor"]),
-                PadIndex = Convert.ToBoolean(row["PadIndex"]),
-                AllowRowLocks = Convert.ToBoolean(row["AllowRowLocks"]),
-                AllowPageLocks = Convert.ToBoolean(row["AllowPageLocks"]),
-                FilterPredicate = GetNullableString(row, "FilterPredicate"),
-                FileGroup = GetNullableString(row, "FileGroup") ?? string.Empty
+                IndexName = row.GetString("IndexName"),
+                IndexType = row.GetString("IndexType"),
+                Columns = row.GetString("KeyColumns"),
+                IncludeColumns = row.GetNullableString("IncludeColumns"),
+                IsUnique = row.GetBoolean("IsUnique"),
+                IsPrimaryKey = row.GetBoolean("IsPrimaryKey"),
+                IsUniqueConstraint = row.GetBoolean("IsUniqueConstraint"),
+                FillFactor = row.GetInt16("FillFactor"),
+                PadIndex = row.GetBoolean("PadIndex"),
+                AllowRowLocks = row.GetBoolean("AllowRowLocks"),
+                AllowPageLocks = row.GetBoolean("AllowPageLocks"),
+                FilterPredicate = row.GetNullableString("FilterPredicate"),
+                FileGroup = row.GetString("FileGroup")
             };
         }
 
@@ -1571,17 +1549,17 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
             return new ForeignKeyOperation.Information
             {
                 DatabaseName = databaseName,
-                FKName = Convert.ToString(row["FKName"]) ?? string.Empty,
-                SchemaName = Convert.ToString(row["SchemaName"]) ?? string.Empty,
-                TableName = Convert.ToString(row["TableName"]) ?? string.Empty,
-                ColumnName = GetNullableString(row, "ColumnName") ?? string.Empty,
-                RefSchemaName = Convert.ToString(row["RefSchemaName"]) ?? string.Empty,
-                RefTableName = Convert.ToString(row["RefTableName"]) ?? string.Empty,
-                RefColumnName = GetNullableString(row, "RefColumnName") ?? string.Empty,
-                OnDelete = (Convert.ToString(row["OnDelete"]) ?? "NO_ACTION").Replace('_', ' '),
-                OnUpdate = (Convert.ToString(row["OnUpdate"]) ?? "NO_ACTION").Replace('_', ' '),
-                IsNotForReplication = Convert.ToBoolean(row["IsNotForReplication"]),
-                Enabled = Convert.ToBoolean(row["Enabled"])
+                FKName = row.GetString("FKName"),
+                SchemaName = row.GetString("SchemaName"),
+                TableName = row.GetString("TableName"),
+                ColumnName = row.GetString("ColumnName"),
+                RefSchemaName = row.GetString("RefSchemaName"),
+                RefTableName = row.GetString("RefTableName"),
+                RefColumnName = row.GetString("RefColumnName"),
+                OnDelete = (row.GetString("OnDelete", "NO_ACTION")).Replace('_', ' '),
+                OnUpdate = (row.GetString("OnUpdate", "NO_ACTION")).Replace('_', ' '),
+                IsNotForReplication = row.GetBoolean("IsNotForReplication"),
+                Enabled = row.GetBoolean("Enabled")
             };
         }
 
@@ -1590,12 +1568,12 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
             return new CheckConstraintOperation.Information
             {
                 DatabaseName = table.DatabaseName,
-                SchemaName = Convert.ToString(row["SchemaName"]) ?? table.SchemaName,
-                TableName = Convert.ToString(row["TableName"]) ?? table.TableName,
-                ConstraintName = Convert.ToString(row["ConstraintName"]) ?? string.Empty,
-                CheckExpression = Convert.ToString(row["CheckExpression"]) ?? string.Empty,
-                IsDisabled = Convert.ToBoolean(row["IsDisabled"]),
-                IsNotForReplication = Convert.ToBoolean(row["IsNotForReplication"])
+                SchemaName = row.GetString("SchemaName", table.SchemaName),
+                TableName = row.GetString("TableName", table.TableName),
+                ConstraintName = row.GetString("ConstraintName"),
+                CheckExpression = row.GetString("CheckExpression"),
+                IsDisabled = row.GetBoolean("IsDisabled"),
+                IsNotForReplication = row.GetBoolean("IsNotForReplication")
             };
         }
 
@@ -1675,14 +1653,14 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                 var table = await ExecuteQuery(_sqlGenerator.GenerateGetViewsScript(databaseName));
                 var views = table.Rows.Cast<DataRow>().Select(row =>
                 {
-                    var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
+                    var isEncrypted = row.GetBoolean("IsEncrypted");
                     return new ViewOperation.Information
                     {
                         DatabaseName = databaseName,
-                        SchemaName = Convert.ToString(row["SchemaName"]) ?? "dbo",
-                        ViewName = Convert.ToString(row["ViewName"]) ?? string.Empty,
-                        CreateDate = row.Table.Columns.Contains("CreateDate") && row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
-                        ModifyDate = row.Table.Columns.Contains("ModifyDate") && row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                        SchemaName = row.GetString("SchemaName", "dbo"),
+                        ViewName = row.GetString("ViewName"),
+                        CreateDate = row.GetDateTime("CreateDate"),
+                        ModifyDate = row.GetDateTime("ModifyDate"),
                         IsEncrypted = isEncrypted,
                         WithEncryption = isEncrypted
                     };
@@ -1705,16 +1683,16 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                     return (OperationResult.ErrorResult($"View '{schemaName}.{viewName}' not found."), null);
 
                 var row = table.Rows[0];
-                var definition = Convert.ToString(row["ViewDefinition"]) ?? string.Empty;
-                var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
+                var definition = row.GetString("ViewDefinition");
+                var isEncrypted = row.GetBoolean("IsEncrypted");
                 var view = new ViewOperation.Information
                 {
                     DatabaseName = databaseName,
                     SchemaName = schemaName,
                     ViewName = viewName,
                     Definition = definition,
-                    CreateDate = row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
-                    ModifyDate = row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                    CreateDate = row.GetDateTime("CreateDate"),
+                    ModifyDate = row.GetDateTime("ModifyDate"),
                     IsEncrypted = isEncrypted,
                     WithEncryption = isEncrypted || definition.Contains("WITH ENCRYPTION", StringComparison.OrdinalIgnoreCase)
                 };
@@ -1788,14 +1766,14 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                 var table = await ExecuteQuery(_sqlGenerator.GenerateGetProceduresScript(databaseName));
                 var procs = table.Rows.Cast<DataRow>().Select(row =>
                 {
-                    var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
+                    var isEncrypted = row.GetBoolean("IsEncrypted");
                     return new StoredProcedureOperation.Information
                     {
                         DatabaseName = databaseName,
-                        SchemaName = Convert.ToString(row["SchemaName"]) ?? "dbo",
-                        ProcedureName = Convert.ToString(row["ProcedureName"]) ?? string.Empty,
-                        CreateDate = row.Table.Columns.Contains("CreateDate") && row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
-                        ModifyDate = row.Table.Columns.Contains("ModifyDate") && row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                        SchemaName = row.GetString("SchemaName", "dbo"),
+                        ProcedureName = row.GetString("ProcedureName"),
+                        CreateDate = row.GetDateTime("CreateDate"),
+                        ModifyDate = row.GetDateTime("ModifyDate"),
                         IsEncrypted = isEncrypted,
                         WithEncryption = isEncrypted
                     };
@@ -1818,16 +1796,16 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                     return (OperationResult.ErrorResult($"Stored procedure '{schemaName}.{procName}' not found."), null);
 
                 var row = table.Rows[0];
-                var definition = Convert.ToString(row["ProcedureDefinition"]) ?? string.Empty;
-                var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
+                var definition = row.GetString("ProcedureDefinition");
+                var isEncrypted = row.GetBoolean("IsEncrypted");
                 var proc = new StoredProcedureOperation.Information
                 {
                     DatabaseName = databaseName,
                     SchemaName = schemaName,
                     ProcedureName = procName,
                     Definition = definition,
-                    CreateDate = row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
-                    ModifyDate = row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                    CreateDate = row.GetDateTime("CreateDate"),
+                    ModifyDate = row.GetDateTime("ModifyDate"),
                     IsEncrypted = isEncrypted,
                     WithEncryption = isEncrypted || definition.Contains("WITH ENCRYPTION", StringComparison.OrdinalIgnoreCase)
                 };
@@ -1888,18 +1866,18 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                 var table = await ExecuteQuery(_sqlGenerator.GenerateGetFunctionsScript(databaseName));
                 var funcs = table.Rows.Cast<DataRow>().Select(row =>
                 {
-                    var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
-                    var funcType = row.Table.Columns.Contains("FunctionType") ? Convert.ToString(row["FunctionType"])?.Trim() ?? "FN" : "FN";
+                    var isEncrypted = row.GetBoolean("IsEncrypted");
+                    var funcType = row.GetString("FunctionType", "FN").Trim();
                     return new FunctionOperation.Information
                     {
                         DatabaseName = databaseName,
-                        SchemaName = Convert.ToString(row["SchemaName"]) ?? "dbo",
-                        FunctionName = Convert.ToString(row["FunctionName"]) ?? string.Empty,
-                        CreateDate = row.Table.Columns.Contains("CreateDate") && row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
-                        ModifyDate = row.Table.Columns.Contains("ModifyDate") && row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                        SchemaName = row.GetString("SchemaName", "dbo"),
+                        FunctionName = row.GetString("FunctionName"),
+                        CreateDate = row.GetDateTime("CreateDate"),
+                        ModifyDate = row.GetDateTime("ModifyDate"),
                         IsEncrypted = isEncrypted,
                         WithEncryption = isEncrypted,
-                        FunctionType = funcType
+                        FunctionType = string.IsNullOrWhiteSpace(funcType) ? "FN" : funcType
                     };
                 }).ToList();
 
@@ -1920,20 +1898,20 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                     return (OperationResult.ErrorResult($"Function '{schemaName}.{funcName}' not found."), null);
 
                 var row = table.Rows[0];
-                var definition = Convert.ToString(row["FunctionDefinition"]) ?? string.Empty;
-                var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
-                var funcType = row.Table.Columns.Contains("FunctionType") ? Convert.ToString(row["FunctionType"])?.Trim() ?? "FN" : "FN";
+                var definition = row.GetString("FunctionDefinition");
+                var isEncrypted = row.GetBoolean("IsEncrypted");
+                var funcType = row.GetString("FunctionType", "FN").Trim();
                 var func = new FunctionOperation.Information
                 {
                     DatabaseName = databaseName,
                     SchemaName = schemaName,
                     FunctionName = funcName,
                     Definition = definition,
-                    CreateDate = row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
-                    ModifyDate = row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                    CreateDate = row.GetDateTime("CreateDate"),
+                    ModifyDate = row.GetDateTime("ModifyDate"),
                     IsEncrypted = isEncrypted,
                     WithEncryption = isEncrypted || definition.Contains("WITH ENCRYPTION", StringComparison.OrdinalIgnoreCase),
-                    FunctionType = funcType
+                    FunctionType = string.IsNullOrWhiteSpace(funcType) ? "FN" : funcType
                 };
 
                 return (OperationResult.SuccessResult($"Retrieved function '{schemaName}.{funcName}'"), func);
@@ -2006,21 +1984,21 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                 var table = await ExecuteQuery(_sqlGenerator.GenerateGetTriggersScript(databaseName));
                 var triggers = table.Rows.Cast<DataRow>().Select(row =>
                 {
-                    var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
-                    var isDisabled = row.Table.Columns.Contains("IsDisabled") && Convert.ToBoolean(row["IsDisabled"]);
-                    var isInsteadOf = row.Table.Columns.Contains("IsInsteadOfTrigger") && Convert.ToBoolean(row["IsInsteadOfTrigger"]);
+                    var isEncrypted = row.GetBoolean("IsEncrypted");
+                    var isDisabled = row.GetBoolean("IsDisabled");
+                    var isInsteadOf = row.GetBoolean("IsInsteadOfTrigger");
                     return new TriggerOperation.Information
                     {
                         DatabaseName = databaseName,
-                        SchemaName = Convert.ToString(row["SchemaName"]) ?? "dbo",
-                        TriggerName = Convert.ToString(row["TriggerName"]) ?? string.Empty,
-                        TableSchema = Convert.ToString(row["TableSchema"]) ?? "dbo",
-                        TableName = Convert.ToString(row["TableName"]) ?? string.Empty,
+                        SchemaName = row.GetString("SchemaName", "dbo"),
+                        TriggerName = row.GetString("TriggerName"),
+                        TableSchema = row.GetString("TableSchema", "dbo"),
+                        TableName = row.GetString("TableName"),
                         IsDisabled = isDisabled,
                         IsInsteadOfTrigger = isInsteadOf,
-                        TriggerEvents = Convert.ToString(row["TriggerEvents"]) ?? string.Empty,
-                        CreateDate = row.Table.Columns.Contains("CreateDate") && row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
-                        ModifyDate = row.Table.Columns.Contains("ModifyDate") && row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                        TriggerEvents = row.GetString("TriggerEvents"),
+                        CreateDate = row.GetDateTime("CreateDate"),
+                        ModifyDate = row.GetDateTime("ModifyDate"),
                         IsEncrypted = isEncrypted,
                         WithEncryption = isEncrypted
                     };
@@ -2043,22 +2021,22 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                     return (OperationResult.ErrorResult($"Trigger '{schemaName}.{triggerName}' not found."), null);
 
                 var row = table.Rows[0];
-                var definition = Convert.ToString(row["TriggerDefinition"]) ?? string.Empty;
-                var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
-                var isDisabled = row.Table.Columns.Contains("IsDisabled") && Convert.ToBoolean(row["IsDisabled"]);
-                var isInsteadOf = row.Table.Columns.Contains("IsInsteadOfTrigger") && Convert.ToBoolean(row["IsInsteadOfTrigger"]);
+                var definition = row.GetString("TriggerDefinition");
+                var isEncrypted = row.GetBoolean("IsEncrypted");
+                var isDisabled = row.GetBoolean("IsDisabled");
+                var isInsteadOf = row.GetBoolean("IsInsteadOfTrigger");
                 var trig = new TriggerOperation.Information
                 {
                     DatabaseName = databaseName,
                     SchemaName = schemaName,
                     TriggerName = triggerName,
-                    TableSchema = Convert.ToString(row["TableSchema"]) ?? "dbo",
-                    TableName = Convert.ToString(row["TableName"]) ?? string.Empty,
+                    TableSchema = row.GetString("TableSchema", "dbo"),
+                    TableName = row.GetString("TableName"),
                     Definition = definition,
                     IsDisabled = isDisabled,
                     IsInsteadOfTrigger = isInsteadOf,
-                    CreateDate = row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
-                    ModifyDate = row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                    CreateDate = row.GetDateTime("CreateDate"),
+                    ModifyDate = row.GetDateTime("ModifyDate"),
                     IsEncrypted = isEncrypted,
                     WithEncryption = isEncrypted || definition.Contains("WITH ENCRYPTION", StringComparison.OrdinalIgnoreCase)
                 };
@@ -2112,21 +2090,36 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
 
         private async Task<OperationResult> ExecuteDatabaseCommand(string sql, string successMessage)
         {
-            using var connection = await OpenConnectionAsync();
-
-            foreach (var batch in SplitSqlBatches(sql))
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            _logger.LogDebug("DatabaseManager", $"[SQL Execute] Starting execution on database '{_config.Server.DefaultDatabase}'...");
+            try
             {
-                using var command = connection.CreateCommand();
-                command.CommandText = batch;
-                command.CommandTimeout = _config.Server.CommandTimeout;
-                await command.ExecuteNonQueryAsync();
-            }
+                using var connection = await OpenConnectionAsync();
 
-            return OperationResult.SuccessResult(successMessage);
+                foreach (var batch in SplitSqlBatches(sql))
+                {
+                    using var command = connection.CreateCommand();
+                    command.CommandText = batch;
+                    command.CommandTimeout = _config.Server.CommandTimeout;
+                    await command.ExecuteNonQueryAsync();
+                }
+
+                sw.Stop();
+                _logger.LogInformation("DatabaseManager", $"[SQL Executed] {successMessage}", serverName: _config.Server.ServerName, databaseName: _config.Server.DefaultDatabase, executionTimeMs: sw.ElapsedMilliseconds);
+                return OperationResult.SuccessResult(successMessage);
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                _logger.LogError("DatabaseManager", $"[SQL Error] Execution failed after {sw.ElapsedMilliseconds} ms: {ex.Message}", ex, serverName: _config.Server.ServerName, databaseName: _config.Server.DefaultDatabase);
+                throw;
+            }
         }
 
         private async Task<OperationResult> ExecuteInTransaction(List<string> scripts, string successMessage, string customMessage)
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            _logger.LogDebug("DatabaseManager", $"[Tx Begin] Starting transaction with {scripts.Count} script(s)...");
             using var connection = await OpenConnectionAsync();
             using var transaction = await connection.BeginTransactionAsync();
             try
@@ -2145,19 +2138,24 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                 }
 
                 await transaction.CommitAsync();
+                sw.Stop();
+                _logger.LogInformation("DatabaseManager", $"[Tx Committed] {customMessage}", serverName: _config.Server.ServerName, databaseName: _config.Server.DefaultDatabase, executionTimeMs: sw.ElapsedMilliseconds);
 
                 return OperationResult.SuccessResult(customMessage);
             }
             catch (Exception ex)
             {
+                sw.Stop();
                 try
                 {
                     await transaction.RollbackAsync();
+                    _logger.LogWarning("DatabaseManager", $"[Tx RolledBack] Transaction rolled back after error: {ex.Message} ({sw.ElapsedMilliseconds} ms)");
                 }
                 catch
                 {
                     // Ignore rollback exceptions
                 }
+                _logger.LogError("DatabaseManager", $"[Tx Error] Transaction failed: {ex.Message}", ex, serverName: _config.Server.ServerName, databaseName: _config.Server.DefaultDatabase);
                 return OperationResult.ErrorResult($"Transaction failed and was rolled back: {ex.Message}", ex);
             }
         }
@@ -2192,6 +2190,7 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
         private async Task<DataTable> ExecuteQuery(string sql)
         {
             DataTable result = new();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 using var connection = await OpenConnectionAsync();
@@ -2201,9 +2200,13 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
 
                 using var reader = await command.ExecuteReaderAsync();
                 result.Load(reader);
+                sw.Stop();
+                _logger.LogTrace("DatabaseManager", $"[Query] Loaded {result.Rows.Count} row(s) in {sw.ElapsedMilliseconds} ms");
             }
             catch (Exception exp)
             {
+                sw.Stop();
+                _logger.LogError("DatabaseManager", $"[Query Error] Failed after {sw.ElapsedMilliseconds} ms: {exp.Message}", exp, serverName: _config.Server.ServerName, databaseName: _config.Server.DefaultDatabase);
                 ExceptionHandler.HandleException(exp);
             }
             return result;
@@ -2212,6 +2215,7 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
         private async Task<List<string>> ExecuteListQuery(string sql)
         {
             List<string> result = new();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 using var connection = await OpenConnectionAsync();
@@ -2226,9 +2230,13 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                     if (!reader.IsDBNull(0))
                         result.Add(reader.GetString(0));
                 }
+                sw.Stop();
+                _logger.LogTrace("DatabaseManager", $"[ListQuery] Retrieved {result.Count} item(s) in {sw.ElapsedMilliseconds} ms");
             }
             catch (Exception exp)
             {
+                sw.Stop();
+                _logger.LogError("DatabaseManager", $"[ListQuery Error] Failed after {sw.ElapsedMilliseconds} ms: {exp.Message}", exp, serverName: _config.Server.ServerName, databaseName: _config.Server.DefaultDatabase);
                 ExceptionHandler.HandleException(exp);
             }
             return result;

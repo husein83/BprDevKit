@@ -21,13 +21,7 @@
         </button>
     </div>
 
-    @if (!string.IsNullOrWhiteSpace(_message))
-    {
-        <div class="database-alert alert @_messageClass alert-dismissible fade show" role="alert">
-            <i class="bi @_messageIcon me-2"></i>@_message
-            <button class="btn-close" type="button" @onclick="ClearMessage"></button>
-        </div>
-    }
+    <BprAlert Message="@_bprMessage" OnDismiss="ClearMessage" CssClass="database-alert mb-4" />
 
     @if (_showCreateForm)
     {
@@ -292,9 +286,7 @@
     private bool _showInformationDialog;
     private bool _isLoading;
     private bool _isSaving;
-    private string? _message;
-    private string _messageClass = "alert-info";
-    private string _messageIcon = "bi-info-circle-fill";
+    private BprMessage? _bprMessage;
     private string _readOnlySelection = string.Empty;
     private string _autoShrinkSelection = string.Empty;
     private string _autoCloseSelection = string.Empty;
@@ -479,8 +471,19 @@
         _databaseInformation = null;
     }
 
-    private void ShowMessage(string message, string messageClass, string messageIcon) { _message = message; _messageClass = messageClass; _messageIcon = messageIcon; }
-    private void ClearMessage() => _message = null;
+    private void ShowMessage(BprMessage message) => _bprMessage = message;
+    private void ShowMessage(OperationResult result) => _bprMessage = result;
+    private void ShowMessage(string message, string messageClass = "alert-info", string messageIcon = "bi-info-circle-fill")
+    {
+        _bprMessage = messageClass.Contains("danger")
+            ? BprMessage.Error(message)
+            : messageClass.Contains("success")
+                ? BprMessage.Success(message)
+                : messageClass.Contains("warning")
+                    ? BprMessage.Warning(message)
+                    : BprMessage.Info(message);
+    }
+    private void ClearMessage() => _bprMessage = null;
     private static bool? ParseNullableBoolean(string value) => bool.TryParse(value, out var result) ? result : null;
     private static string FormatValue(object value) => value == DBNull.Value ? "—" : Convert.ToString(value) ?? "—";
 }

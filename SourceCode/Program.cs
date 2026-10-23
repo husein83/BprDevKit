@@ -18,6 +18,7 @@ builder.Services.AddSingleton<ISqlGeneratorFactory, SqlGeneratorFactory>();
 builder.Services.AddSingleton<SqlServerGenerator>();
 builder.Services.AddSingleton<ISqlGenerator, SqlServerGenerator>();
 builder.Services.AddSingleton<ISqlObjectDecryptor, SqlObjectDecryptor>();
+builder.Services.AddSingleton<BprDevKit.Utility.Logging.IBprLogger>(BprDevKit.Utility.Logging.BprLogger.Instance);
 builder.Services.AddScoped<DatabaseManager>();
 builder.Services.AddSingleton<DatabaseManagerFactory>();
 
