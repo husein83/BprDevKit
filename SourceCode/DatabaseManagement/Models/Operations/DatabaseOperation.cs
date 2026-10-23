@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using BprDevKit.Utility;
 
 namespace BprDevKit.DatabaseManagement.Models.Operations
 {
@@ -11,12 +12,12 @@ namespace BprDevKit.DatabaseManagement.Models.Operations
             public string DatabaseName { get; set; } = null!;
             public string DataFilePath { get; set; } = null!;
             public string? LogFilePath { get; set; }
-            public int InitialSizeMB { get; set; } = 8;
+            public int InitialSizeMB { get; set; } = Constants.DefaultInitialDataSizeMB;
             public int? MaxSizeMB { get; set; }
-            public int FileGrowthMB { get; set; } = 64;
-            public int LogInitialSizeMB { get; set; } = 8;
+            public int FileGrowthMB { get; set; } = Constants.DefaultFileGrowthMB;
+            public int LogInitialSizeMB { get; set; } = Constants.DefaultInitialLogSizeMB;
             public int? LogMaxSizeMB { get; set; }
-            public int LogFileGrowthMB { get; set; } = 64;
+            public int LogFileGrowthMB { get; set; } = Constants.DefaultLogFileGrowthMB;
             public string? Collation { get; set; }
             public string RecoveryModel { get; set; } = "SIMPLE";
             public short? CompatibilityLevel { get; set; }

@@ -1068,6 +1068,89 @@ WHERE s.name = {SQLLiteral(config.SchemaName)} AND t.name = {SQLLiteral(config.T
         }
         #endregion
 
+        #region Check Constraint Operations
+        public override string GenerateGetTableCheckConstraintsScript(TableOperation.Information config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            ValidateTableTarget(config.DatabaseName, config.SchemaName, config.TableName);
+            var database = QUOTENAME(config.DatabaseName);
+            var schemaName = SQLLiteral(config.SchemaName);
+            var tableName = SQLLiteral(config.TableName);
+
+            return $@"SELECT
+    cc.name AS ConstraintName,
+    s.name AS SchemaName,
+    t.name AS TableName,
+    cc.definition AS CheckExpression,
+    cc.is_disabled AS IsDisabled,
+    cc.is_not_for_replication AS IsNotForReplication
+FROM {database}.sys.check_constraints AS cc
+INNER JOIN {database}.sys.tables AS t ON t.object_id = cc.parent_object_id
+INNER JOIN {database}.sys.schemas AS s ON s.schema_id = t.schema_id
+WHERE s.name = {schemaName} AND t.name = {tableName}
+ORDER BY cc.name;";
+        }
+
+        public override string GenerateCreateCheckConstraintScript(CheckConstraintOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            ValidateTableTarget(config.DatabaseName, config.SchemaName, config.TableName);
+            ValidateOptionalObjectName(config.ConstraintName, "Check constraint name");
+
+            if (string.IsNullOrWhiteSpace(config.CheckExpression))
+                throw new InvalidOperationException("[BprDevKit] Check constraint expression cannot be empty.");
+
+            ValidateExpression(config.CheckExpression, "Check constraint expression");
+
+            var expr = config.CheckExpression.Trim();
+            if (!expr.StartsWith('(') || !expr.EndsWith(')'))
+                expr = $"({expr})";
+
+            var constraintName = string.IsNullOrWhiteSpace(config.ConstraintName)
+                ? $"CK_{config.TableName}_{Math.Abs(config.CheckExpression.GetHashCode()):X}"
+                : config.ConstraintName;
+
+            if (constraintName.Length > 128)
+                throw new InvalidOperationException("[BprDevKit] The check constraint name cannot exceed 128 characters.");
+
+            var table = $"{QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)}";
+            var builder = new StringBuilder();
+            builder.AppendLine($"USE {QUOTENAME(config.DatabaseName)};")
+                .AppendLine("GO");
+
+            builder.Append($"ALTER TABLE {table} WITH CHECK ADD CONSTRAINT {QUOTENAME(constraintName)} CHECK");
+            if (config.IsNotForReplication)
+                builder.Append(" NOT FOR REPLICATION");
+            builder.AppendLine($" {expr};");
+
+            return builder.ToString();
+        }
+
+        public override string GenerateDropCheckConstraintScript(CheckConstraintOperation.Drop config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            ValidateTableTarget(config.DatabaseName, config.SchemaName, config.TableName);
+            ValidateObjectName(config.ConstraintName, "Check constraint name");
+
+            return $"USE {QUOTENAME(config.DatabaseName)};{Environment.NewLine}GO{Environment.NewLine}"
+                + $"ALTER TABLE {QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)} DROP CONSTRAINT {QUOTENAME(config.ConstraintName)};{Environment.NewLine}";
+        }
+
+        public override string GenerateToggleCheckConstraintScript(CheckConstraintOperation.ToggleState config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            ValidateTableTarget(config.DatabaseName, config.SchemaName, config.TableName);
+            ValidateObjectName(config.ConstraintName, "Check constraint name");
+
+            var table = $"{QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)}";
+            var statement = config.Enable
+                ? $"ALTER TABLE {table} WITH CHECK CHECK CONSTRAINT {QUOTENAME(config.ConstraintName)};"
+                : $"ALTER TABLE {table} NOCHECK CONSTRAINT {QUOTENAME(config.ConstraintName)};";
+
+            return $"USE {QUOTENAME(config.DatabaseName)};{Environment.NewLine}GO{Environment.NewLine}{statement}{Environment.NewLine}";
+        }
+        #endregion
+
         #region View Operations
         public override string GenerateCreateViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true)
         {
@@ -1411,6 +1494,158 @@ WHERE s.name = {SQLLiteral(schemaName)} AND f.name = {SQLLiteral(funcName)} AND 
         public override string GenerateTestFunctionScript(string databaseName, string funcName, string body)
         {
             return $"USE {QUOTENAME(databaseName)}; PRINT N'[BprDevKit] Testing Function [{funcName}]...'; DECLARE @Result INT; {body} SELECT @Result; PRINT N'[BprDevKit] Function [{funcName}] test completed successfully.';";
+        }
+        #endregion
+
+        #region Trigger Operations
+        public override string GenerateCreateTriggerScript(TriggerOperation.Create config)
+        {
+            var trimmed = config.Body.Trim();
+            if (Regex.IsMatch(trimmed, @"^(CREATE\s+OR\s+ALTER|CREATE)\s+TRIGGER\b", RegexOptions.IgnoreCase))
+            {
+                var fullScript = config.WithEncryption ? InjectWithEncryptionBeforeAs(trimmed) : trimmed;
+                return $"USE {QUOTENAME(config.DatabaseName)};\r\nGO\r\n\r\n{fullScript};\r\nGO\r\n\r\nPRINT N'[BprDevKit] Operation completed successfully.';\r\nGO";
+            }
+
+            var events = new List<string>();
+            if (config.OnInsert) events.Add("INSERT");
+            if (config.OnUpdate) events.Add("UPDATE");
+            if (config.OnDelete) events.Add("DELETE");
+            var eventStr = events.Count > 0 ? string.Join(", ", events) : "INSERT, UPDATE";
+
+            var timing = string.Equals(config.Timing, "INSTEAD OF", StringComparison.OrdinalIgnoreCase) ? "INSTEAD OF" : "AFTER";
+
+            var sb = new StringBuilder();
+            sb.AppendLine("USE " + QUOTENAME(config.DatabaseName) + ";")
+                .AppendLine("GO")
+                .AppendLine();
+
+            if (Regex.IsMatch(trimmed, @"\bAS\b", RegexOptions.IgnoreCase))
+            {
+                var trigBody = config.WithEncryption ? InjectWithEncryptionBeforeAs(trimmed) : trimmed;
+                sb.AppendLine($"CREATE TRIGGER {QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TriggerName)} ON {QUOTENAME(config.TableSchema)}.{QUOTENAME(config.TableName)} {timing} {eventStr} {trigBody}");
+            }
+            else
+            {
+                sb.Append($"CREATE TRIGGER {QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TriggerName)} ON {QUOTENAME(config.TableSchema)}.{QUOTENAME(config.TableName)}");
+                if (config.WithEncryption)
+                    sb.Append(" WITH ENCRYPTION");
+                sb.AppendLine($" {timing} {eventStr} AS");
+
+                string indentBody = "    ";
+                string[] lines = config.Body.Split('\n');
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    sb.AppendLine(indentBody + lines[i]);
+                }
+            }
+
+            sb.AppendLine(";")
+                .AppendLine("GO")
+                .AppendLine()
+                .AppendLine("PRINT N'[BprDevKit] Operation completed successfully.';")
+                .AppendLine("GO");
+
+            return sb.ToString();
+        }
+
+        public override string GenerateAlterTriggerScript(string databaseName, string schemaName, string triggerName, string body, bool withEncryption = true)
+        {
+            var trimmed = body.Trim();
+            if (Regex.IsMatch(trimmed, @"^(CREATE\s+OR\s+ALTER|CREATE|ALTER)\s+TRIGGER\b", RegexOptions.IgnoreCase))
+            {
+                var modified = Regex.Replace(trimmed, @"^CREATE\s+TRIGGER\b", "ALTER TRIGGER", RegexOptions.IgnoreCase);
+                return $"USE {QUOTENAME(databaseName)};\r\nGO\r\n\r\n{modified};\r\nGO\r\n\r\nPRINT N'[BprDevKit] Operation completed successfully.';\r\nGO";
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine("USE " + QUOTENAME(databaseName) + ";")
+                .AppendLine("GO")
+                .AppendLine();
+
+            if (Regex.IsMatch(trimmed, @"\bAS\b", RegexOptions.IgnoreCase))
+            {
+                var trigBody = withEncryption ? InjectWithEncryptionBeforeAs(trimmed) : trimmed;
+                sb.AppendLine($"ALTER TRIGGER {QUOTENAME(schemaName)}.{QUOTENAME(triggerName)} {trigBody}");
+            }
+            else
+            {
+                sb.Append($"ALTER TRIGGER {QUOTENAME(schemaName)}.{QUOTENAME(triggerName)}");
+                if (withEncryption)
+                    sb.Append(" WITH ENCRYPTION");
+                sb.AppendLine(" AS");
+
+                string indentBody = "    ";
+                string[] lines = body.Split('\n');
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    sb.AppendLine(indentBody + lines[i]);
+                }
+            }
+
+            sb.AppendLine(";")
+                .AppendLine("GO")
+                .AppendLine()
+                .AppendLine("PRINT N'[BprDevKit] Operation completed successfully.';")
+                .AppendLine("GO");
+
+            return sb.ToString();
+        }
+
+        public override string GenerateDropTriggerScript(string databaseName, string schemaName, string triggerName)
+        {
+            return $"USE {QUOTENAME(databaseName)}; DROP TRIGGER {QUOTENAME(schemaName)}.{QUOTENAME(triggerName)}; PRINT N'[BprDevKit] Trigger [{triggerName}] dropped successfully.';";
+        }
+
+        public override string GenerateToggleTriggerScript(string databaseName, string schemaName, string triggerName, string tableSchema, string tableName, bool enable)
+        {
+            var action = enable ? "ENABLE" : "DISABLE";
+            return $"USE {QUOTENAME(databaseName)}; ALTER TABLE {QUOTENAME(tableSchema)}.{QUOTENAME(tableName)} {action} TRIGGER {QUOTENAME(triggerName)}; PRINT N'[BprDevKit] Trigger [{triggerName}] {action.ToLower()}d successfully.';";
+        }
+
+        public override string GenerateGetTriggerInfoScript(string databaseName, string schemaName, string triggerName)
+        {
+            return $@"USE {QUOTENAME(databaseName)};
+SELECT 
+    t.name AS TriggerName,
+    s.name AS SchemaName,
+    s.name AS TableSchema,
+    o.name AS TableName,
+    t.is_disabled AS IsDisabled,
+    t.is_instead_of_trigger AS IsInsteadOfTrigger,
+    t.create_date AS CreateDate,
+    t.modify_date AS ModifyDate,
+    m.definition AS TriggerDefinition,
+    CAST(ISNULL(OBJECTPROPERTY(t.object_id, 'IsEncrypted'), 0) AS BIT) AS IsEncrypted
+FROM sys.triggers t
+INNER JOIN sys.objects o ON t.parent_id = o.object_id
+INNER JOIN sys.schemas s ON o.schema_id = s.schema_id
+LEFT JOIN sys.sql_modules m ON t.object_id = m.object_id
+WHERE t.name = {SQLLiteral(triggerName)} AND s.name = {SQLLiteral(schemaName)};";
+        }
+
+        public override string GenerateGetTriggersScript(string databaseName)
+        {
+            return $@"USE {QUOTENAME(databaseName)};
+SELECT 
+    t.name AS TriggerName,
+    s.name AS SchemaName,
+    s.name AS TableSchema,
+    o.name AS TableName,
+    t.is_disabled AS IsDisabled,
+    t.is_instead_of_trigger AS IsInsteadOfTrigger,
+    t.create_date AS CreateDate,
+    t.modify_date AS ModifyDate,
+    CAST(ISNULL(OBJECTPROPERTY(t.object_id, 'IsEncrypted'), 0) AS BIT) AS IsEncrypted,
+    STUFF((SELECT ', ' + te.type_desc 
+           FROM sys.trigger_events te 
+           WHERE te.object_id = t.object_id 
+           FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS TriggerEvents
+FROM sys.triggers t
+INNER JOIN sys.objects o ON t.parent_id = o.object_id
+INNER JOIN sys.schemas s ON o.schema_id = s.schema_id
+WHERE t.parent_class = 1 AND o.type IN ('U', 'V')
+ORDER BY s.name, o.name, t.name;";
         }
         #endregion
 

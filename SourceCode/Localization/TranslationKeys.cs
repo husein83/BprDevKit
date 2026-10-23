@@ -40,6 +40,7 @@ namespace BprDevKit.Localization
         public const string Remove = "Common.Remove";
         public const string Yes = "Common.Yes";
         public const string No = "Common.No";
+        public const string Status = "Common.Status";
 
         // Navigation & Workspace
         public const string ActiveServer = "Nav.ActiveServer";
@@ -336,6 +337,20 @@ namespace BprDevKit.Localization
         public const string FkPanelEnable = "FkPanel.Enable";
         public const string FkPanelDisable = "FkPanel.Disable";
 
+        // Check Constraints Panel
+        public const string CheckConstraints = "CheckConstraints";
+        public const string CheckConstraintsCreate = "CheckConstraints.Create";
+        public const string CheckConstraintsCreateOn = "CheckConstraints.CreateOn";
+        public const string CheckConstraintsExpression = "CheckConstraints.Expression";
+        public const string CheckConstraintsExpressionPlaceholder = "CheckConstraints.ExpressionPlaceholder";
+        public const string CheckConstraintsNotForReplication = "CheckConstraints.NotForReplication";
+        public const string CheckConstraintsNoConstraints = "CheckConstraints.NoConstraints";
+        public const string CheckConstraintsDropTitle = "CheckConstraints.DropTitle";
+        public const string CheckConstraintsDropWarning = "CheckConstraints.DropWarning";
+        public const string CheckConstraintsEnable = "CheckConstraints.Enable";
+        public const string CheckConstraintsDisable = "CheckConstraints.Disable";
+        public const string CheckConstraintsStatus = "CheckConstraints.Status";
+
         // View Management Tab
         public const string ViewTabSubtitle = "ViewTab.Subtitle";
         public const string ViewTabCreateView = "ViewTab.CreateView";
@@ -394,5 +409,25 @@ namespace BprDevKit.Localization
         public const string CommonType = "Common.Type";
         public const string CommonCopy = "Common.Copy";
         public const string CommonCopied = "Common.Copied";
+        public const string CommonFullScreen = "Common.FullScreen";
+        public const string CommonExitFullScreen = "Common.ExitFullScreen";
+
+        // Triggers Management Tab
+        public const string Triggers = "Triggers";
+        public const string TriggerTabSubtitle = "TriggerTab.Subtitle";
+        public const string TriggerTabCreateTrigger = "TriggerTab.CreateTrigger";
+        public const string TriggerTabTableName = "TriggerTab.TableName";
+        public const string TriggerTabTiming = "TriggerTab.Timing";
+        public const string TriggerTabEvents = "TriggerTab.Events";
+        public const string TriggerTabEnabled = "TriggerTab.Enabled";
+        public const string TriggerTabDisabled = "TriggerTab.Disabled";
+        public const string TriggerTabEnable = "TriggerTab.Enable";
+        public const string TriggerTabDisable = "TriggerTab.Disable";
+        public const string TriggerTabNoTriggersFound = "TriggerTab.NoTriggersFound";
+        public const string TriggerTabNoMatchFilter = "TriggerTab.NoMatchFilter";
+        public const string TriggerTabConfirmDrop = "TriggerTab.ConfirmDrop";
+        public const string TriggerTabBody = "TriggerTab.Body";
+        public const string TriggerTabWithEncryption = "TriggerTab.WithEncryption";
+        public const string TriggerTabDropTitle = "TriggerTab.DropTitle";
     }
 }

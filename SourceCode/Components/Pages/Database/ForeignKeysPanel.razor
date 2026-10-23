@@ -1,4 +1,5 @@
 @using BprDevKit.Utility
+@using BprDevKit.Config
 @using BprDevKit.DatabaseManagement.Models.Metadata
 @using BprDevKit.DatabaseManagement.Models.Operations
 @using BprDevKit.DatabaseManagement.Services
@@ -25,10 +26,27 @@
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label small fw-semibold">@t[TranslationKeys.AutoName]</label>
-                    <div class="form-control form-control-sm font-monospace bg-light text-primary fw-semibold text-truncate" title="@ComputedFKName">
-                        <i class="bi bi-magic me-1"></i>@ComputedFKName
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small fw-semibold mb-0" for="fk-name-input">@t[TranslationKeys.Name]</label>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" id="auto-name-fk" @bind="_autoGenerateName" />
+                            <label class="form-check-label small" for="auto-name-fk">@t[TranslationKeys.AutoName]</label>
+                        </div>
                     </div>
+                    @if (_autoGenerateName)
+                    {
+                        <div class="form-control form-control-sm font-monospace bg-light text-primary fw-semibold text-truncate d-flex align-items-center justify-content-between" title="@ComputedFKName">
+                            <span class="text-truncate"><i class="bi bi-magic me-1"></i>@ComputedFKName</span>
+                            <span class="badge text-bg-secondary font-monospace small">AUTO</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <input id="fk-name-input" class="form-control form-control-sm font-monospace" 
+                               maxlength="@(ServerConfig?.Database?.MaxForeignKeyNameLength ?? Constants.MaxForeignKeyNameLength)" 
+                               placeholder="@ComputedFKName" 
+                               @bind="_customFkName" @bind:event="oninput" />
+                    }
                 </div>
                 <div class="col-md-6">
                     <label class="form-label small fw-semibold" for="fk-reference">@t[TranslationKeys.FkPanelReferencedTable]</label>
@@ -187,6 +205,7 @@ else
     [Parameter, EditorRequired] public DatabaseManager Manager { get; set; } = null!;
     [Parameter, EditorRequired] public TableOperation.Information Table { get; set; } = null!;
     [Parameter] public IReadOnlyList<TableOperation.Information> Tables { get; set; } = Array.Empty<TableOperation.Information>();
+    [Parameter] public ServerConfiguration? ServerConfig { get; set; }
     [Parameter] public EventCallback<OperationResult> OnChanged { get; set; }
 
     private PanelMode _mode = PanelMode.None;
@@ -194,6 +213,8 @@ else
     private ForeignKeyOperation.Information? _selected;
     private List<string> _referenceColumns = new();
     private string _referenceKey = string.Empty;
+    private bool _autoGenerateName = true;
+    private string _customFkName = string.Empty;
     private bool _isSaving;
     private string? _message;
     private bool _messageSuccess;
@@ -210,6 +231,8 @@ else
     private void OpenCreate()
     {
         Close();
+        _autoGenerateName = true;
+        _customFkName = string.Empty;
         _form = new ForeignKeyOperation.Create();
         _form.Columns.Add(new ForeignKeyOperation.ColumnMapping());
         _referenceKey = string.Empty;
@@ -265,7 +288,9 @@ else
         _form.TableName = Table.TableName;
         _form.RefSchemaName = reference.SchemaName;
         _form.RefTableName = reference.TableName;
-        _form.FKName = null;
+        _form.FKName = _autoGenerateName || string.IsNullOrWhiteSpace(_customFkName)
+            ? null
+            : _customFkName.Trim();
 
         await Run(() => Manager.CreateForeignKey(_form));
     }

@@ -109,14 +109,25 @@ namespace BprDevKit.DatabaseManagement.Services
                 wasRemoteDacInitiallyDisabled = connResult.WasRemoteDacInitiallyDisabled;
 
                 // 2. Query object_id and object type from sys.objects via DAC
+                // 2. Query object_id, object type, and parent table (for triggers) from sys.objects via DAC
                 int objectId;
                 string resolvedType;
+                string parentSchema = string.Empty;
+                string parentTable = string.Empty;
+                bool isInsteadOf = false;
+
                 using (var cmd = dacConnection.CreateCommand())
                 {
                     cmd.CommandText = @"
-SELECT object_id, RTRIM(type) AS type 
-FROM sys.objects 
-WHERE schema_id = SCHEMA_ID(@schemaName) AND name = @objectName;";
+SELECT 
+    o.object_id, 
+    RTRIM(o.type) AS type,
+    ISNULL(OBJECT_SCHEMA_NAME(o.parent_object_id), '') AS parentSchema,
+    ISNULL(OBJECT_NAME(o.parent_object_id), '') AS parentName,
+    CAST(ISNULL(tr.is_instead_of_trigger, 0) AS INT) AS isInsteadOf
+FROM sys.objects AS o
+LEFT JOIN sys.triggers AS tr ON tr.object_id = o.object_id
+WHERE o.schema_id = SCHEMA_ID(@schemaName) AND o.name = @objectName;";
                     cmd.Parameters.Add(new SqlParameter("@schemaName", SqlDbType.NVarChar, 128) { Value = schemaName });
                     cmd.Parameters.Add(new SqlParameter("@objectName", SqlDbType.NVarChar, 128) { Value = objectName });
 
@@ -132,6 +143,9 @@ WHERE schema_id = SCHEMA_ID(@schemaName) AND name = @objectName;";
 
                     objectId = reader.GetInt32(0);
                     resolvedType = reader.GetString(1);
+                    parentSchema = reader.GetString(2);
+                    parentTable = reader.GetString(3);
+                    isInsteadOf = reader.GetInt32(4) == 1;
                 }
 
                 // 3. Read original encrypted bytes from sys.sysobjvalues (valclass = 1)
@@ -148,7 +162,7 @@ WHERE schema_id = SCHEMA_ID(@schemaName) AND name = @objectName;";
                 int totalCharCount = encryptedOriginal.Length / 2;
 
                 // 4. Build matching dummy statement (leading spaces guarantee characters 0..(totalCharCount-1) are spaces)
-                string dummyStatement = BuildDummyStatement(schemaName, objectName, resolvedType, totalCharCount);
+                string dummyStatement = BuildDummyStatement(schemaName, objectName, resolvedType, totalCharCount, parentSchema, parentTable, isInsteadOf);
                 if (dummyStatement.Length < totalCharCount)
                 {
                     return new DecryptionResult
@@ -473,7 +487,14 @@ ORDER BY subobjid;";
             return result;
         }
 
-        private static string BuildDummyStatement(string schemaName, string objectName, string type, int targetCharLength)
+        private static string BuildDummyStatement(
+            string schemaName, 
+            string objectName, 
+            string type, 
+            int targetCharLength,
+            string? parentSchema = null,
+            string? parentTable = null,
+            bool isInsteadOfTrigger = false)
         {
             string tail;
             switch (type.Trim().ToUpperInvariant())
@@ -498,6 +519,14 @@ ORDER BY subobjid;";
                 case "TF":
                 case "FT":
                     tail = $"ALTER FUNCTION [{schemaName}].[{objectName}]() RETURNS @t TABLE ([_c] INT) WITH ENCRYPTION AS BEGIN RETURN; END;";
+                    break;
+
+                case "TR":
+                    var targetTable = !string.IsNullOrWhiteSpace(parentTable)
+                        ? (!string.IsNullOrWhiteSpace(parentSchema) ? $"[{parentSchema}].[{parentTable}]" : $"[{parentTable}]")
+                        : $"[{schemaName}].[{objectName}]";
+                    var timing = isInsteadOfTrigger ? "INSTEAD OF INSERT" : "AFTER INSERT";
+                    tail = $"ALTER TRIGGER [{schemaName}].[{objectName}] ON {targetTable} WITH ENCRYPTION {timing} AS RETURN;";
                     break;
 
                 default:

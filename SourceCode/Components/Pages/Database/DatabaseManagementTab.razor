@@ -2,6 +2,7 @@
 @using BprDevKit.Config
 @using BprDevKit.DatabaseManagement.Models.Operations;
 @using BprDevKit.DatabaseManagement.Services
+@using BprDevKit.Utility
 @inject DatabaseManagerFactory DatabaseManagerFactory
 @inject ITranslationFactory TranslationFactory
 
@@ -39,7 +40,7 @@
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label fw-semibold" for="database-name">@t[TranslationKeys.Name]</label>
-                        <input id="database-name" class="form-control" maxlength="128" @bind="_createConfiguration.DatabaseName" placeholder="ExampleDb" />
+                        <input id="database-name" class="form-control" maxlength="@(ServerConfig?.Database?.MaxDatabaseNameLength ?? Constants.MaxDatabaseNameLength)" @bind="_createConfiguration.DatabaseName" placeholder="ExampleDb" />
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-semibold" for="database-collation">@t[TranslationKeys.DbTabCollation] <span class="text-muted fw-normal">@t[TranslationKeys.DbTabOptional]</span></label>
@@ -345,7 +346,15 @@
 
     private void OpenCreateDatabase()
     {
-        _createConfiguration = new DatabaseOperation.Create { InitialSizeMB = 8, FileGrowthMB = 64, LogInitialSizeMB = 8, LogFileGrowthMB = 64, RecoveryModel = "SIMPLE", PageVerify = "CHECKSUM" };
+        _createConfiguration = new DatabaseOperation.Create
+        {
+            InitialSizeMB = ServerConfig?.Database?.DefaultDataFileSizeMB ?? Constants.DefaultInitialDataSizeMB,
+            FileGrowthMB = ServerConfig?.Database?.DefaultFileGrowthMB ?? Constants.DefaultFileGrowthMB,
+            LogInitialSizeMB = ServerConfig?.Database?.DefaultLogFileSizeMB ?? Constants.DefaultInitialLogSizeMB,
+            LogFileGrowthMB = ServerConfig?.Database?.DefaultLogFileGrowthMB ?? Constants.DefaultLogFileGrowthMB,
+            RecoveryModel = "SIMPLE",
+            PageVerify = "CHECKSUM"
+        };
         _showCreateForm = true;
     }
 

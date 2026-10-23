@@ -49,6 +49,7 @@ namespace BprDevKit.Localization
             [TranslationKeys.Remove] = "Remove",
             [TranslationKeys.Yes] = "Yes",
             [TranslationKeys.No] = "No",
+            [TranslationKeys.Status] = "Status",
 
             // Navigation & Workspace
             [TranslationKeys.ActiveServer] = "Active Server",
@@ -345,6 +346,20 @@ namespace BprDevKit.Localization
             [TranslationKeys.FkPanelEnable] = "Enable",
             [TranslationKeys.FkPanelDisable] = "Disable",
 
+            // Check Constraints Panel
+            [TranslationKeys.CheckConstraints] = "Check Constraints",
+            [TranslationKeys.CheckConstraintsCreate] = "Add Check Constraint",
+            [TranslationKeys.CheckConstraintsCreateOn] = "New check constraint on {0}",
+            [TranslationKeys.CheckConstraintsExpression] = "Check Condition (Expression)",
+            [TranslationKeys.CheckConstraintsExpressionPlaceholder] = "[Amount] > 0 AND [Status] IN (1, 2)",
+            [TranslationKeys.CheckConstraintsNotForReplication] = "Not For Replication",
+            [TranslationKeys.CheckConstraintsNoConstraints] = "This table has no check constraints.",
+            [TranslationKeys.CheckConstraintsDropTitle] = "Drop check constraint '{0}'?",
+            [TranslationKeys.CheckConstraintsDropWarning] = "The check constraint '{0}' on table '{1}' will be dropped permanently.",
+            [TranslationKeys.CheckConstraintsEnable] = "Enable constraint",
+            [TranslationKeys.CheckConstraintsDisable] = "Disable constraint",
+            [TranslationKeys.CheckConstraintsStatus] = "Status",
+
             // View Management Tab
             [TranslationKeys.ViewTabSubtitle] = "Create, inspect, test, alter and drop database views.",
             [TranslationKeys.ViewTabCreateView] = "Create view",
@@ -402,7 +417,27 @@ namespace BprDevKit.Localization
             [TranslationKeys.CommonCannotSaveEncryptedEmpty] = "Cannot save an empty definition for an encrypted object.",
             [TranslationKeys.CommonType] = "Type",
             [TranslationKeys.CommonCopy] = "Copy Script",
-            [TranslationKeys.CommonCopied] = "Copied!"
+            [TranslationKeys.CommonCopied] = "Copied!",
+            [TranslationKeys.CommonFullScreen] = "Fullscreen",
+            [TranslationKeys.CommonExitFullScreen] = "Exit Fullscreen",
+
+            // Triggers
+            [TranslationKeys.Triggers] = "Triggers",
+            [TranslationKeys.TriggerTabSubtitle] = "Inspect, create, alter, and manage database triggers",
+            [TranslationKeys.TriggerTabCreateTrigger] = "Create Trigger",
+            [TranslationKeys.TriggerTabTableName] = "Table",
+            [TranslationKeys.TriggerTabTiming] = "Timing",
+            [TranslationKeys.TriggerTabEvents] = "Events",
+            [TranslationKeys.TriggerTabEnabled] = "Enabled",
+            [TranslationKeys.TriggerTabDisabled] = "Disabled",
+            [TranslationKeys.TriggerTabEnable] = "Enable",
+            [TranslationKeys.TriggerTabDisable] = "Disable",
+            [TranslationKeys.TriggerTabNoTriggersFound] = "No triggers found for this database.",
+            [TranslationKeys.TriggerTabNoMatchFilter] = "No triggers match the current filter.",
+            [TranslationKeys.TriggerTabConfirmDrop] = "Are you sure you want to drop trigger '{0}'?",
+            [TranslationKeys.TriggerTabBody] = "Trigger Body",
+            [TranslationKeys.TriggerTabWithEncryption] = "Encrypt trigger (WITH ENCRYPTION)",
+            [TranslationKeys.TriggerTabDropTitle] = "Drop Trigger"
         };
 
         public string this[string key]

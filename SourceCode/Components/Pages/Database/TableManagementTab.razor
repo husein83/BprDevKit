@@ -86,7 +86,7 @@
                     </div>
                     <div class="col-md-5">
                         <label class="form-label fw-semibold" for="new-table-name">@t[TranslationKeys.TableName]</label>
-                        <input id="new-table-name" class="form-control" maxlength="128" placeholder="Customers" @bind="_createConfiguration.TableName" />
+                        <input id="new-table-name" class="form-control" maxlength="@(ServerConfig?.Database?.MaxTableNameLength ?? Constants.MaxTableNameLength)" placeholder="Customers" @bind="_createConfiguration.TableName" />
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-semibold" for="new-table-filegroup">@t[TranslationKeys.TableTabFileGroup]</label>
@@ -124,7 +124,7 @@
                             {
                                 var type = ColumnDataType.Find(column.DataType);
                                 <tr>
-                                    <td><input class="form-control form-control-sm font-monospace" maxlength="128" @bind="column.ColumnName" @bind:event="oninput" /></td>
+                                    <td><input class="form-control form-control-sm font-monospace" maxlength="@(ServerConfig?.Database?.MaxColumnNameLength ?? Constants.MaxColumnNameLength)" @bind="column.ColumnName" @bind:event="oninput" /></td>
                                     <td>
                                         <select class="form-select form-select-sm" value="@column.DataType" @onchange="e => column.ApplyDataType(e.Value?.ToString())">
                                             @foreach (var option in ColumnDataType.All)
@@ -277,7 +277,7 @@
                         }
                         else if (_details is not null)
                         {
-                            <TableDetailsView Manager="_databaseManager!" Table="_details" Tables="_tables" FileGroups="_fileGroups" OnChanged="OnTableStructureChanged" />
+                            <TableDetailsView Manager="_databaseManager!" Table="_details" Tables="_tables" FileGroups="_fileGroups" ServerConfig="ServerConfig" OnChanged="OnTableStructureChanged" />
                         }
                     </div>
                     <div class="modal-footer"><button class="btn btn-primary" type="button" @onclick="CloseDialogs">@t[TranslationKeys.Close]</button></div>
@@ -299,7 +299,7 @@
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label fw-semibold" for="edit-table-name">@t[TranslationKeys.TableName]</label>
-                            <input id="edit-table-name" class="form-control" maxlength="128" @bind="_editNewName" @bind:event="oninput" />
+                            <input id="edit-table-name" class="form-control" maxlength="@(ServerConfig?.Database?.MaxTableNameLength ?? Constants.MaxTableNameLength)" @bind="_editNewName" @bind:event="oninput" />
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-semibold" for="edit-table-description">@t[TranslationKeys.Description]</label>

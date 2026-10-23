@@ -171,7 +171,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small fw-semibold" for="new-view-name">@t[TranslationKeys.Name]</label>
-                                <input id="new-view-name" class="form-control form-control-sm font-monospace" maxlength="128" placeholder="vw_MyView" @bind="_createModel.ViewName" />
+                                <input id="new-view-name" class="form-control form-control-sm font-monospace" maxlength="@(ServerConfig?.Database?.MaxTableNameLength ?? Constants.MaxTableNameLength)" placeholder="vw_MyView" @bind="_createModel.ViewName" />
                             </div>
                             <div class="col-12">
                                 <div class="form-check">
@@ -245,11 +245,11 @@
     @if (_showDefinitionModal && _selectedView is not null)
     {
         <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-dialog @(_isFullScreen ? "modal-fullscreen" : "modal-lg") modal-dialog-scrollable">
                 <div class="modal-content">
-                    <div class="modal-header">
+                    <div class="modal-header d-flex align-items-center justify-content-between flex-row" style="direction: ltr !important;">
                         <div class="d-flex align-items-center gap-2">
-                            <h5 class="modal-title font-monospace mb-0"><i class="bi bi-code-square me-2 text-primary"></i>@($"{_selectedView.SchemaName}.{_selectedView.ViewName}")</h5>
+                            <h5 class="modal-title font-monospace mb-0" style="direction: ltr; text-align: left;"><i class="bi bi-code-square me-2 text-primary"></i>@($"{_selectedView.SchemaName}.{_selectedView.ViewName}")</h5>
                             @if (_selectedView.IsEncrypted)
                             {
                                 if (_isDecrypted)
@@ -262,7 +262,27 @@
                                 }
                             }
                         </div>
-                        <button type="button" class="btn-close" @onclick="CloseModals"></button>
+                        <div class="d-flex align-items-center gap-2 ms-auto" style="direction: ltr;">
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 d-inline-flex align-items-center justify-content-center"
+                                    @onclick="ToggleFullScreen"
+                                    title="@t[_isFullScreen ? TranslationKeys.CommonExitFullScreen : TranslationKeys.CommonFullScreen]"
+                                    style="min-width: 2rem; height: 1.85rem;">
+                                @if (_isFullScreen)
+                                {
+                                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M3 0a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h1v-1H3a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1h1V2a2 2 0 0 0-2-2z"/>
+                                        <path d="M5 4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-1 2a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/>
+                                    </svg>
+                                }
+                                else
+                                {
+                                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M1.5 1a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 .5-.5v-13a.5.5 0 0 0-.5-.5zM2 2h12v12H2z"/>
+                                    </svg>
+                                }
+                            </button>
+                            <button type="button" class="btn-close m-0" @onclick="CloseModals" aria-label="@t[TranslationKeys.Close]"></button>
+                        </div>
                     </div>
                     <div class="modal-body">
                         @if (!string.IsNullOrEmpty(_modalMessage))
@@ -334,7 +354,7 @@
 
                             <div class="mb-3">
                                 <label class="form-label small fw-semibold">@t[TranslationKeys.ViewTabDefinition]</label>
-                                <textarea class="form-control font-monospace" rows="14" @bind="_editDefinition" @bind:event="oninput"></textarea>
+                                <textarea class="form-control font-monospace" rows="@(_isFullScreen ? 26 : 14)" @bind="_editDefinition" @bind:event="oninput"></textarea>
                             </div>
                         }
                     </div>
@@ -425,6 +445,7 @@
     private string? _modalMessage;
     private bool _modalMessageSuccess;
     private bool _isCopied;
+    private bool _isFullScreen;
 
     private bool _showCreateModal;
     private bool _showDefinitionModal;
@@ -759,7 +780,10 @@
         _isDacRequired = false;
         _modalMessage = null;
         _isCopied = false;
+        _isFullScreen = false;
     }
+
+    private void ToggleFullScreen() => _isFullScreen = !_isFullScreen;
 
     private async Task CopyDefinitionToClipboard()
     {

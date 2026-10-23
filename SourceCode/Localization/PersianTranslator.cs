@@ -49,6 +49,7 @@ namespace BprDevKit.Localization
             [TranslationKeys.Remove] = "حذف",
             [TranslationKeys.Yes] = "بله",
             [TranslationKeys.No] = "خیر",
+            [TranslationKeys.Status] = "وضعیت",
 
             // Navigation & Workspace
             [TranslationKeys.ActiveServer] = "سرور فعال",
@@ -346,6 +347,20 @@ namespace BprDevKit.Localization
             [TranslationKeys.FkPanelEnable] = "فعال‌سازی",
             [TranslationKeys.FkPanelDisable] = "غیرفعال‌سازی",
 
+            // Check Constraints Panel
+            [TranslationKeys.CheckConstraints] = "قیود کنترلی (Check Constraints)",
+            [TranslationKeys.CheckConstraintsCreate] = "افزودن قید کنترلی (CK)",
+            [TranslationKeys.CheckConstraintsCreateOn] = "قید کنترلی جدید روی {0}",
+            [TranslationKeys.CheckConstraintsExpression] = "شرط بررسی (عبارت / WHERE)",
+            [TranslationKeys.CheckConstraintsExpressionPlaceholder] = "[Amount] > 0 AND [Status] IN (1, 2)",
+            [TranslationKeys.CheckConstraintsNotForReplication] = "عدم اعمال در همانندسازی (Not For Replication)",
+            [TranslationKeys.CheckConstraintsNoConstraints] = "این جدول قید کنترلی (Check Constraint) ندارد.",
+            [TranslationKeys.CheckConstraintsDropTitle] = "حذف قید کنترلی «{0}»؟",
+            [TranslationKeys.CheckConstraintsDropWarning] = "قید کنترلی «{0}» از جدول «{1}» به‌صورت دائمی حذف خواهد شد.",
+            [TranslationKeys.CheckConstraintsEnable] = "فعال‌سازی قید",
+            [TranslationKeys.CheckConstraintsDisable] = "غیرفعال‌سازی قید",
+            [TranslationKeys.CheckConstraintsStatus] = "وضعیت",
+
             // View Management Tab
             [TranslationKeys.ViewTabSubtitle] = "ایجاد، مشاهده، تست، ویرایش و حذف نماهای پایگاه داده (Views).",
             [TranslationKeys.ViewTabCreateView] = "ایجاد نمای جدید",
@@ -403,7 +418,27 @@ namespace BprDevKit.Localization
             [TranslationKeys.CommonCannotSaveEncryptedEmpty] = "ذخیره کردن تعریف خالی برای یک آبجکت رمزنگاری‌شده امکان‌پذیر نیست.",
             [TranslationKeys.CommonType] = "نوع",
             [TranslationKeys.CommonCopy] = "کپی اسکریپت",
-            [TranslationKeys.CommonCopied] = "کپی شد!"
+            [TranslationKeys.CommonCopied] = "کپی شد!",
+            [TranslationKeys.CommonFullScreen] = "تمام‌صفحه",
+            [TranslationKeys.CommonExitFullScreen] = "خروج از تمام‌صفحه",
+
+            // Triggers
+            [TranslationKeys.Triggers] = "تریگرها",
+            [TranslationKeys.TriggerTabSubtitle] = "مشاهده، ایجاد، ویرایش و مدیریت تریگرهای دیتابیس",
+            [TranslationKeys.TriggerTabCreateTrigger] = "ایجاد تریگر جدید",
+            [TranslationKeys.TriggerTabTableName] = "جدول مربوطه",
+            [TranslationKeys.TriggerTabTiming] = "زمان اجرا",
+            [TranslationKeys.TriggerTabEvents] = "رویدادها",
+            [TranslationKeys.TriggerTabEnabled] = "فعال",
+            [TranslationKeys.TriggerTabDisabled] = "غیرفعال",
+            [TranslationKeys.TriggerTabEnable] = "فعال‌سازی",
+            [TranslationKeys.TriggerTabDisable] = "غیرفعال‌سازی",
+            [TranslationKeys.TriggerTabNoTriggersFound] = "هیچ تریگری در این دیتابیس یافت نشد.",
+            [TranslationKeys.TriggerTabNoMatchFilter] = "هیچ تریگری با فیلتر جستجو مطابقت ندارد.",
+            [TranslationKeys.TriggerTabConfirmDrop] = "آیا از حذف تریگر '{0}' اطمینان دارید؟",
+            [TranslationKeys.TriggerTabBody] = "بدنه تریگر",
+            [TranslationKeys.TriggerTabWithEncryption] = "رمزنگاری تریگر (WITH ENCRYPTION)",
+            [TranslationKeys.TriggerTabDropTitle] = "حذف تریگر"
         };
 
         public string this[string key]

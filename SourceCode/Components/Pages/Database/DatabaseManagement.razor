@@ -131,6 +131,10 @@
             {
                 <FunctionManagementTab ServerConfig="_selectedServer" OnOperationComplete="NotifyOperationCompleted" />
             }
+            else if (_activeTab == "triggers")
+            {
+                <TriggerManagementTab ServerConfig="_selectedServer" OnOperationComplete="NotifyOperationCompleted" />
+            }
             else
             {
                 <div class="text-center text-muted py-5">
@@ -151,7 +155,8 @@
         ("tables", TranslationKeys.Tables, "bi-table"),
         ("views", TranslationKeys.Views, "bi-eye"),
         ("procedures", TranslationKeys.StoredProcedures, "bi-braces"),
-        ("functions", TranslationKeys.Functions, "bi-function")
+        ("functions", TranslationKeys.Functions, "bi-function"),
+        ("triggers", TranslationKeys.Triggers, "bi-lightning-charge")
     };
 
     private List<ServerConfiguration> _serverConfigurations = new();

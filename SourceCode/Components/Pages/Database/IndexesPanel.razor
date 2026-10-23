@@ -1,4 +1,5 @@
 @using BprDevKit.Utility
+@using BprDevKit.Config
 @using BprDevKit.DatabaseManagement.Models.Metadata
 @using BprDevKit.DatabaseManagement.Models.Operations
 @using BprDevKit.DatabaseManagement.Services
@@ -25,10 +26,27 @@
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-5">
-                    <label class="form-label small fw-semibold">@t[TranslationKeys.AutoName]</label>
-                    <div class="form-control form-control-sm font-monospace bg-light text-primary fw-semibold text-truncate" title="@ComputedIndexName">
-                        <i class="bi bi-magic me-1"></i>@ComputedIndexName
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small fw-semibold mb-0" for="index-name">@t[TranslationKeys.Name]</label>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" id="auto-name-idx" @bind="_autoGenerateName" />
+                            <label class="form-check-label small" for="auto-name-idx">@t[TranslationKeys.AutoName]</label>
+                        </div>
                     </div>
+                    @if (_autoGenerateName)
+                    {
+                        <div class="form-control form-control-sm font-monospace bg-light text-primary fw-semibold text-truncate d-flex align-items-center justify-content-between" title="@ComputedIndexName">
+                            <span class="text-truncate"><i class="bi bi-magic me-1"></i>@ComputedIndexName</span>
+                            <span class="badge text-bg-secondary font-monospace small">AUTO</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <input id="index-name" class="form-control form-control-sm font-monospace" 
+                               maxlength="@(ServerConfig?.Database?.MaxIndexNameLength ?? Constants.MaxIndexNameLength)" 
+                               placeholder="@ComputedIndexName" 
+                               @bind="_customIndexName" @bind:event="oninput" />
+                    }
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small fw-semibold" for="index-kind">@t[TranslationKeys.IdxPanelKind]</label>
@@ -146,7 +164,7 @@
     <div class="card border-secondary mb-3">
         <div class="card-header py-2 fw-semibold">@t.Get(TranslationKeys.IdxPanelRenameTitle, _selected.IndexName)</div>
         <div class="card-body">
-            <input class="form-control form-control-sm font-monospace mb-3" maxlength="128" aria-label="@t[TranslationKeys.IdxPanelNewName]" @bind="_newName" @bind:event="oninput" />
+            <input class="form-control form-control-sm font-monospace mb-3" maxlength="@(ServerConfig?.Database?.MaxIndexNameLength ?? Constants.MaxIndexNameLength)" aria-label="@t[TranslationKeys.IdxPanelNewName]" @bind="_newName" @bind:event="oninput" />
             <div class="d-flex justify-content-end gap-2">
                 <button class="btn btn-sm btn-light" type="button" @onclick="Close">@t[TranslationKeys.Cancel]</button>
                 <button class="btn btn-sm btn-primary" type="button" @onclick="RenameIndex"
@@ -234,12 +252,15 @@ else
     [Parameter, EditorRequired] public DatabaseManager Manager { get; set; } = null!;
     [Parameter, EditorRequired] public TableOperation.Information Table { get; set; } = null!;
     [Parameter] public IReadOnlyList<string> FileGroups { get; set; } = Array.Empty<string>();
+    [Parameter] public ServerConfiguration? ServerConfig { get; set; }
     [Parameter] public EventCallback<OperationResult> OnChanged { get; set; }
 
     private PanelMode _mode = PanelMode.None;
     private IndexOperation.Create _form = new();
     private IndexOperation.Information? _selected;
     private string _newName = string.Empty;
+    private bool _autoGenerateName = true;
+    private string _customIndexName = string.Empty;
     private bool _isSaving;
     private string? _message;
     private bool _messageSuccess;
@@ -256,6 +277,8 @@ else
     private void OpenCreate()
     {
         Close();
+        _autoGenerateName = true;
+        _customIndexName = string.Empty;
         _form = new IndexOperation.Create { FileGroup = string.Empty };
         if (Table.Columns.Count > 0)
             _form.Columns.Add(new IndexOperation.KeyColumn { ColumnName = Table.Columns[0].ColumnName });
@@ -312,7 +335,9 @@ else
         _form.DatabaseName = Table.DatabaseName;
         _form.SchemaName = Table.SchemaName;
         _form.TableName = Table.TableName;
-        _form.IndexName = null;
+        _form.IndexName = _autoGenerateName || string.IsNullOrWhiteSpace(_customIndexName)
+            ? null
+            : _customIndexName.Trim();
         _form.FilterPredicate = string.IsNullOrWhiteSpace(_form.FilterPredicate) ? null : _form.FilterPredicate.Trim();
 
         // A column chosen as key afterwards must not stay in the include list.

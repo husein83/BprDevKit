@@ -1,0 +1,277 @@
+@using System.Text.RegularExpressions
+@using BprDevKit.Utility
+@using BprDevKit.Config
+@using BprDevKit.DatabaseManagement.Models.Metadata
+@using BprDevKit.DatabaseManagement.Models.Operations
+@using BprDevKit.DatabaseManagement.Services
+@inject ITranslationFactory TranslationFactory
+
+@{
+    var t = TranslationFactory.Current;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h3 class="h6 mb-0"><i class="bi bi-shield-check me-1 text-primary"></i>@t[TranslationKeys.CheckConstraints] (@Table.CheckConstraints.Count)</h3>
+    <button class="btn btn-sm btn-primary" type="button" @onclick="OpenCreate" disabled="@_isSaving"><i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.CheckConstraintsCreate]</button>
+</div>
+
+<StatusAlert Message="@_message" Success="@_messageSuccess" OnDismiss="ClearMessage" />
+
+@if (_mode == PanelMode.Create)
+{
+    <div class="card border-primary mb-3">
+        <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">@t.Get(TranslationKeys.CheckConstraintsCreateOn, $"{Table.SchemaName}.{Table.TableName}")</span>
+            <button class="btn-close btn-close-white" type="button" @onclick="Close"></button>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small fw-semibold mb-0" for="ck-name-input">@t[TranslationKeys.Name]</label>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" id="auto-name-ck" @bind="_autoGenerateName" />
+                            <label class="form-check-label small" for="auto-name-ck">@t[TranslationKeys.AutoName]</label>
+                        </div>
+                    </div>
+                    @if (_autoGenerateName)
+                    {
+                        <div class="form-control form-control-sm font-monospace bg-light text-primary fw-semibold text-truncate d-flex align-items-center justify-content-between" title="@ComputedConstraintName">
+                            <span class="text-truncate"><i class="bi bi-magic me-1"></i>@ComputedConstraintName</span>
+                            <span class="badge text-bg-secondary font-monospace small">AUTO</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <input id="ck-name-input" class="form-control form-control-sm font-monospace" 
+                               maxlength="128" 
+                               placeholder="@ComputedConstraintName" 
+                               @bind="_customConstraintName" @bind:event="oninput" />
+                    }
+                </div>
+
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="form-check">
+                        <input id="ck-not-rep" class="form-check-input" type="checkbox" @bind="_form.IsNotForReplication" />
+                        <label class="form-check-label small" for="ck-not-rep">@t[TranslationKeys.CheckConstraintsNotForReplication]</label>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label small fw-semibold" for="ck-expression">@t[TranslationKeys.CheckConstraintsExpression]</label>
+                    <textarea id="ck-expression" class="form-control font-monospace" 
+                              rows="4"
+                              placeholder="@t[TranslationKeys.CheckConstraintsExpressionPlaceholder]" 
+                              @bind="_form.CheckExpression" @bind:event="oninput"></textarea>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <button class="btn btn-sm btn-light" type="button" @onclick="Close">@t[TranslationKeys.Cancel]</button>
+                <button class="btn btn-sm btn-success" type="button" @onclick="CreateConstraint" disabled="@(_isSaving || !CanCreate)">
+                    @if (_isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    @t[TranslationKeys.Create]
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_mode == PanelMode.Drop && _selected is not null)
+{
+    <div class="card border-danger mb-3">
+        <div class="card-header bg-danger text-white py-2 fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1"></i>@t.Get(TranslationKeys.CheckConstraintsDropTitle, _selected.ConstraintName)</div>
+        <div class="card-body">
+            <p class="small mb-3">
+                @t.Get(TranslationKeys.CheckConstraintsDropWarning, _selected.ConstraintName, $"{_selected.SchemaName}.{_selected.TableName}")
+            </p>
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-sm btn-light" type="button" @onclick="Close">@t[TranslationKeys.Cancel]</button>
+                <button class="btn btn-sm btn-danger" type="button" @onclick="DropConstraint" disabled="@_isSaving">@t[TranslationKeys.Delete]</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (Table.CheckConstraints.Count == 0)
+{
+    <p class="text-muted small mb-0">@t[TranslationKeys.CheckConstraintsNoConstraints]</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>@t[TranslationKeys.Name]</th>
+                    <th>@t[TranslationKeys.CheckConstraintsExpression]</th>
+                    <th class="text-center">@t[TranslationKeys.CheckConstraintsStatus]</th>
+                    <th class="text-center">@t[TranslationKeys.CheckConstraintsNotForReplication]</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var constraint in Table.CheckConstraints)
+                {
+                    <tr>
+                        <td class="font-monospace small fw-semibold">@constraint.ConstraintName</td>
+                        <td class="font-monospace small text-break">
+                            <span class="badge bg-light text-dark border font-monospace text-wrap text-start">@constraint.CheckExpression</span>
+                        </td>
+                        <td class="text-center">
+                            @if (constraint.IsDisabled)
+                            {
+                                <span class="badge text-bg-secondary">@t[TranslationKeys.FkPanelDisabled]</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-success">@t[TranslationKeys.FkPanelEnabled]</span>
+                            }
+                        </td>
+                        <td class="text-center">
+                            @(constraint.IsNotForReplication ? t[TranslationKeys.Yes] : t[TranslationKeys.No])
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary" type="button" 
+                                        title="@(constraint.IsDisabled ? t[TranslationKeys.CheckConstraintsEnable] : t[TranslationKeys.CheckConstraintsDisable])" 
+                                        disabled="@_isSaving" @onclick="() => ToggleEnabled(constraint)">
+                                    <i class="bi @(constraint.IsDisabled ? "bi-toggle-off" : "bi-toggle-on")"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" type="button" title="@t[TranslationKeys.Delete]" disabled="@_isSaving" @onclick="() => OpenDrop(constraint)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private enum PanelMode { None, Create, Drop }
+
+    [Parameter, EditorRequired] public DatabaseManager Manager { get; set; } = null!;
+    [Parameter, EditorRequired] public TableOperation.Information Table { get; set; } = null!;
+    [Parameter] public ServerConfiguration? ServerConfig { get; set; }
+    [Parameter] public EventCallback<OperationResult> OnChanged { get; set; }
+
+    private PanelMode _mode = PanelMode.None;
+    private CheckConstraintOperation.Create _form = new();
+    private CheckConstraintOperation.Information? _selected;
+    private bool _autoGenerateName = true;
+    private string _customConstraintName = string.Empty;
+    private bool _isSaving;
+    private string? _message;
+    private bool _messageSuccess;
+
+    private bool CanCreate => !string.IsNullOrWhiteSpace(_form.CheckExpression);
+
+    private string ComputedConstraintName
+    {
+        get
+        {
+            var cleanExpr = Regex.Replace(_form.CheckExpression ?? string.Empty, @"[^a-zA-Z0-9_]", "_");
+            while (cleanExpr.Contains("__")) cleanExpr = cleanExpr.Replace("__", "_");
+            cleanExpr = cleanExpr.Trim('_');
+            if (string.IsNullOrWhiteSpace(cleanExpr))
+                cleanExpr = "Condition";
+            if (cleanExpr.Length > 25)
+                cleanExpr = cleanExpr[..25].TrimEnd('_');
+
+            return $"CK_{Table.TableName}_{cleanExpr}";
+        }
+    }
+
+    private void OpenCreate()
+    {
+        Close();
+        _autoGenerateName = true;
+        _customConstraintName = string.Empty;
+        _form = new CheckConstraintOperation.Create();
+        _mode = PanelMode.Create;
+    }
+
+    private void OpenDrop(CheckConstraintOperation.Information constraint)
+    {
+        Close();
+        _selected = constraint;
+        _mode = PanelMode.Drop;
+    }
+
+    private void Close() => _mode = PanelMode.None;
+
+    private async Task CreateConstraint()
+    {
+        if (string.IsNullOrWhiteSpace(_form.CheckExpression)) return;
+
+        _form.DatabaseName = Table.DatabaseName;
+        _form.SchemaName = Table.SchemaName;
+        _form.TableName = Table.TableName;
+        _form.ConstraintName = _autoGenerateName || string.IsNullOrWhiteSpace(_customConstraintName)
+            ? ComputedConstraintName
+            : _customConstraintName.Trim();
+
+        await Run(() => Manager.CreateCheckConstraint(_form));
+    }
+
+    private async Task ToggleEnabled(CheckConstraintOperation.Information constraint)
+    {
+        await Run(() => Manager.ToggleCheckConstraint(new CheckConstraintOperation.ToggleState
+        {
+            DatabaseName = Table.DatabaseName,
+            SchemaName = constraint.SchemaName,
+            TableName = constraint.TableName,
+            ConstraintName = constraint.ConstraintName,
+            Enable = constraint.IsDisabled
+        }));
+    }
+
+    private async Task DropConstraint()
+    {
+        if (_selected is null) return;
+
+        await Run(() => Manager.DropCheckConstraint(new CheckConstraintOperation.Drop
+        {
+            DatabaseName = Table.DatabaseName,
+            SchemaName = _selected.SchemaName,
+            TableName = _selected.TableName,
+            ConstraintName = _selected.ConstraintName
+        }));
+    }
+
+    private async Task Run(Func<Task<OperationResult>> operation)
+    {
+        _isSaving = true;
+        try
+        {
+            var result = await operation();
+            ShowResult(result);
+
+            if (result.Success)
+            {
+                Close();
+                await OnChanged.InvokeAsync(result);
+            }
+        }
+        catch (Exception exception)
+        {
+            _message = $"Unable to complete the operation: {exception.Message}";
+            _messageSuccess = false;
+        }
+        finally { _isSaving = false; }
+    }
+
+    private void ShowResult(OperationResult result)
+    {
+        _message = result.Message;
+        _messageSuccess = result.Success;
+    }
+
+    private void ClearMessage() => _message = null;
+}

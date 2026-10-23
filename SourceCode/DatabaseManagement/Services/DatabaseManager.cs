@@ -412,6 +412,9 @@ namespace BprDevKit.DatabaseManagement.Services
                 var foreignKeys = await ExecuteQuery(_sqlGenerator.GenerateGetTableForeignKeysScript(config));
                 table.ForeignKeys = foreignKeys.Rows.Cast<DataRow>().Select(row => MapForeignKey(config.DatabaseName, row)).ToList();
 
+                var checkConstraints = await ExecuteQuery(_sqlGenerator.GenerateGetTableCheckConstraintsScript(config));
+                table.CheckConstraints = checkConstraints.Rows.Cast<DataRow>().Select(row => MapCheckConstraint(config, row)).ToList();
+
                 return (OperationResult.SuccessResult($"Retrieved information for table '{config.SchemaName}.{config.TableName}'."), table);
             }
             catch (Exception ex)
@@ -760,6 +763,79 @@ namespace BprDevKit.DatabaseManagement.Services
             catch (Exception ex)
             {
                 return (OperationResult.ErrorResult($"Error retrieving foreign key information: {ex.Message}"), null);
+            }
+        }
+        #endregion
+
+        #region Check Constraint Operations
+        public async Task<OperationResult> CreateCheckConstraint(CheckConstraintOperation.Create config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateCreateCheckConstraintScript(config);
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Check constraint created successfully",
+                    $"Check constraint created on table '{config.SchemaName}.{config.TableName}'.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error creating check constraint: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<OperationResult> DropCheckConstraint(CheckConstraintOperation.Drop config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateDropCheckConstraintScript(config);
+
+                if (!await CheckConstraintExistsAsync(config.DatabaseName, config.SchemaName, config.TableName, config.ConstraintName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Check constraint [{config.ConstraintName}] does not exist on table [{config.SchemaName}].[{config.TableName}].");
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    "Check constraint dropped successfully",
+                    $"Check constraint '{config.ConstraintName}' dropped from table '{config.SchemaName}.{config.TableName}'.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error dropping check constraint: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<OperationResult> ToggleCheckConstraint(CheckConstraintOperation.ToggleState config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateToggleCheckConstraintScript(config);
+
+                if (!await CheckConstraintExistsAsync(config.DatabaseName, config.SchemaName, config.TableName, config.ConstraintName))
+                    return OperationResult.ErrorResult($"[BprDevKit] Check constraint [{config.ConstraintName}] does not exist on table [{config.SchemaName}].[{config.TableName}].");
+
+                return await ExecuteInTransaction(
+                    new List<string> { script },
+                    config.Enable ? "Check constraint enabled successfully" : "Check constraint disabled successfully",
+                    $"Check constraint '{config.ConstraintName}' {(config.Enable ? "enabled" : "disabled")}.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error updating check constraint: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<(OperationResult operationResult, List<CheckConstraintOperation.Information> constraints)> GetTableCheckConstraints(TableOperation.Information config)
+        {
+            try
+            {
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTableCheckConstraintsScript(config));
+                var constraints = table.Rows.Cast<DataRow>().Select(row => MapCheckConstraint(config, row)).ToList();
+                return (OperationResult.SuccessResult($"Retrieved {constraints.Count} check constraint(s)"), constraints);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving check constraints: {ex.Message}", ex), new List<CheckConstraintOperation.Information>());
             }
         }
         #endregion
@@ -1416,6 +1492,14 @@ INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
 WHERE s.name = @schemaName AND t.name = @tableName AND fk.name = @foreignKeyName;",
                 ("@schemaName", schemaName), ("@tableName", tableName), ("@foreignKeyName", foreignKeyName));
 
+        private Task<bool> CheckConstraintExistsAsync(string databaseName, string schemaName, string tableName, string constraintName) =>
+            ExistsAsync(databaseName,
+                @"SELECT 1 FROM sys.check_constraints AS cc
+INNER JOIN sys.tables AS t ON t.object_id = cc.parent_object_id
+INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName;",
+                ("@schemaName", schemaName), ("@tableName", tableName), ("@constraintName", constraintName));
+
         private static SchemaOperation.Information MapSchema(string databaseName, DataRow row)
         {
             return new SchemaOperation.Information
@@ -1498,6 +1582,20 @@ WHERE s.name = @schemaName AND t.name = @tableName AND fk.name = @foreignKeyName
                 OnUpdate = (Convert.ToString(row["OnUpdate"]) ?? "NO_ACTION").Replace('_', ' '),
                 IsNotForReplication = Convert.ToBoolean(row["IsNotForReplication"]),
                 Enabled = Convert.ToBoolean(row["Enabled"])
+            };
+        }
+
+        private static CheckConstraintOperation.Information MapCheckConstraint(TableOperation.Information table, DataRow row)
+        {
+            return new CheckConstraintOperation.Information
+            {
+                DatabaseName = table.DatabaseName,
+                SchemaName = Convert.ToString(row["SchemaName"]) ?? table.SchemaName,
+                TableName = Convert.ToString(row["TableName"]) ?? table.TableName,
+                ConstraintName = Convert.ToString(row["ConstraintName"]) ?? string.Empty,
+                CheckExpression = Convert.ToString(row["CheckExpression"]) ?? string.Empty,
+                IsDisabled = Convert.ToBoolean(row["IsDisabled"]),
+                IsNotForReplication = Convert.ToBoolean(row["IsNotForReplication"])
             };
         }
 
@@ -1847,6 +1945,133 @@ WHERE s.name = @schemaName AND t.name = @tableName AND fk.name = @foreignKeyName
         }
         #endregion
 
+        #region Trigger Operations
+        public async Task<OperationResult> CreateTrigger(TriggerOperation.Create config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateCreateTriggerScript(config);
+                return await ExecuteDatabaseCommand(script, $"Trigger '{config.SchemaName}.{config.TriggerName}' created successfully.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error creating trigger: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<OperationResult> AlterTrigger(TriggerOperation.Alter config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateAlterTriggerScript(config.DatabaseName, config.SchemaName, config.TriggerName, config.Body, config.WithEncryption);
+                return await ExecuteDatabaseCommand(script, $"Trigger '{config.SchemaName}.{config.TriggerName}' updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error updating trigger: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<OperationResult> DropTrigger(TriggerOperation.Drop config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateDropTriggerScript(config.DatabaseName, config.SchemaName, config.TriggerName);
+                return await ExecuteDatabaseCommand(script, $"Trigger '{config.SchemaName}.{config.TriggerName}' dropped successfully.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error dropping trigger: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<OperationResult> ToggleTrigger(TriggerOperation.ToggleState config)
+        {
+            try
+            {
+                var script = _sqlGenerator.GenerateToggleTriggerScript(config.DatabaseName, config.SchemaName, config.TriggerName, config.TableSchema, config.TableName, config.Enable);
+                var action = config.Enable ? "enabled" : "disabled";
+                return await ExecuteDatabaseCommand(script, $"Trigger '{config.SchemaName}.{config.TriggerName}' {action} successfully.");
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.ErrorResult($"Error changing trigger state: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<(OperationResult operationResult, List<TriggerOperation.Information> triggers)> GetTriggers(string databaseName)
+        {
+            try
+            {
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTriggersScript(databaseName));
+                var triggers = table.Rows.Cast<DataRow>().Select(row =>
+                {
+                    var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
+                    var isDisabled = row.Table.Columns.Contains("IsDisabled") && Convert.ToBoolean(row["IsDisabled"]);
+                    var isInsteadOf = row.Table.Columns.Contains("IsInsteadOfTrigger") && Convert.ToBoolean(row["IsInsteadOfTrigger"]);
+                    return new TriggerOperation.Information
+                    {
+                        DatabaseName = databaseName,
+                        SchemaName = Convert.ToString(row["SchemaName"]) ?? "dbo",
+                        TriggerName = Convert.ToString(row["TriggerName"]) ?? string.Empty,
+                        TableSchema = Convert.ToString(row["TableSchema"]) ?? "dbo",
+                        TableName = Convert.ToString(row["TableName"]) ?? string.Empty,
+                        IsDisabled = isDisabled,
+                        IsInsteadOfTrigger = isInsteadOf,
+                        TriggerEvents = Convert.ToString(row["TriggerEvents"]) ?? string.Empty,
+                        CreateDate = row.Table.Columns.Contains("CreateDate") && row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
+                        ModifyDate = row.Table.Columns.Contains("ModifyDate") && row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                        IsEncrypted = isEncrypted,
+                        WithEncryption = isEncrypted
+                    };
+                }).ToList();
+
+                return (OperationResult.SuccessResult($"Retrieved {triggers.Count} trigger(s)"), triggers);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving triggers: {ex.Message}", ex), new List<TriggerOperation.Information>());
+            }
+        }
+
+        public async Task<(OperationResult operationResult, TriggerOperation.Information? trigger)> GetTriggerInformation(string databaseName, string schemaName, string triggerName)
+        {
+            try
+            {
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTriggerInfoScript(databaseName, schemaName, triggerName));
+                if (table.Rows.Count == 0)
+                    return (OperationResult.ErrorResult($"Trigger '{schemaName}.{triggerName}' not found."), null);
+
+                var row = table.Rows[0];
+                var definition = Convert.ToString(row["TriggerDefinition"]) ?? string.Empty;
+                var isEncrypted = row.Table.Columns.Contains("IsEncrypted") && Convert.ToBoolean(row["IsEncrypted"]);
+                var isDisabled = row.Table.Columns.Contains("IsDisabled") && Convert.ToBoolean(row["IsDisabled"]);
+                var isInsteadOf = row.Table.Columns.Contains("IsInsteadOfTrigger") && Convert.ToBoolean(row["IsInsteadOfTrigger"]);
+                var trig = new TriggerOperation.Information
+                {
+                    DatabaseName = databaseName,
+                    SchemaName = schemaName,
+                    TriggerName = triggerName,
+                    TableSchema = Convert.ToString(row["TableSchema"]) ?? "dbo",
+                    TableName = Convert.ToString(row["TableName"]) ?? string.Empty,
+                    Definition = definition,
+                    IsDisabled = isDisabled,
+                    IsInsteadOfTrigger = isInsteadOf,
+                    CreateDate = row["CreateDate"] is DateTime cd ? cd : DateTime.MinValue,
+                    ModifyDate = row["ModifyDate"] is DateTime md ? md : DateTime.MinValue,
+                    IsEncrypted = isEncrypted,
+                    WithEncryption = isEncrypted || definition.Contains("WITH ENCRYPTION", StringComparison.OrdinalIgnoreCase)
+                };
+
+                return (OperationResult.SuccessResult($"Retrieved trigger '{schemaName}.{triggerName}'"), trig);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving trigger information: {ex.Message}", ex), null);
+            }
+        }
+        #endregion
+
         #region Object Decryption Operations
         public async Task<DecryptionResult> DecryptView(string databaseName, string schemaName, string viewName, CancellationToken cancellationToken = default)
         {
@@ -1861,6 +2086,11 @@ WHERE s.name = @schemaName AND t.name = @tableName AND fk.name = @foreignKeyName
         public async Task<DecryptionResult> DecryptFunction(string databaseName, string schemaName, string funcName, string funcType = "FN", CancellationToken cancellationToken = default)
         {
             return await _decryptor.DecryptObjectAsync(_config, databaseName, schemaName, funcName, funcType, cancellationToken);
+        }
+
+        public async Task<DecryptionResult> DecryptTrigger(string databaseName, string schemaName, string triggerName, CancellationToken cancellationToken = default)
+        {
+            return await _decryptor.DecryptObjectAsync(_config, databaseName, schemaName, triggerName, "TR", cancellationToken);
         }
 
         public async Task<OperationResult> EnableRemoteDac(CancellationToken cancellationToken = default)

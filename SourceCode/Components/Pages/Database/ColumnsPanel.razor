@@ -1,5 +1,6 @@
 @using System.Globalization
 @using BprDevKit.Utility
+@using BprDevKit.Config
 @using BprDevKit.DatabaseManagement.Models.Metadata
 @using BprDevKit.DatabaseManagement.Models.Operations
 @using BprDevKit.DatabaseManagement.Services
@@ -27,7 +28,7 @@
             <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label small fw-semibold" for="column-name">@t[TranslationKeys.ColumnName]</label>
-                    <input id="column-name" class="form-control form-control-sm font-monospace" maxlength="128" @bind="_form.ColumnName" @bind:event="oninput" />
+                    <input id="column-name" class="form-control form-control-sm font-monospace" maxlength="@(ServerConfig?.Database?.MaxColumnNameLength ?? Constants.MaxColumnNameLength)" @bind="_form.ColumnName" @bind:event="oninput" />
                 </div>
                 <div class="col-md-8">
                     @if (CanEditType)
@@ -164,6 +165,7 @@
 
     [Parameter, EditorRequired] public DatabaseManager Manager { get; set; } = null!;
     [Parameter, EditorRequired] public TableOperation.Information Table { get; set; } = null!;
+    [Parameter] public ServerConfiguration? ServerConfig { get; set; }
     [Parameter] public EventCallback<OperationResult> OnChanged { get; set; }
 
     private PanelMode _mode = PanelMode.None;

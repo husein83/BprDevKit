@@ -66,6 +66,7 @@ namespace BprDevKit.DatabaseManagement.Models.Operations
             public List<ColumnOperation.Information> Columns { get; set; } = new();
             public List<IndexOperation.Information> Indexes { get; set; } = new();
             public List<ForeignKeyOperation.Information> ForeignKeys { get; set; } = new();
+            public List<CheckConstraintOperation.Information> CheckConstraints { get; set; } = new();
 
             public string FullName => $"{SchemaName}.{TableName}";
         }

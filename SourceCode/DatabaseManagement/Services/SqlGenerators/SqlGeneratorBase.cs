@@ -72,6 +72,13 @@ namespace BprDevKit.DatabaseManagement.Services
         public virtual string GenerateGetReferentialActionsScript() => NotSupported(nameof(GenerateGetReferentialActionsScript));
         #endregion
 
+        #region Check Constraint Operations
+        public virtual string GenerateGetTableCheckConstraintsScript(TableOperation.Information config) => NotSupported(nameof(GenerateGetTableCheckConstraintsScript));
+        public virtual string GenerateCreateCheckConstraintScript(CheckConstraintOperation.Create config) => NotSupported(nameof(GenerateCreateCheckConstraintScript));
+        public virtual string GenerateDropCheckConstraintScript(CheckConstraintOperation.Drop config) => NotSupported(nameof(GenerateDropCheckConstraintScript));
+        public virtual string GenerateToggleCheckConstraintScript(CheckConstraintOperation.ToggleState config) => NotSupported(nameof(GenerateToggleCheckConstraintScript));
+        #endregion
+
         #region View Operations
         public virtual string GenerateCreateViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true) => NotSupported(nameof(GenerateCreateViewScript));
         public virtual string GenerateAlterViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true) => NotSupported(nameof(GenerateAlterViewScript));
@@ -97,6 +104,15 @@ namespace BprDevKit.DatabaseManagement.Services
         public virtual string GenerateGetFunctionInfoScript(string databaseName, string schemaName, string funcName) => NotSupported(nameof(GenerateGetFunctionInfoScript));
         public virtual string GenerateGetFunctionsScript(string databaseName) => NotSupported(nameof(GenerateGetFunctionsScript));
         public virtual string GenerateTestFunctionScript(string databaseName, string funcName, string body) => NotSupported(nameof(GenerateTestFunctionScript));
+        #endregion
+
+        #region Trigger Operations
+        public virtual string GenerateCreateTriggerScript(TriggerOperation.Create config) => NotSupported(nameof(GenerateCreateTriggerScript));
+        public virtual string GenerateAlterTriggerScript(string databaseName, string schemaName, string triggerName, string body, bool withEncryption = true) => NotSupported(nameof(GenerateAlterTriggerScript));
+        public virtual string GenerateDropTriggerScript(string databaseName, string schemaName, string triggerName) => NotSupported(nameof(GenerateDropTriggerScript));
+        public virtual string GenerateToggleTriggerScript(string databaseName, string schemaName, string triggerName, string tableSchema, string tableName, bool enable) => NotSupported(nameof(GenerateToggleTriggerScript));
+        public virtual string GenerateGetTriggerInfoScript(string databaseName, string schemaName, string triggerName) => NotSupported(nameof(GenerateGetTriggerInfoScript));
+        public virtual string GenerateGetTriggersScript(string databaseName) => NotSupported(nameof(GenerateGetTriggersScript));
         #endregion
 
         #region Backup/Restore

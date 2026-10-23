@@ -69,6 +69,13 @@ namespace BprDevKit.DatabaseManagement.Services
         string GenerateGetReferentialActionsScript();
         #endregion
 
+        #region Check Constraint Operations
+        string GenerateGetTableCheckConstraintsScript(TableOperation.Information config);
+        string GenerateCreateCheckConstraintScript(CheckConstraintOperation.Create config);
+        string GenerateDropCheckConstraintScript(CheckConstraintOperation.Drop config);
+        string GenerateToggleCheckConstraintScript(CheckConstraintOperation.ToggleState config);
+        #endregion
+
         #region View Operations
         string GenerateCreateViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true);
         string GenerateAlterViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true);
@@ -94,6 +101,15 @@ namespace BprDevKit.DatabaseManagement.Services
         string GenerateGetFunctionInfoScript(string databaseName, string schemaName, string funcName);
         string GenerateGetFunctionsScript(string databaseName);
         string GenerateTestFunctionScript(string databaseName, string funcName, string body);
+        #endregion
+
+        #region Trigger Operations
+        string GenerateCreateTriggerScript(TriggerOperation.Create config);
+        string GenerateAlterTriggerScript(string databaseName, string schemaName, string triggerName, string body, bool withEncryption = true);
+        string GenerateDropTriggerScript(string databaseName, string schemaName, string triggerName);
+        string GenerateToggleTriggerScript(string databaseName, string schemaName, string triggerName, string tableSchema, string tableName, bool enable);
+        string GenerateGetTriggerInfoScript(string databaseName, string schemaName, string triggerName);
+        string GenerateGetTriggersScript(string databaseName);
         #endregion
 
         #region Backup/Restore

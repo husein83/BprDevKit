@@ -35,26 +35,38 @@
             @t[TranslationKeys.ForeignKeys] <span class="badge text-bg-light border">@Table.ForeignKeys.Count</span>
         </button>
     </li>
+    <li class="nav-item">
+        <button class="nav-link @(_activeTab == DetailsTab.CheckConstraints ? "active" : string.Empty)" type="button" @onclick="() => _activeTab = DetailsTab.CheckConstraints">
+            @t[TranslationKeys.CheckConstraints] <span class="badge text-bg-light border">@Table.CheckConstraints.Count</span>
+        </button>
+    </li>
 </ul>
+
+@using BprDevKit.Config
 
 @if (_activeTab == DetailsTab.Columns)
 {
-    <ColumnsPanel Manager="Manager" Table="Table" OnChanged="OnChanged" />
+    <ColumnsPanel Manager="Manager" Table="Table" ServerConfig="ServerConfig" OnChanged="OnChanged" />
 }
 else if (_activeTab == DetailsTab.Indexes)
 {
-    <IndexesPanel Manager="Manager" Table="Table" FileGroups="FileGroups" OnChanged="OnChanged" />
+    <IndexesPanel Manager="Manager" Table="Table" FileGroups="FileGroups" ServerConfig="ServerConfig" OnChanged="OnChanged" />
+}
+else if (_activeTab == DetailsTab.ForeignKeys)
+{
+    <ForeignKeysPanel Manager="Manager" Table="Table" Tables="Tables" ServerConfig="ServerConfig" OnChanged="OnChanged" />
 }
 else
 {
-    <ForeignKeysPanel Manager="Manager" Table="Table" Tables="Tables" OnChanged="OnChanged" />
+    <CheckConstraintsPanel Manager="Manager" Table="Table" ServerConfig="ServerConfig" OnChanged="OnChanged" />
 }
 
 @code {
-    private enum DetailsTab { Columns, Indexes, ForeignKeys }
+    private enum DetailsTab { Columns, Indexes, ForeignKeys, CheckConstraints }
 
     [Parameter, EditorRequired] public DatabaseManager Manager { get; set; } = null!;
     [Parameter, EditorRequired] public TableOperation.Information Table { get; set; } = null!;
+    [Parameter] public ServerConfiguration? ServerConfig { get; set; }
 
     /// <summary>All tables of the database (the candidates a foreign key can reference).</summary>
     [Parameter] public IReadOnlyList<TableOperation.Information> Tables { get; set; } = Array.Empty<TableOperation.Information>();
