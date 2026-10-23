@@ -156,7 +156,9 @@ namespace BprDevKit.Localization
             [TranslationKeys.HomeTitle] = "بخش مورد نظر را برای شروع انتخاب کنید",
             [TranslationKeys.HomeSubtitle] = "مدیریت پایگاه‌های داده یا ویرایش تنظیمات سرور و برنامه.",
             [TranslationKeys.HomeDbCardDesc] = "ایجاد، بررسی و مدیریت پایگاه‌های داده، جداول و طرح‌واره‌ها در سرورهای پیکربندی‌شده.",
+            [TranslationKeys.HomeScriptCardDesc] = "تولید اسکریپت‌های جامع ساختار (DDL) و داده‌ها (DML) برای آبجکت‌های پایگاه داده.",
             [TranslationKeys.HomeSettingsCardDesc] = "پیکربندی سرورها، پیش‌فرض‌های دیتابیس، لاگ‌ها و تنظیمات کلی برنامه.",
+            [TranslationKeys.HomeLogsCardDesc] = "مانیتورینگ بلادرنگ کوئری‌ها، لاگ‌های تشخیصی و ردگیری ممیزی سیستم.",
 
             // Database Management Workspace Parent
             [TranslationKeys.DbSubtitle] = "برای مدیریت دیتابیس‌ها، ابتدا یک سرور ذخیره‌شده را انتخاب کنید.",
@@ -421,6 +423,7 @@ namespace BprDevKit.Localization
             [TranslationKeys.CommonCopied] = "کپی شد!",
             [TranslationKeys.CommonFullScreen] = "تمام‌صفحه",
             [TranslationKeys.CommonExitFullScreen] = "خروج از تمام‌صفحه",
+            [TranslationKeys.Clear] = "پاکسازی",
 
             // Triggers
             [TranslationKeys.Triggers] = "تریگرها",
@@ -461,7 +464,117 @@ namespace BprDevKit.Localization
             [TranslationKeys.LogsDetails] = "جزئیات لاگ",
             [TranslationKeys.LogsNoLogs] = "تاکنون هیچ لاگی در سیستم ثبت نشده است.",
             [TranslationKeys.LogsTotalCount] = "تعداد کل رکوردها",
-            [TranslationKeys.LogsExport] = "خروجی لاگ‌ها"
+            [TranslationKeys.LogsExport] = "خروجی لاگ‌ها",
+            [TranslationKeys.LogsLiveSession] = "جریان زنده (امروز)",
+            [TranslationKeys.LogsImport] = "ایمپورت فایل لاگ",
+            [TranslationKeys.LogsFileSelect] = "انتخاب فایل لاگ",
+            [TranslationKeys.LogsViewingFile] = "مشاهده فایل لاگ",
+
+            // SQL Script Generator
+            [TranslationKeys.ScriptGenerator] = "تولید اسکریپت SQL",
+            [TranslationKeys.ScriptGenTitle] = "تولیدکننده اسکریپت SQL",
+            [TranslationKeys.ScriptGenSubtitle] = "ایجاد اسکریپت‌های جامع ساختار (DDL) و داده‌ها (DML) برای آبجکت‌های پایگاه داده",
+            [TranslationKeys.ScriptGenSelectServer] = "انتخاب سرور",
+            [TranslationKeys.ScriptGenSelectDatabase] = "انتخاب پایگاه داده",
+            [TranslationKeys.ScriptGenSelectDatabasePrompt] = "لطفاً ابتدا پایگاه داده مورد نظر را انتخاب نمایید",
+            [TranslationKeys.ScriptGenScriptMode] = "نوع اسکریپت",
+            [TranslationKeys.ScriptGenSchemaOnly] = "فقط ساختار (DDL)",
+            [TranslationKeys.ScriptGenDataOnly] = "فقط داده‌ها (DML)",
+            [TranslationKeys.ScriptGenSchemaAndData] = "ساختار و داده‌ها (کامل)",
+            [TranslationKeys.ScriptGenOptions] = "تنظیمات اسکریپت‌نویسی",
+            [TranslationKeys.ScriptGenIncludeIfNotExists] = "بررسی شرط وجود نداشتن (IF NOT EXISTS)",
+            [TranslationKeys.ScriptGenIncludeDropAndCreate] = "دستورات حذف و ایجاد مجدد (DROP & CREATE)",
+            [TranslationKeys.ScriptGenIncludeForeignKeys] = "اسکریپت کلیدهای خارجی (Foreign Keys)",
+            [TranslationKeys.ScriptGenIncludeIndexes] = "اسکریپت ایندکس‌های غیر اصلی (Indexes)",
+            [TranslationKeys.ScriptGenIncludeCheckConstraints] = "اسکریپت محدودیت‌های کنترلی (Check Constraints)",
+            [TranslationKeys.ScriptGenIncludeTriggers] = "اسکریپت تریگرها (Triggers)",
+            [TranslationKeys.ScriptGenIncludeComments] = "شامل سربرگ و توضیحات راهنما",
+            [TranslationKeys.ScriptGenIncludeUseDatabase] = "دستور استفاده از دیتابیس (USE [Database])",
+            [TranslationKeys.ScriptGenMaxRows] = "حداکثر سطر داده برای هر جدول",
+            [TranslationKeys.ScriptGenMaxRowsHelp] = "مقدار 0 برای نامحدود",
+            [TranslationKeys.ScriptGenUnlimitedRows] = "نامحدود (تمام سطرها)",
+            [TranslationKeys.ScriptGenSelectObjects] = "انتخاب آبجکت‌های پایگاه داده",
+            [TranslationKeys.ScriptGenSelectAll] = "انتخاب همه",
+            [TranslationKeys.ScriptGenDeselectAll] = "لغو انتخاب همه",
+            [TranslationKeys.ScriptGenGenerateButton] = "تولید اسکریپت SQL",
+            [TranslationKeys.ScriptGenGenerating] = "در حال تولید اسکریپت...",
+            [TranslationKeys.ScriptGenGeneratedSuccess] = "اسکریپت با موفقیت تولید شد! ({0} خط، {1} کیلوبایت)",
+            [TranslationKeys.ScriptGenCopyClipboard] = "کپی در کلیپ‌بورد",
+            [TranslationKeys.ScriptGenCopied] = "کپی شد!",
+            [TranslationKeys.ScriptGenDownloadFile] = "دانلود فایل .sql",
+            [TranslationKeys.ScriptGenNoObjectsSelected] = "لطفاً حداقل یک آبجکت یا جدول را برای تولید اسکریپت انتخاب کنید.",
+            [TranslationKeys.ScriptGenOutputTitle] = "اسکریپت SQL تولید شده",
+            [TranslationKeys.ScriptGenTotalObjects] = "انتخاب شده: {0} از {1} آبجکت",
+            [TranslationKeys.ScriptGenFilterObjects] = "جستجوی آبجکت‌ها...",
+            [TranslationKeys.ScriptGenLines] = "خطوط",
+            [TranslationKeys.ScriptGenCharacters] = "کاراکترها",
+            [TranslationKeys.ScriptGenSizeKb] = "حجم",
+            [TranslationKeys.ScriptGenClear] = "پاکسازی خروجی",
+            [TranslationKeys.ScriptGenNoObjectsFound] = "هیچ آبجکتی در این دیتابیس یافت نشد.",
+            [TranslationKeys.ScriptGenLoadingObjects] = "در حال بارگذاری آبجکت‌های پایگاه داده...",
+            [TranslationKeys.ScriptGenNoMatchFilter] = "هیچ موردی با فیلتر جستجو همخوانی ندارد",
+            [TranslationKeys.ScriptGenInitializing] = "در حال آماده‌سازی تولید اسکریپت...",
+            [TranslationKeys.ScriptGenRowsUnit] = "سطر",
+            [TranslationKeys.ScriptGenErrLoadServers] = "بارگذاری تنظیمات سرورها با خطا مواجه شد: {0}",
+            [TranslationKeys.ScriptGenErrLoadDatabases] = "خطا در بارگذاری پایگاه‌های داده: {0}",
+            [TranslationKeys.ScriptGenErrLoadObjects] = "خطا در بارگذاری آبجکت‌های دیتابیس: {0}",
+            [TranslationKeys.ScriptGenErrGenerationFailed] = "تولید اسکریپت با خطا مواجه شد: {0}",
+            [TranslationKeys.ScriptGenErrDownloadFailed] = "دانلود فایل اسکریپت با خطا مواجه شد: {0}",
+
+            // Logs
+            [TranslationKeys.LogsErrInvalidFile] = "فایل '{0}' حاوی رکوردهای معتبر لاگ BprDevKit نیست یا خالی می‌باشد.",
+            [TranslationKeys.LogsErrLoadFile] = "خطا در بارگذاری فایل لاگ: {0}",
+
+            // Common
+            [TranslationKeys.CommonOperationFailed] = "عملیات با خطا مواجه شد: {0}",
+
+            // Server Management
+            [TranslationKeys.ServerSavedSuccess] = "تنظیمات سرور '{0}' با موفقیت ذخیره شد.",
+            [TranslationKeys.ServerSaveError] = "خطا در ذخیره تنظیمات: {0}",
+            [TranslationKeys.ServerDeletedSuccess] = "تنظیمات سرور '{0}' با موفقیت حذف شد.",
+            [TranslationKeys.ServerDeleteError] = "خطا در حذف تنظیمات سرور: {0}",
+            [TranslationKeys.ServerLoadError] = "خطا در بارگذاری تنظیمات سرورها: {0}",
+            [TranslationKeys.ServerNameRequired] = "نام یا آدرس سرور الزامی است.",
+            [TranslationKeys.ServerNotFound] = "تنظیمات سرور یافت نشد.",
+            [TranslationKeys.ServerAppSettingsSaved] = "تنظیمات برنامه با موفقیت ذخیره شد.",
+            [TranslationKeys.ServerAppSettingsError] = "خطا در ذخیره تنظیمات برنامه: {0}",
+
+            // Database Errors
+            [TranslationKeys.DbErrLoadDatabases] = "خطا در بارگذاری پایگاه‌های داده: {0}",
+            [TranslationKeys.DbErrCreateDatabase] = "خطا در ایجاد پایگاه داده: {0}",
+            [TranslationKeys.DbErrLoadConfig] = "خطا در بارگذاری تنظیمات پایگاه داده: {0}",
+            [TranslationKeys.DbErrUpdateDatabase] = "خطا در ویرایش پایگاه داده: {0}",
+            [TranslationKeys.DbErrDeleteDatabase] = "خطا در حذف پایگاه داده: {0}",
+            [TranslationKeys.DbErrLoadDetails] = "خطا در دریافت جزئیات پایگاه داده: {0}",
+
+            // Schema Errors
+            [TranslationKeys.SchemaErrLoadSchemas] = "خطا در بارگذاری طرح‌واره‌ها: {0}",
+            [TranslationKeys.SchemaErrCreateSchema] = "خطا در ایجاد طرح‌واره: {0}",
+            [TranslationKeys.SchemaErrUpdateSchema] = "خطا در ویرایش طرح‌واره: {0}",
+            [TranslationKeys.SchemaErrDeleteSchema] = "خطا در حذف طرح‌واره: {0}",
+            [TranslationKeys.SchemaErrLoadObjects] = "خطا در بارگذاری اشیاء طرح‌واره: {0}",
+
+            // Table Errors
+            [TranslationKeys.TableErrLoadTables] = "خطا در بارگذاری جداول: {0}",
+            [TranslationKeys.TableErrCreateTable] = "خطا در ایجاد جدول: {0}",
+            [TranslationKeys.TableErrLoadDetails] = "خطا در بارگذاری جزئیات جدول: {0}",
+            [TranslationKeys.TableErrReloadTable] = "خطا در بازخوانی جدول: {0}",
+            [TranslationKeys.TableErrUpdateTable] = "خطا در بروزرسانی جدول: {0}",
+            [TranslationKeys.TableErrDropTable] = "خطا در حذف جدول: {0}",
+
+            // Column Errors
+            [TranslationKeys.ColErrSaveColumn] = "خطا در ذخیره ستون: {0}",
+            [TranslationKeys.ColErrDropColumn] = "خطا در حذف ستون: {0}",
+
+            // Foreign Key Errors
+            [TranslationKeys.FkPanelErrLoadRefColumns] = "خطا در بارگذاری ستون‌های جدول {0}: {1}",
+
+            // General UI & Column Precision
+            [TranslationKeys.Reset] = "بازنشانی",
+            [TranslationKeys.CommonDefault] = "پیش‌فرض",
+            [TranslationKeys.ColFractionalPrecision] = "دقت کسر ثانیه",
+            [TranslationKeys.ColVectorDimensions] = "ابعاد بردار",
+            [TranslationKeys.ScriptGenResetTooltip] = "بازنشانی گزینه‌ها به حالت پیش‌فرض"
         };
 
         public string this[string key]

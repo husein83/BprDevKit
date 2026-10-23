@@ -46,13 +46,13 @@
         }
         else if (type?.Kind == ColumnDataTypeKind.FractionalSeconds)
         {
-            <input type="number" class="form-control form-control-sm" min="0" max="7" title="Fractional seconds precision" placeholder="default"
+            <input type="number" class="form-control form-control-sm" min="0" max="7" title="@t[TranslationKeys.ColFractionalPrecision]" placeholder="@t[TranslationKeys.CommonDefault]"
                    value="@(Column.Scale?.ToString(CultureInfo.InvariantCulture))" @onchange="e => Column.Scale = ParseInt(e.Value)" />
         }
         else if (type?.Kind == ColumnDataTypeKind.VectorDimensions)
         {
             <div class="input-group input-group-sm">
-                <input type="number" class="form-control" min="1" max="1998" title="Vector dimensions" placeholder="dimensions (e.g. 1536)"
+                <input type="number" class="form-control" min="1" max="1998" title="@t[TranslationKeys.ColVectorDimensions]" placeholder="1536"
                        value="@(Column.Length is > 0 ? Column.Length.Value.ToString(CultureInfo.InvariantCulture) : "1536")"
                        @onchange="e => Column.Length = ParseInt(e.Value)" />
                 <span class="input-group-text text-muted small">dim</span>

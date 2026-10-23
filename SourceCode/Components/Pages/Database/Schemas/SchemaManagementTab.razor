@@ -24,7 +24,7 @@
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body p-3">
             <div class="row g-2 align-items-end">
-                <div class="col-md-8 col-lg-6">
+                <div class="col">
                     <label class="form-label fw-semibold" for="schema-database"><i class="bi bi-database me-1 text-primary"></i>@t[TranslationKeys.Database]</label>
                     <select id="schema-database" class="form-select" @bind="_selectedDatabase" @bind:after="OnDatabaseSelected" disabled="@(_isLoadingDatabases || _isSaving)">
                         <option value="">@t[TranslationKeys.SchemaTabSelectDbPrompt]</option>
@@ -34,9 +34,27 @@
                         }
                     </select>
                 </div>
-                <div class="col-auto">
-                    <button class="btn btn-outline-secondary" type="button" @onclick="RefreshAll" disabled="@(_isLoadingDatabases || _isLoadingSchemas || _isSaving)">
-                        <i class="bi bi-arrow-clockwise me-1"></i> @t[TranslationKeys.Refresh]
+                <div class="col-auto d-flex gap-2">
+                    <button class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center"
+                            style="width: 40px; height: 38px;"
+                            type="button"
+                            @onclick="RefreshAll"
+                            disabled="@(_isLoadingDatabases || _isLoadingSchemas || _isSaving)"
+                            title="@t[TranslationKeys.Refresh]">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+                        </svg>
+                    </button>
+                    <button class="btn btn-outline-danger d-inline-flex align-items-center justify-content-center"
+                            style="width: 40px; height: 38px;"
+                            type="button"
+                            @onclick="ClearSelection"
+                            disabled="@(string.IsNullOrEmpty(_selectedDatabase))"
+                            title="@t[TranslationKeys.Clear]">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                            <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/>
+                        </svg>
                     </button>
                 </div>
             </div>
@@ -290,6 +308,14 @@
         CloseDialogs();
     }
 
+    private void ClearSelection()
+    {
+        _selectedDatabase = string.Empty;
+        _schemas.Clear();
+        CloseCreateSchema();
+        CloseDialogs();
+    }
+
     private async Task LoadDatabases()
     {
         if (_databaseManager is null) return;
@@ -302,7 +328,7 @@
             else
                 ShowError(result.operationResult.Message);
         }
-        catch (Exception exception) { ShowError($"Unable to load databases: {exception.Message}"); }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.DbErrLoadDatabases, exception.Message)); }
         finally { _isLoadingDatabases = false; }
     }
 
@@ -328,7 +354,7 @@
             if (ownerResult.operationResult.Success)
                 _owners = ownerResult.owners;
         }
-        catch (Exception exception) { ShowError($"Unable to load schemas: {exception.Message}"); }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.SchemaErrLoadSchemas, exception.Message)); }
         finally { _isLoadingSchemas = false; }
     }
 
@@ -385,7 +411,7 @@
 
             await OnOperationComplete.InvokeAsync(result.Message);
         }
-        catch (Exception exception) { ShowError($"Unable to create schema: {exception.Message}"); }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.SchemaErrCreateSchema, exception.Message)); }
         finally { _isSaving = false; }
     }
 
@@ -423,7 +449,7 @@
 
             await OnOperationComplete.InvokeAsync(result.Message);
         }
-        catch (Exception exception) { ShowError($"Unable to update schema: {exception.Message}"); }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.SchemaErrUpdateSchema, exception.Message)); }
         finally { _isSaving = false; }
     }
 
@@ -456,7 +482,7 @@
 
             await OnOperationComplete.InvokeAsync(result.Message);
         }
-        catch (Exception exception) { ShowError($"Unable to delete schema: {exception.Message}"); }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.SchemaErrDeleteSchema, exception.Message)); }
         finally { _isSaving = false; }
     }
 
@@ -495,7 +521,7 @@
         catch (Exception exception)
         {
             CloseDialogs();
-            ShowError($"Unable to load schema objects: {exception.Message}");
+            ShowError(TranslationFactory.Current.Get(TranslationKeys.SchemaErrLoadObjects, exception.Message));
         }
         finally { _isLoadingObjects = false; }
     }

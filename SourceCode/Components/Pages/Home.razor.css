@@ -79,7 +79,9 @@
 }
 
 .database-action .home-action-icon { background: linear-gradient(135deg, #2563eb, #4f46e5); }
+.script-action .home-action-icon { background: linear-gradient(135deg, #7c3aed, #9333ea); }
 .settings-action .home-action-icon { background: linear-gradient(135deg, #0f766e, #059669); }
+.logs-action .home-action-icon { background: linear-gradient(135deg, #d97706, #ea580c); }
 
 .home-action-body {
     display: grid;

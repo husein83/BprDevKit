@@ -324,7 +324,7 @@
         }
         catch (Exception exception)
         {
-            ShowMessage($"Unable to load databases: {exception.Message}", "alert-danger", "bi-x-octagon-fill");
+            ShowMessage(TranslationFactory.Current.Get(TranslationKeys.DbErrLoadDatabases, exception.Message), "alert-danger", "bi-x-octagon-fill");
         }
         finally { _isLoading = false; }
     }
@@ -363,7 +363,7 @@
             if (result.Success) { CloseCreateDatabase(); await LoadDatabases(); }
             await OnOperationComplete.InvokeAsync(result.Message);
         }
-        catch (Exception exception) { ShowMessage($"Unable to create database: {exception.Message}", "alert-danger", "bi-x-octagon-fill"); }
+        catch (Exception exception) { ShowMessage(TranslationFactory.Current.Get(TranslationKeys.DbErrCreateDatabase, exception.Message), "alert-danger", "bi-x-octagon-fill"); }
         finally { _isSaving = false; }
     }
 
@@ -405,7 +405,7 @@
         }
         catch (Exception exception)
         {
-            ShowMessage($"Unable to load database configuration: {exception.Message}", "alert-danger", "bi-x-octagon-fill");
+            ShowMessage(TranslationFactory.Current.Get(TranslationKeys.DbErrLoadConfig, exception.Message), "alert-danger", "bi-x-octagon-fill");
         }
         finally { _isSaving = false; }
     }
@@ -424,7 +424,7 @@
             if (result.Success) CloseDialogs();
             await OnOperationComplete.InvokeAsync(result.Message);
         }
-        catch (Exception exception) { ShowMessage($"Unable to update database: {exception.Message}", "alert-danger", "bi-x-octagon-fill"); }
+        catch (Exception exception) { ShowMessage(TranslationFactory.Current.Get(TranslationKeys.DbErrUpdateDatabase, exception.Message), "alert-danger", "bi-x-octagon-fill"); }
         finally { _isSaving = false; }
     }
 
@@ -445,7 +445,7 @@
             if (result.Success) { CloseDialogs(); await LoadDatabases(); }
             await OnOperationComplete.InvokeAsync(result.Message);
         }
-        catch (Exception exception) { ShowMessage($"Unable to delete database: {exception.Message}", "alert-danger", "bi-x-octagon-fill"); }
+        catch (Exception exception) { ShowMessage(TranslationFactory.Current.Get(TranslationKeys.DbErrDeleteDatabase, exception.Message), "alert-danger", "bi-x-octagon-fill"); }
         finally { _isSaving = false; }
     }
 
@@ -462,7 +462,7 @@
             }
             else ShowMessage(result.operationResult.Message, "alert-danger", "bi-x-octagon-fill");
         }
-        catch (Exception exception) { ShowMessage($"Unable to retrieve database details: {exception.Message}", "alert-danger", "bi-x-octagon-fill"); }
+        catch (Exception exception) { ShowMessage(TranslationFactory.Current.Get(TranslationKeys.DbErrLoadDetails, exception.Message), "alert-danger", "bi-x-octagon-fill"); }
     }
 
     private void CloseDialogs()

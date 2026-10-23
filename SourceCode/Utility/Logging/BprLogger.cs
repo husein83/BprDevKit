@@ -117,6 +117,19 @@ namespace BprDevKit.Utility.Logging
         {
             lock (_lock)
             {
+                if (_inMemoryLogs.Count == 0)
+                {
+                    var todayFile = GetTodayLogFilePath();
+                    if (!string.IsNullOrEmpty(todayFile))
+                    {
+                        var fromDisk = LogFileParser.ParseFile(todayFile);
+                        if (fromDisk.Count > 0)
+                        {
+                            var slice = fromDisk.Skip(Math.Max(0, fromDisk.Count - MaxInMemoryLogs)).ToList();
+                            _inMemoryLogs.AddRange(slice);
+                        }
+                    }
+                }
                 return _inMemoryLogs.ToList();
             }
         }
@@ -128,6 +141,14 @@ namespace BprDevKit.Utility.Logging
                 _inMemoryLogs.Clear();
             }
         }
+
+        public List<string> GetAvailableLogFiles() => _fileLogger.GetAvailableLogFiles();
+
+        public string? GetTodayLogFilePath() => _fileLogger.GetTodayLogFilePath();
+
+        public List<LogEntry> LoadLogsFromFile(string filePath) => LogFileParser.ParseFile(filePath);
+
+        public List<LogEntry> LoadLogsFromContent(string content) => LogFileParser.ParseLogs(content);
 
         private static void WriteToConsole(LogEntry entry)
         {

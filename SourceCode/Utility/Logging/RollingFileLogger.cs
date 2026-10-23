@@ -26,6 +26,43 @@ namespace BprDevKit.Utility.Logging
             return logDir;
         }
 
+        public List<string> GetAvailableLogFiles()
+        {
+            var list = new List<string>();
+            try
+            {
+                var dir = GetLogDirectory();
+                if (Directory.Exists(dir))
+                {
+                    var files = Directory.GetFiles(dir, "bprdevkit-*.log")
+                        .Select(Path.GetFileName)
+                        .Where(f => !string.IsNullOrEmpty(f))
+                        .OrderByDescending(f => f)
+                        .ToList();
+                    list.AddRange(files!);
+                }
+            }
+            catch
+            {
+            }
+            return list;
+        }
+
+        public string? GetTodayLogFilePath()
+        {
+            try
+            {
+                var dir = GetLogDirectory();
+                var todayPath = Path.Combine(dir, $"bprdevkit-{DateTime.Now:yyyy-MM-dd}.log");
+                if (File.Exists(todayPath))
+                    return todayPath;
+            }
+            catch
+            {
+            }
+            return null;
+        }
+
         public void WriteLog(LogEntry entry, LoggingSettings settings)
         {
             if (!settings.EnableFileLogging) return;

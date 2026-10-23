@@ -147,7 +147,9 @@ namespace BprDevKit.Localization
         public const string HomeTitle = "Home.Title";
         public const string HomeSubtitle = "Home.Subtitle";
         public const string HomeDbCardDesc = "Home.DbCardDesc";
+        public const string HomeScriptCardDesc = "Home.ScriptCardDesc";
         public const string HomeSettingsCardDesc = "Home.SettingsCardDesc";
+        public const string HomeLogsCardDesc = "Home.LogsCardDesc";
 
         // Database Management Workspace Parent
         public const string DbSubtitle = "Db.Subtitle";
@@ -411,6 +413,7 @@ namespace BprDevKit.Localization
         public const string CommonCopied = "Common.Copied";
         public const string CommonFullScreen = "Common.FullScreen";
         public const string CommonExitFullScreen = "Common.ExitFullScreen";
+        public const string Clear = "Common.Clear";
 
         // Triggers Management Tab
         public const string Triggers = "Triggers";
@@ -452,5 +455,115 @@ namespace BprDevKit.Localization
         public const string LogsNoLogs = "Logs.NoLogs";
         public const string LogsTotalCount = "Logs.TotalCount";
         public const string LogsExport = "Logs.Export";
+        public const string LogsLiveSession = "Logs.LiveSession";
+        public const string LogsImport = "Logs.Import";
+        public const string LogsFileSelect = "Logs.FileSelect";
+        public const string LogsViewingFile = "Logs.ViewingFile";
+
+        // SQL Script Generator
+        public const string ScriptGenerator = "Nav.ScriptGenerator";
+        public const string ScriptGenTitle = "ScriptGen.Title";
+        public const string ScriptGenSubtitle = "ScriptGen.Subtitle";
+        public const string ScriptGenSelectServer = "ScriptGen.SelectServer";
+        public const string ScriptGenSelectDatabase = "ScriptGen.SelectDatabase";
+        public const string ScriptGenSelectDatabasePrompt = "ScriptGen.SelectDatabasePrompt";
+        public const string ScriptGenScriptMode = "ScriptGen.ScriptMode";
+        public const string ScriptGenSchemaOnly = "ScriptGen.SchemaOnly";
+        public const string ScriptGenDataOnly = "ScriptGen.DataOnly";
+        public const string ScriptGenSchemaAndData = "ScriptGen.SchemaAndData";
+        public const string ScriptGenOptions = "ScriptGen.Options";
+        public const string ScriptGenIncludeIfNotExists = "ScriptGen.IncludeIfNotExists";
+        public const string ScriptGenIncludeDropAndCreate = "ScriptGen.IncludeDropAndCreate";
+        public const string ScriptGenIncludeForeignKeys = "ScriptGen.IncludeForeignKeys";
+        public const string ScriptGenIncludeIndexes = "ScriptGen.IncludeIndexes";
+        public const string ScriptGenIncludeCheckConstraints = "ScriptGen.IncludeCheckConstraints";
+        public const string ScriptGenIncludeTriggers = "ScriptGen.IncludeTriggers";
+        public const string ScriptGenIncludeComments = "ScriptGen.IncludeComments";
+        public const string ScriptGenIncludeUseDatabase = "ScriptGen.IncludeUseDatabase";
+        public const string ScriptGenMaxRows = "ScriptGen.MaxRows";
+        public const string ScriptGenMaxRowsHelp = "ScriptGen.MaxRowsHelp";
+        public const string ScriptGenUnlimitedRows = "ScriptGen.UnlimitedRows";
+        public const string ScriptGenSelectObjects = "ScriptGen.SelectObjects";
+        public const string ScriptGenSelectAll = "ScriptGen.SelectAll";
+        public const string ScriptGenDeselectAll = "ScriptGen.DeselectAll";
+        public const string ScriptGenGenerateButton = "ScriptGen.GenerateButton";
+        public const string ScriptGenGenerating = "ScriptGen.Generating";
+        public const string ScriptGenGeneratedSuccess = "ScriptGen.GeneratedSuccess";
+        public const string ScriptGenCopyClipboard = "ScriptGen.CopyClipboard";
+        public const string ScriptGenCopied = "ScriptGen.Copied";
+        public const string ScriptGenDownloadFile = "ScriptGen.DownloadFile";
+        public const string ScriptGenNoObjectsSelected = "ScriptGen.NoObjectsSelected";
+        public const string ScriptGenOutputTitle = "ScriptGen.OutputTitle";
+        public const string ScriptGenTotalObjects = "ScriptGen.TotalObjects";
+        public const string ScriptGenFilterObjects = "ScriptGen.FilterObjects";
+        public const string ScriptGenLines = "ScriptGen.Lines";
+        public const string ScriptGenCharacters = "ScriptGen.Characters";
+        public const string ScriptGenSizeKb = "ScriptGen.SizeKb";
+        public const string ScriptGenClear = "ScriptGen.Clear";
+        public const string ScriptGenNoObjectsFound = "ScriptGen.NoObjectsFound";
+        public const string ScriptGenLoadingObjects = "ScriptGen.LoadingObjects";
+        public const string ScriptGenNoMatchFilter = "ScriptGen.NoMatchFilter";
+        public const string ScriptGenInitializing = "ScriptGen.Initializing";
+        public const string ScriptGenRowsUnit = "ScriptGen.RowsUnit";
+        public const string ScriptGenErrLoadServers = "ScriptGen.ErrLoadServers";
+        public const string ScriptGenErrLoadDatabases = "ScriptGen.ErrLoadDatabases";
+        public const string ScriptGenErrLoadObjects = "ScriptGen.ErrLoadObjects";
+        public const string ScriptGenErrGenerationFailed = "ScriptGen.ErrGenerationFailed";
+        public const string ScriptGenErrDownloadFailed = "ScriptGen.ErrDownloadFailed";
+
+        // Logs Errors
+        public const string LogsErrInvalidFile = "Logs.ErrInvalidFile";
+        public const string LogsErrLoadFile = "Logs.ErrLoadFile";
+
+        // Common Operation Failed
+        public const string CommonOperationFailed = "Common.OperationFailed";
+
+        // Server Management Notifications & Errors
+        public const string ServerSavedSuccess = "Server.SavedSuccess";
+        public const string ServerSaveError = "Server.SaveError";
+        public const string ServerDeletedSuccess = "Server.DeletedSuccess";
+        public const string ServerDeleteError = "Server.DeleteError";
+        public const string ServerLoadError = "Server.LoadError";
+        public const string ServerNameRequired = "Server.NameRequired";
+        public const string ServerNotFound = "Server.NotFound";
+        public const string ServerAppSettingsSaved = "Server.AppSettingsSaved";
+        public const string ServerAppSettingsError = "Server.AppSettingsError";
+
+        // Database Errors
+        public const string DbErrLoadDatabases = "Db.ErrLoadDatabases";
+        public const string DbErrCreateDatabase = "Db.ErrCreateDatabase";
+        public const string DbErrLoadConfig = "Db.ErrLoadConfig";
+        public const string DbErrUpdateDatabase = "Db.ErrUpdateDatabase";
+        public const string DbErrDeleteDatabase = "Db.ErrDeleteDatabase";
+        public const string DbErrLoadDetails = "Db.ErrLoadDetails";
+
+        // Schema Errors
+        public const string SchemaErrLoadSchemas = "Schema.ErrLoadSchemas";
+        public const string SchemaErrCreateSchema = "Schema.ErrCreateSchema";
+        public const string SchemaErrUpdateSchema = "Schema.ErrUpdateSchema";
+        public const string SchemaErrDeleteSchema = "Schema.ErrDeleteSchema";
+        public const string SchemaErrLoadObjects = "Schema.ErrLoadObjects";
+
+        // Table Errors
+        public const string TableErrLoadTables = "Table.ErrLoadTables";
+        public const string TableErrCreateTable = "Table.ErrCreateTable";
+        public const string TableErrLoadDetails = "Table.ErrLoadDetails";
+        public const string TableErrReloadTable = "Table.ErrReloadTable";
+        public const string TableErrUpdateTable = "Table.ErrUpdateTable";
+        public const string TableErrDropTable = "Table.ErrDropTable";
+
+        // Column Errors
+        public const string ColErrSaveColumn = "Col.ErrSaveColumn";
+        public const string ColErrDropColumn = "Col.ErrDropColumn";
+
+        // Foreign Key Errors
+        public const string FkPanelErrLoadRefColumns = "FkPanel.ErrLoadRefColumns";
+
+        // General UI & Column Precision
+        public const string Reset = "Reset";
+        public const string CommonDefault = "Common.Default";
+        public const string ColFractionalPrecision = "Col.FractionalPrecision";
+        public const string ColVectorDimensions = "Col.VectorDimensions";
+        public const string ScriptGenResetTooltip = "ScriptGen.ResetTooltip";
     }
 }

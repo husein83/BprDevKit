@@ -579,7 +579,7 @@
         }
         catch (Exception ex)
         {
-            _bprMessage = BprMessage.Error($"Error loading configurations: {ex.Message}");
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.ServerLoadError, ex.Message));
         }
     }
 
@@ -698,7 +698,7 @@
         {
             if (string.IsNullOrWhiteSpace(_currentConfig.Server.ServerName))
             {
-                _bprMessage = BprMessage.Warning("Server name/IP is required.");
+                _bprMessage = BprMessage.Warning(TranslationFactory.Current[TranslationKeys.ServerNameRequired]);
                 return;
             }
 
@@ -715,7 +715,7 @@
             ServerConfiguration.SaveChanges(_currentConfig);
 
             string serverTitle = string.IsNullOrWhiteSpace(_currentConfig.Server.Alias) ? _currentConfig.Server.ServerName : $"{_currentConfig.Server.Alias} ({_currentConfig.Server.ServerName})";
-            _bprMessage = BprMessage.Success($"Configuration for {serverTitle} saved successfully");
+            _bprMessage = BprMessage.Success(TranslationFactory.Current.Get(TranslationKeys.ServerSavedSuccess, serverTitle));
             _showAddForm = false;
             _isEditMode = false;
             LoadSavedServers();
@@ -723,7 +723,7 @@
         }
         catch (Exception ex)
         {
-            _bprMessage = BprMessage.Error($"Error saving configuration: {ex.Message}");
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.ServerSaveError, ex.Message));
         }
     }
 
@@ -733,13 +733,13 @@
         {
             TranslationFactory.SetLanguage(_appConfig.Language);
             ApplicationConfiguration.SaveChanges(_appConfig);
-            _bprMessage = BprMessage.Success("Application configuration saved successfully");
+            _bprMessage = BprMessage.Success(TranslationFactory.Current[TranslationKeys.ServerAppSettingsSaved]);
             _showAppAddForm = false;
             NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
         }
         catch (Exception ex)
         {
-            _bprMessage = BprMessage.Error($"Error saving application configuration: {ex.Message}");
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.ServerAppSettingsError, ex.Message));
         }
     }
 
@@ -755,19 +755,19 @@
         {
             if (config.HasAny() && config.Id.HasValue && ServerConfiguration.TryDeleteServerById(config.Id.Value))
             {
-                _bprMessage = BprMessage.Success($"Server configuration '{config.Server.ServerName}' deleted successfully.");
+                _bprMessage = BprMessage.Success(TranslationFactory.Current.Get(TranslationKeys.ServerDeletedSuccess, config.Server.ServerName));
                 LoadSavedServers();
             }
             else
             {
-                _bprMessage = BprMessage.Warning("Server configuration not found.");
+                _bprMessage = BprMessage.Warning(TranslationFactory.Current[TranslationKeys.ServerNotFound]);
             }
 
             StateHasChanged();
         }
         catch (Exception ex)
         {
-            _bprMessage = BprMessage.Error($"Error deleting server configuration: {ex.Message}");
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.ServerDeleteError, ex.Message));
             StateHasChanged();
         }
     }

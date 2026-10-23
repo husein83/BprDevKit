@@ -36,5 +36,9 @@ namespace BprDevKit.Utility.Logging
         void ClearRecentLogs();
         event Action<LogEntry>? OnLogEntryAdded;
         string GetLogDirectory();
+        List<string> GetAvailableLogFiles();
+        string? GetTodayLogFilePath();
+        List<LogEntry> LoadLogsFromFile(string filePath);
+        List<LogEntry> LoadLogsFromContent(string content);
     }
 }

@@ -156,7 +156,9 @@ namespace BprDevKit.Localization
             [TranslationKeys.HomeTitle] = "Choose where you want to start",
             [TranslationKeys.HomeSubtitle] = "Manage database instances or update server and application preferences.",
             [TranslationKeys.HomeDbCardDesc] = "Create, inspect, and manage databases, tables, and schemas on configured servers.",
+            [TranslationKeys.HomeScriptCardDesc] = "Generate comprehensive DDL schemas and DML insert scripts for database objects.",
             [TranslationKeys.HomeSettingsCardDesc] = "Configure servers, database defaults, logging, and application preferences.",
+            [TranslationKeys.HomeLogsCardDesc] = "Real-time query execution monitoring, diagnostic logs, and activity audit.",
 
             // Database Management Workspace Parent
             [TranslationKeys.DbSubtitle] = "Select a saved server configuration before managing its databases.",
@@ -420,6 +422,7 @@ namespace BprDevKit.Localization
             [TranslationKeys.CommonCopied] = "Copied!",
             [TranslationKeys.CommonFullScreen] = "Fullscreen",
             [TranslationKeys.CommonExitFullScreen] = "Exit Fullscreen",
+            [TranslationKeys.Clear] = "Clear",
 
             // Triggers
             [TranslationKeys.Triggers] = "Triggers",
@@ -460,7 +463,117 @@ namespace BprDevKit.Localization
             [TranslationKeys.LogsDetails] = "Log Details",
             [TranslationKeys.LogsNoLogs] = "No log entries captured yet.",
             [TranslationKeys.LogsTotalCount] = "Total Entries",
-            [TranslationKeys.LogsExport] = "Export Logs"
+            [TranslationKeys.LogsExport] = "Export Logs",
+            [TranslationKeys.LogsLiveSession] = "Live Session (Today)",
+            [TranslationKeys.LogsImport] = "Import Log",
+            [TranslationKeys.LogsFileSelect] = "Select Log File",
+            [TranslationKeys.LogsViewingFile] = "Viewing Log File",
+
+            // SQL Script Generator
+            [TranslationKeys.ScriptGenerator] = "Script Generator",
+            [TranslationKeys.ScriptGenTitle] = "SQL Script Generator",
+            [TranslationKeys.ScriptGenSubtitle] = "Generate comprehensive DDL schemas and DML insert scripts for database objects",
+            [TranslationKeys.ScriptGenSelectServer] = "Select Server",
+            [TranslationKeys.ScriptGenSelectDatabase] = "Select Database",
+            [TranslationKeys.ScriptGenSelectDatabasePrompt] = "Please select a database to script objects from",
+            [TranslationKeys.ScriptGenScriptMode] = "Script Mode",
+            [TranslationKeys.ScriptGenSchemaOnly] = "Schema Only (DDL)",
+            [TranslationKeys.ScriptGenDataOnly] = "Data Only (DML)",
+            [TranslationKeys.ScriptGenSchemaAndData] = "Schema & Data (Full)",
+            [TranslationKeys.ScriptGenOptions] = "Scripting Options",
+            [TranslationKeys.ScriptGenIncludeIfNotExists] = "Include 'IF NOT EXISTS' checks",
+            [TranslationKeys.ScriptGenIncludeDropAndCreate] = "Include 'DROP and CREATE' statements",
+            [TranslationKeys.ScriptGenIncludeForeignKeys] = "Script Foreign Keys",
+            [TranslationKeys.ScriptGenIncludeIndexes] = "Script Non-PK Indexes",
+            [TranslationKeys.ScriptGenIncludeCheckConstraints] = "Script Check Constraints",
+            [TranslationKeys.ScriptGenIncludeTriggers] = "Script Triggers",
+            [TranslationKeys.ScriptGenIncludeComments] = "Include Descriptive Header & Comments",
+            [TranslationKeys.ScriptGenIncludeUseDatabase] = "Include 'USE [Database]' statement",
+            [TranslationKeys.ScriptGenMaxRows] = "Max Data Rows per Table",
+            [TranslationKeys.ScriptGenMaxRowsHelp] = "Set to 0 for unlimited rows",
+            [TranslationKeys.ScriptGenUnlimitedRows] = "Unlimited (All Rows)",
+            [TranslationKeys.ScriptGenSelectObjects] = "Database Objects Selection",
+            [TranslationKeys.ScriptGenSelectAll] = "Select All",
+            [TranslationKeys.ScriptGenDeselectAll] = "Deselect All",
+            [TranslationKeys.ScriptGenGenerateButton] = "Generate SQL Script",
+            [TranslationKeys.ScriptGenGenerating] = "Generating Script...",
+            [TranslationKeys.ScriptGenGeneratedSuccess] = "Script generated successfully! ({0} lines, {1} KB)",
+            [TranslationKeys.ScriptGenCopyClipboard] = "Copy to Clipboard",
+            [TranslationKeys.ScriptGenCopied] = "Copied!",
+            [TranslationKeys.ScriptGenDownloadFile] = "Download .sql File",
+            [TranslationKeys.ScriptGenNoObjectsSelected] = "Please select at least one database object or table to script.",
+            [TranslationKeys.ScriptGenOutputTitle] = "Generated SQL Script",
+            [TranslationKeys.ScriptGenTotalObjects] = "Selected: {0} of {1} objects",
+            [TranslationKeys.ScriptGenFilterObjects] = "Search objects...",
+            [TranslationKeys.ScriptGenLines] = "Lines",
+            [TranslationKeys.ScriptGenCharacters] = "Characters",
+            [TranslationKeys.ScriptGenSizeKb] = "Size",
+            [TranslationKeys.ScriptGenClear] = "Clear Output",
+            [TranslationKeys.ScriptGenNoObjectsFound] = "No objects found in this database.",
+            [TranslationKeys.ScriptGenLoadingObjects] = "Loading database objects...",
+            [TranslationKeys.ScriptGenNoMatchFilter] = "No objects match filter",
+            [TranslationKeys.ScriptGenInitializing] = "Initializing script generation...",
+            [TranslationKeys.ScriptGenRowsUnit] = "rows",
+            [TranslationKeys.ScriptGenErrLoadServers] = "Unable to load server configurations: {0}",
+            [TranslationKeys.ScriptGenErrLoadDatabases] = "Error loading databases: {0}",
+            [TranslationKeys.ScriptGenErrLoadObjects] = "Error loading database objects: {0}",
+            [TranslationKeys.ScriptGenErrGenerationFailed] = "Script generation failed: {0}",
+            [TranslationKeys.ScriptGenErrDownloadFailed] = "Failed to download script file: {0}",
+
+            // Logs
+            [TranslationKeys.LogsErrInvalidFile] = "File '{0}' does not contain valid BprDevKit log entries or is empty.",
+            [TranslationKeys.LogsErrLoadFile] = "Failed to load log file: {0}",
+
+            // Common
+            [TranslationKeys.CommonOperationFailed] = "Unable to complete the operation: {0}",
+
+            // Server Management
+            [TranslationKeys.ServerSavedSuccess] = "Configuration for '{0}' saved successfully",
+            [TranslationKeys.ServerSaveError] = "Error saving configuration: {0}",
+            [TranslationKeys.ServerDeletedSuccess] = "Server configuration '{0}' deleted successfully.",
+            [TranslationKeys.ServerDeleteError] = "Error deleting server configuration: {0}",
+            [TranslationKeys.ServerLoadError] = "Error loading configurations: {0}",
+            [TranslationKeys.ServerNameRequired] = "Server name/IP is required.",
+            [TranslationKeys.ServerNotFound] = "Server configuration not found.",
+            [TranslationKeys.ServerAppSettingsSaved] = "Application configuration saved successfully.",
+            [TranslationKeys.ServerAppSettingsError] = "Error saving application configuration: {0}",
+
+            // Database Errors
+            [TranslationKeys.DbErrLoadDatabases] = "Unable to load databases: {0}",
+            [TranslationKeys.DbErrCreateDatabase] = "Unable to create database: {0}",
+            [TranslationKeys.DbErrLoadConfig] = "Unable to load database configuration: {0}",
+            [TranslationKeys.DbErrUpdateDatabase] = "Unable to update database: {0}",
+            [TranslationKeys.DbErrDeleteDatabase] = "Unable to delete database: {0}",
+            [TranslationKeys.DbErrLoadDetails] = "Unable to retrieve database details: {0}",
+
+            // Schema Errors
+            [TranslationKeys.SchemaErrLoadSchemas] = "Unable to load schemas: {0}",
+            [TranslationKeys.SchemaErrCreateSchema] = "Unable to create schema: {0}",
+            [TranslationKeys.SchemaErrUpdateSchema] = "Unable to update schema: {0}",
+            [TranslationKeys.SchemaErrDeleteSchema] = "Unable to delete schema: {0}",
+            [TranslationKeys.SchemaErrLoadObjects] = "Unable to load schema objects: {0}",
+
+            // Table Errors
+            [TranslationKeys.TableErrLoadTables] = "Unable to load tables: {0}",
+            [TranslationKeys.TableErrCreateTable] = "Unable to create table: {0}",
+            [TranslationKeys.TableErrLoadDetails] = "Unable to load table details: {0}",
+            [TranslationKeys.TableErrReloadTable] = "Unable to reload the table: {0}",
+            [TranslationKeys.TableErrUpdateTable] = "Unable to update table: {0}",
+            [TranslationKeys.TableErrDropTable] = "Unable to drop table: {0}",
+
+            // Column Errors
+            [TranslationKeys.ColErrSaveColumn] = "Unable to save the column: {0}",
+            [TranslationKeys.ColErrDropColumn] = "Unable to drop the column: {0}",
+
+            // Foreign Key Errors
+            [TranslationKeys.FkPanelErrLoadRefColumns] = "Unable to load the columns of {0}: {1}",
+
+            // General UI & Column Precision
+            [TranslationKeys.Reset] = "Reset",
+            [TranslationKeys.CommonDefault] = "Default",
+            [TranslationKeys.ColFractionalPrecision] = "Fractional seconds precision",
+            [TranslationKeys.ColVectorDimensions] = "Vector dimensions",
+            [TranslationKeys.ScriptGenResetTooltip] = "Reset options to default"
         };
 
         public string this[string key]

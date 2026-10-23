@@ -4,6 +4,8 @@
 @using BprDevKit.Utility.Logging
 @using BprDevKit.Localization
 @using System.Diagnostics
+@using System.IO
+@using System.Text
 @inject IBprLogger Logger
 @inject ITranslationFactory TranslationFactory
 @inject IJSRuntime JSRuntime
@@ -19,7 +21,7 @@
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
         <div>
             <div class="d-flex align-items-center gap-2 mb-1">
-                @if (_isLiveStreaming)
+                @if (string.IsNullOrEmpty(_selectedLogFileName))
                 {
                     <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 d-flex align-items-center gap-1">
                         <span class="live-pulse"></span> @t[TranslationKeys.LogsLiveStream]
@@ -28,7 +30,7 @@
                 else
                 {
                     <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">
-                        <i class="bi bi-pause-circle me-1"></i> @t[TranslationKeys.LogsPause]
+                        <i class="bi bi-file-earmark-text me-1"></i> @t[TranslationKeys.LogsViewingFile]
                     </span>
                 }
             </div>
@@ -37,31 +39,79 @@
         </div>
 
         <div class="d-flex flex-wrap align-items-center gap-2">
-            <!-- Pause / Resume Toggle -->
-            <button class="btn btn-outline-secondary d-flex align-items-center gap-1" @onclick="ToggleLiveStream" title="@(_isLiveStreaming ? t[TranslationKeys.LogsPause] : t[TranslationKeys.LogsResume])">
-                <i class="bi @(_isLiveStreaming ? "bi-pause-fill" : "bi-play-fill") text-primary fs-5"></i>
-                <span>@(_isLiveStreaming ? t[TranslationKeys.LogsPause] : t[TranslationKeys.LogsResume])</span>
-            </button>
+            <!-- Log File Selector Dropdown -->
+            <div class="input-group input-group-sm" style="width: auto;">
+                <span class="input-group-text bg-white"><i class="bi bi-file-earmark-text text-primary"></i></span>
+                <select class="form-select form-select-sm" style="min-width: 210px;" @bind="_selectedLogFileName" @bind:after="OnLogFileSelected">
+                    <option value="">@t[TranslationKeys.LogsLiveSession]</option>
+                    @foreach (var file in _availableLogFiles)
+                    {
+                        <option value="@file">@file</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Import Log File -->
+            <InputFile id="import-log-file" class="d-none" OnChange="OnImportFileUploaded" accept=".log,.txt" />
+            <label for="import-log-file" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 mb-0" style="cursor: pointer;" title="@t[TranslationKeys.LogsImport]">
+                <i class="bi bi-file-earmark-arrow-up"></i>
+                <span>@t[TranslationKeys.LogsImport]</span>
+            </label>
+
+            <!-- Return to Live Session (when viewing a file) -->
+            @if (!string.IsNullOrEmpty(_selectedLogFileName))
+            {
+                <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" @onclick="ReturnToLiveStream">
+                    <i class="bi bi-broadcast"></i>
+                    <span>@t[TranslationKeys.LogsLiveSession]</span>
+                </button>
+            }
 
             <!-- Auto-scroll Toggle -->
-            <button class="btn @(_autoScroll ? "btn-primary" : "btn-outline-primary") d-flex align-items-center gap-1" @onclick="ToggleAutoScroll" title="@t[TranslationKeys.LogsAutoScroll]">
+            <button class="btn btn-sm @(_autoScroll ? "btn-primary" : "btn-outline-primary") d-flex align-items-center gap-1" @onclick="ToggleAutoScroll" title="@t[TranslationKeys.LogsAutoScroll]">
                 <i class="bi bi-arrow-down-circle"></i>
                 <span>@t[TranslationKeys.LogsAutoScroll]</span>
             </button>
 
             <!-- Clear Logs -->
-            <button class="btn btn-outline-danger d-flex align-items-center gap-1" @onclick="ClearLogs" title="@t[TranslationKeys.LogsClear]">
+            <button class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1" @onclick="ClearLogs" title="@t[TranslationKeys.LogsClear]">
                 <i class="bi bi-trash3"></i>
                 <span>@t[TranslationKeys.LogsClear]</span>
             </button>
 
             <!-- Open Log Folder -->
-            <button class="btn btn-outline-dark d-flex align-items-center gap-1" @onclick="OpenLogFolder" title="@t[TranslationKeys.LogsOpenFolder]">
+            <button class="btn btn-sm btn-outline-dark d-flex align-items-center gap-1" @onclick="OpenLogFolder" title="@t[TranslationKeys.LogsOpenFolder]">
                 <i class="bi bi-folder2-open"></i>
                 <span>@t[TranslationKeys.LogsOpenFolder]</span>
             </button>
         </div>
     </div>
+
+    @if (!string.IsNullOrEmpty(_selectedLogFileName))
+    {
+        <div class="alert alert-info py-2 px-3 d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-info-circle-fill fs-5"></i>
+                <span><strong>@t[TranslationKeys.LogsViewingFile]:</strong> @_selectedLogFileName (@_allLogs.Count @t[TranslationKeys.LogsTotalCount])</span>
+            </div>
+            <button class="btn btn-sm btn-outline-primary" @onclick="ReturnToLiveStream">
+                <i class="bi bi-broadcast me-1"></i>@t[TranslationKeys.LogsLiveSession]
+            </button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_importWarning))
+    {
+        <div class="alert alert-warning py-2 px-3 d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                <span>@_importWarning</span>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _importWarning = null">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+    }
 
     <!-- Metrics / Level Counters Summary -->
     <div class="row g-3 mb-4">
@@ -390,7 +440,8 @@
 
 @code {
     private List<LogEntry> _allLogs = new();
-    private bool _isLiveStreaming = true;
+    private List<string> _availableLogFiles = new();
+    private string _selectedLogFileName = string.Empty;
     private bool _autoScroll = true;
     private string _searchText = string.Empty;
     private string? _selectedLevelFilter = null;
@@ -438,13 +489,64 @@
     protected override void OnInitialized()
     {
         _allLogs = Logger.GetRecentLogs().ToList();
+        _availableLogFiles = Logger.GetAvailableLogFiles();
         Logger.OnLogEntryAdded += HandleNewLogEntry;
         TranslationFactory.LanguageChanged += OnLanguageChanged;
     }
 
+    private void OnLogFileSelected()
+    {
+        if (string.IsNullOrWhiteSpace(_selectedLogFileName))
+        {
+            ReturnToLiveStream();
+        }
+        else
+        {
+            var dir = Logger.GetLogDirectory();
+            var fullPath = Path.Combine(dir, _selectedLogFileName);
+            if (File.Exists(fullPath))
+            {
+                _allLogs = Logger.LoadLogsFromFile(fullPath);
+            }
+        }
+    }
+
+    private string? _importWarning = null;
+
+    private async Task OnImportFileUploaded(InputFileChangeEventArgs e)
+    {
+        _importWarning = null;
+        try
+        {
+            using var stream = e.File.OpenReadStream(maxAllowedSize: 25 * 1024 * 1024);
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            var content = await reader.ReadToEndAsync();
+            var parsed = Logger.LoadLogsFromContent(content);
+            if (parsed.Count == 0)
+            {
+                _importWarning = TranslationFactory.Current.Get(TranslationKeys.LogsErrInvalidFile, e.File.Name);
+            }
+            _allLogs = parsed;
+            _selectedLogFileName = e.File.Name;
+        }
+        catch (Exception ex)
+        {
+            _importWarning = TranslationFactory.Current.Get(TranslationKeys.LogsErrLoadFile, ex.Message);
+            Logger.LogError("LogsPage", $"Failed to import log file: {ex.Message}", ex);
+        }
+    }
+
+    private void ReturnToLiveStream()
+    {
+        _importWarning = null;
+        _selectedLogFileName = string.Empty;
+        _allLogs = Logger.GetRecentLogs().ToList();
+        _availableLogFiles = Logger.GetAvailableLogFiles();
+    }
+
     private void HandleNewLogEntry(LogEntry entry)
     {
-        if (!_isLiveStreaming) return;
+        if (!string.IsNullOrEmpty(_selectedLogFileName)) return;
 
         InvokeAsync(() =>
         {
@@ -457,8 +559,6 @@
         });
     }
 
-    private void ToggleLiveStream() => _isLiveStreaming = !_isLiveStreaming;
-
     private void ToggleAutoScroll() => _autoScroll = !_autoScroll;
 
     private void SetLevelFilter(string? level)
@@ -468,8 +568,15 @@
 
     private void ClearLogs()
     {
-        Logger.ClearRecentLogs();
-        _allLogs.Clear();
+        if (string.IsNullOrEmpty(_selectedLogFileName))
+        {
+            Logger.ClearRecentLogs();
+            _allLogs.Clear();
+        }
+        else
+        {
+            _allLogs.Clear();
+        }
         StateHasChanged();
     }
 

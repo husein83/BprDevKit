@@ -30,12 +30,12 @@
         <div class="card shadow-sm border-0">
             <div class="card-body p-3 p-lg-4">
                 <div class="row g-3 align-items-end">
-                    <div class="col-lg-8">
+                    <div class="col">
                         <label class="form-label fw-semibold" for="server-configuration">
                             <i class="bi bi-server me-1 text-primary"></i> @t[TranslationKeys.DbServerConfigLabel]
                         </label>
                         <select id="server-configuration"
-                                class="form-select form-select-lg"
+                                class="form-select"
                                 @bind="_selectedServerId"
                                 @bind:after="OnServerSelected"
                                 disabled="@_isLoadingServers">
@@ -46,12 +46,27 @@
                             }
                         </select>
                     </div>
-                    <div class="col-lg-4 d-flex gap-2">
-                        <button class="btn btn-outline-secondary flex-fill" type="button" @onclick="RefreshServers" disabled="@_isLoadingServers">
-                            <i class="bi bi-arrow-clockwise me-1"></i> @t[TranslationKeys.Refresh]
+                    <div class="col-auto d-flex gap-2">
+                        <button class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center"
+                                style="width: 40px; height: 38px;"
+                                type="button"
+                                @onclick="RefreshServers"
+                                disabled="@_isLoadingServers"
+                                title="@t[TranslationKeys.Refresh]">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                                <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+                            </svg>
                         </button>
-                        <button class="btn btn-outline-danger" type="button" @onclick="ClearServerSelection" disabled="@(_selectedServer is null)" title="@t[TranslationKeys.DbClearServer]">
-                            <i class="bi bi-x-lg"></i><span class="visually-hidden">@t[TranslationKeys.DbClearServer]</span>
+                        <button class="btn btn-outline-danger d-inline-flex align-items-center justify-content-center"
+                                style="width: 40px; height: 38px;"
+                                type="button"
+                                @onclick="ClearServerSelection"
+                                disabled="@(_selectedServer is null)"
+                                title="@t[TranslationKeys.DbClearServer]">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/>
+                            </svg>
                         </button>
                     </div>
                 </div>
@@ -154,8 +169,8 @@
         ("schemas", TranslationKeys.Schemas, "bi-diagram-3"),
         ("tables", TranslationKeys.Tables, "bi-table"),
         ("views", TranslationKeys.Views, "bi-eye"),
-        ("procedures", TranslationKeys.StoredProcedures, "bi-braces"),
-        ("functions", TranslationKeys.Functions, "bi-function"),
+        ("procedures", TranslationKeys.StoredProcedures, "bi-terminal"),
+        ("functions", TranslationKeys.Functions, "bi-braces"),
         ("triggers", TranslationKeys.Triggers, "bi-lightning-charge")
     };
 
@@ -186,7 +201,7 @@
         catch (Exception exception)
         {
             _serverConfigurations.Clear();
-            _loadError = $"Unable to load server configurations: {exception.Message}";
+            _loadError = TranslationFactory.Current.Get(TranslationKeys.ServerLoadError, exception.Message);
         }
         finally
         {

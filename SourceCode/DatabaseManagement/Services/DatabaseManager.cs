@@ -1412,8 +1412,8 @@ namespace BprDevKit.DatabaseManagement.Services
         }
         #endregion
 
-        #region Private Methods
-        private Task<DbConnection> OpenConnectionAsync(string? databaseName = null)
+        #region Connection Methods
+        public Task<DbConnection> OpenConnectionAsync(string? databaseName = null)
         {
             return _connectionFactory.OpenConnectionAsync(_config, databaseName);
         }
@@ -2187,13 +2187,15 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                 yield return finalBatch;
         }
 
-        private async Task<DataTable> ExecuteQuery(string sql)
+        public async Task<DataTable> ExecuteQueryAsync(string sql, string? databaseName = null) => await ExecuteQuery(sql, databaseName);
+
+        private async Task<DataTable> ExecuteQuery(string sql, string? databaseName = null)
         {
             DataTable result = new();
             var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                using var connection = await OpenConnectionAsync();
+                using var connection = await OpenConnectionAsync(databaseName);
                 using var command = connection.CreateCommand();
                 command.CommandText = sql;
                 command.CommandTimeout = _config.Server.CommandTimeout;
@@ -2206,7 +2208,7 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
             catch (Exception exp)
             {
                 sw.Stop();
-                _logger.LogError("DatabaseManager", $"[Query Error] Failed after {sw.ElapsedMilliseconds} ms: {exp.Message}", exp, serverName: _config.Server.ServerName, databaseName: _config.Server.DefaultDatabase);
+                _logger.LogError("DatabaseManager", $"[Query Error] Failed after {sw.ElapsedMilliseconds} ms: {exp.Message}", exp, serverName: _config.Server.ServerName, databaseName: databaseName ?? _config.Server.DefaultDatabase);
                 ExceptionHandler.HandleException(exp);
             }
             return result;

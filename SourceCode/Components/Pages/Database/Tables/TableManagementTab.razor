@@ -45,13 +45,31 @@
                         }
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md">
                     <label class="form-label fw-semibold" for="table-name-filter">@t[TranslationKeys.Search]</label>
                     <input id="table-name-filter" class="form-control" placeholder="@t[TranslationKeys.TableName]" @bind="_nameFilter" @bind:event="oninput" disabled="@(!HasDatabase)" />
                 </div>
-                <div class="col-auto">
-                    <button class="btn btn-outline-secondary" type="button" @onclick="RefreshAll" disabled="@(_isLoadingDatabases || _isLoadingTables || _isSaving)">
-                        <i class="bi bi-arrow-clockwise me-1"></i> @t[TranslationKeys.Refresh]
+                <div class="col-auto d-flex gap-2">
+                    <button class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center"
+                            style="width: 40px; height: 38px;"
+                            type="button"
+                            @onclick="RefreshAll"
+                            disabled="@(_isLoadingDatabases || _isLoadingTables || _isSaving)"
+                            title="@t[TranslationKeys.Refresh]">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+                        </svg>
+                    </button>
+                    <button class="btn btn-outline-danger d-inline-flex align-items-center justify-content-center"
+                            style="width: 40px; height: 38px;"
+                            type="button"
+                            @onclick="ClearSelection"
+                            disabled="@(!HasDatabase && string.IsNullOrEmpty(_nameFilter) && string.IsNullOrEmpty(_schemaFilter))"
+                            title="@t[TranslationKeys.Clear]">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                            <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/>
+                        </svg>
                     </button>
                 </div>
             </div>
@@ -145,15 +163,15 @@
                                         else if (type?.Kind == ColumnDataTypeKind.PrecisionScale)
                                         {
                                             <div class="input-group input-group-sm">
-                                                <input type="number" class="form-control" min="1" max="38" title="Precision" placeholder="p"
+                                                <input type="number" class="form-control" min="1" max="38" title="@t[TranslationKeys.Precision]" placeholder="p"
                                                        value="@(column.Precision?.ToString(CultureInfo.InvariantCulture))" @onchange="e => column.Precision = ParseInt(e.Value)" />
-                                                <input type="number" class="form-control" min="0" max="38" title="Scale" placeholder="s"
+                                                <input type="number" class="form-control" min="0" max="38" title="@t[TranslationKeys.Scale]" placeholder="s"
                                                        value="@(column.Scale?.ToString(CultureInfo.InvariantCulture))" @onchange="e => column.Scale = ParseInt(e.Value)" />
                                             </div>
                                         }
                                         else if (type?.Kind == ColumnDataTypeKind.FractionalSeconds)
                                         {
-                                            <input type="number" class="form-control form-control-sm" min="0" max="7" title="Fractional seconds precision" placeholder="default"
+                                            <input type="number" class="form-control form-control-sm" min="0" max="7" title="@t[TranslationKeys.ColFractionalPrecision]" placeholder="@t[TranslationKeys.CommonDefault]"
                                                    value="@(column.Scale?.ToString(CultureInfo.InvariantCulture))" @onchange="e => column.Scale = ParseInt(e.Value)" />
                                         }
                                         else
@@ -456,6 +474,18 @@
         CloseDialogs();
     }
 
+    private void ClearSelection()
+    {
+        _selectedDatabase = string.Empty;
+        _schemaFilter = string.Empty;
+        _nameFilter = string.Empty;
+        _tables.Clear();
+        _schemas.Clear();
+        _fileGroups.Clear();
+        CloseCreateTable();
+        CloseDialogs();
+    }
+
     private async Task LoadDatabases()
     {
         if (_databaseManager is null) return;
@@ -468,7 +498,7 @@
             else
                 ShowError(result.operationResult.Message);
         }
-        catch (Exception exception) { ShowError($"Unable to load databases: {exception.Message}"); }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.DbErrLoadDatabases, exception.Message)); }
         finally { _isLoadingDatabases = false; }
     }
 
@@ -501,7 +531,7 @@
             if (!string.IsNullOrEmpty(_schemaFilter) && !_tables.Any(table => table.SchemaName == _schemaFilter))
                 _schemaFilter = string.Empty;
         }
-        catch (Exception exception) { ShowError($"Unable to load tables: {exception.Message}"); }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.TableErrLoadTables, exception.Message)); }
         finally { _isLoadingTables = false; }
     }
 
@@ -597,7 +627,7 @@
 
             await OnOperationComplete.InvokeAsync(result.Message);
         }
-        catch (Exception exception) { ShowError($"Unable to create table: {exception.Message}"); }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.TableErrCreateTable, exception.Message)); }
         finally { _isSaving = false; }
     }
 
@@ -638,7 +668,7 @@
         catch (Exception exception)
         {
             CloseDialogs();
-            ShowError($"Unable to load table details: {exception.Message}");
+            ShowError(TranslationFactory.Current.Get(TranslationKeys.TableErrLoadDetails, exception.Message));
         }
         finally { _isLoadingDetails = false; }
     }
@@ -679,7 +709,7 @@
         catch (Exception exception)
         {
             CloseDialogs();
-            ShowError($"Unable to reload the table: {exception.Message}");
+            ShowError(TranslationFactory.Current.Get(TranslationKeys.TableErrReloadTable, exception.Message));
         }
     }
 
@@ -720,7 +750,7 @@
 
             await OnOperationComplete.InvokeAsync(result.Message);
         }
-        catch (Exception exception) { ShowError($"Unable to update table: {exception.Message}"); }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.TableErrUpdateTable, exception.Message)); }
         finally { _isSaving = false; }
     }
 
@@ -760,7 +790,7 @@
 
             await OnOperationComplete.InvokeAsync(result.Message);
         }
-        catch (Exception exception) { ShowError($"Unable to drop table: {exception.Message}"); }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.TableErrDropTable, exception.Message)); }
         finally { _isSaving = false; }
     }
 

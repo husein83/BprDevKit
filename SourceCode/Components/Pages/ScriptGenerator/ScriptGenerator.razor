@@ -1,0 +1,1174 @@
+@page "/script-generator"
+@using System.Text
+@using BprDevKit.Config
+@using BprDevKit.DatabaseManagement.Models.Metadata
+@using BprDevKit.DatabaseManagement.Models.Operations
+@using BprDevKit.DatabaseManagement.Services
+@using BprDevKit.DatabaseManagement.Services.Scripting
+@using BprDevKit.Localization
+@using BprDevKit.Utility
+@inject DatabaseManagerFactory DatabaseManagerFactory
+@inject ITranslationFactory TranslationFactory
+@inject IJSRuntime JSRuntime
+@inject BprDevKit.Utility.Logging.IBprLogger Logger
+@implements IDisposable
+@rendermode InteractiveServer
+
+@{
+    var t = TranslationFactory.Current;
+}
+
+<div class="container-fluid py-4 px-lg-5 script-generator-page">
+    <!-- Hero / Title -->
+    <section class="script-generator-hero d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+        <div>
+            <p class="text-primary text-uppercase fw-semibold small mb-1">@t[TranslationKeys.AppName]</p>
+            <h1 class="h2 mb-1 fw-bold"><i class="bi bi-file-earmark-code me-2"></i>@t[TranslationKeys.ScriptGenTitle]</h1>
+            <p class="text-muted mb-0">@t[TranslationKeys.ScriptGenSubtitle]</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            @if (_selectedServer is not null)
+            {
+                <span class="badge text-bg-light border px-3 py-2 d-flex align-items-center gap-1">
+                    <i class="bi bi-server text-primary"></i> @_selectedServer.Server.ServerName
+                </span>
+            }
+            @if (!string.IsNullOrWhiteSpace(_selectedDatabase))
+            {
+                <span class="badge rounded-pill text-bg-success px-3 py-2 d-flex align-items-center gap-1">
+                    <i class="bi bi-database-check"></i> @_selectedDatabase
+                </span>
+            }
+        </div>
+    </section>
+
+    <!-- Alerts -->
+    <BprAlert Message="@_bprMessage" OnDismiss="ClearMessage" CssClass="mb-4" />
+
+    <!-- Server & Database Selection Card -->
+    <section class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-3 p-lg-4">
+            <div class="row g-3 align-items-end">
+                <!-- Server Selector -->
+                <div class="col-md">
+                    <label class="form-label fw-semibold" for="server-select">
+                        <i class="bi bi-server me-1 text-primary"></i> @t[TranslationKeys.ScriptGenSelectServer]
+                    </label>
+                    <select id="server-select"
+                            class="form-select"
+                            @bind="_selectedServerId"
+                            @bind:after="OnServerSelected"
+                            disabled="@_isLoadingServers">
+                        <option value="">@t[TranslationKeys.DbSelectServerPlaceholder]</option>
+                        @foreach (var server in _serverConfigurations)
+                        {
+                            <option value="@server.Id">@GetServerDisplayName(server)</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Database Selector -->
+                <div class="col-md">
+                    <label class="form-label fw-semibold" for="database-select">
+                        <i class="bi bi-database me-1 text-primary"></i> @t[TranslationKeys.ScriptGenSelectDatabase]
+                    </label>
+                    <select id="database-select"
+                            class="form-select"
+                            @bind="_selectedDatabase"
+                            @bind:after="OnDatabaseSelected"
+                            disabled="@(_selectedServer is null || _isLoadingDatabases)">
+                        <option value="">@(_isLoadingDatabases ? t[TranslationKeys.DbTabLoadingDatabases] : t[TranslationKeys.ScriptGenSelectDatabasePrompt])</option>
+                        @foreach (var db in _databases)
+                        {
+                            <option value="@db">@db</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Refresh / Clear Buttons -->
+                <div class="col-auto d-flex gap-2">
+                    <button class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center"
+                            style="width: 40px; height: 38px;"
+                            type="button"
+                            @onclick="RefreshServers"
+                            disabled="@_isLoadingServers"
+                            title="@t[TranslationKeys.Refresh]">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+                        </svg>
+                    </button>
+                    <button class="btn btn-outline-danger d-inline-flex align-items-center justify-content-center"
+                            style="width: 40px; height: 38px;"
+                            type="button"
+                            @onclick="ClearAll"
+                            disabled="@(_selectedServer is null)"
+                            title="@t[TranslationKeys.ScriptGenClear]">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                            <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            @if (_isLoadingObjects)
+            {
+                <div class="d-flex align-items-center gap-2 mt-3 text-primary">
+                    <span class="spinner-border spinner-border-sm"></span>
+                    <span>@t[TranslationKeys.ScriptGenLoadingObjects]</span>
+                </div>
+            }
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(_selectedDatabase))
+    {
+        <div class="row g-4">
+            <!-- Left Column: Scripting Options & Object Picker -->
+            <div class="col-xl-5 col-lg-6">
+                <!-- 1. Script Mode Selection -->
+                <div class="card shadow-sm border-0 mb-3">
+                    <div class="card-header bg-white py-3 border-bottom-0">
+                        <h2 class="h6 mb-0 fw-bold"><i class="bi bi-sliders me-2 text-primary"></i>@t[TranslationKeys.ScriptGenScriptMode]</h2>
+                    </div>
+                    <div class="card-body pt-0">
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <div class="mode-card text-center @(_options.ScriptType == ScriptType.SchemaOnly ? "active" : "")"
+                                     @onclick="() => SetScriptType(ScriptType.SchemaOnly)">
+                                    <i class="bi bi-diagram-3 fs-5 d-block text-primary mb-1"></i>
+                                    <small class="fw-semibold">@t[TranslationKeys.ScriptGenSchemaOnly]</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="mode-card text-center @(_options.ScriptType == ScriptType.DataOnly ? "active" : "")"
+                                     @onclick="() => SetScriptType(ScriptType.DataOnly)">
+                                    <i class="bi bi-table fs-5 d-block text-success mb-1"></i>
+                                    <small class="fw-semibold">@t[TranslationKeys.ScriptGenDataOnly]</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="mode-card text-center @(_options.ScriptType == ScriptType.SchemaAndData ? "active" : "")"
+                                     @onclick="() => SetScriptType(ScriptType.SchemaAndData)">
+                                    <i class="bi bi-database-fill-gear fs-5 d-block text-info mb-1"></i>
+                                    <small class="fw-semibold">@t[TranslationKeys.ScriptGenSchemaAndData]</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Scripting Options -->
+                <div class="card shadow-sm border-0 mb-3">
+                    <div class="card-header bg-white py-3 border-bottom-0 d-flex justify-content-between align-items-center">
+                        <h2 class="h6 mb-0 fw-bold"><i class="bi bi-gear-fill me-2 text-primary"></i>@t[TranslationKeys.ScriptGenOptions]</h2>
+                        <button class="btn btn-link btn-sm text-decoration-none text-muted p-0" type="button" @onclick="ResetOptions" title="@t[TranslationKeys.ScriptGenResetTooltip]">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>@t[TranslationKeys.Reset]
+                        </button>
+                    </div>
+                    <div class="card-body pt-0">
+                        <div class="row g-2">
+                            <div class="col-sm-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="opt-ifnotexists" @bind="_options.IncludeIfNotExists" />
+                                    <label class="form-check-label small" for="opt-ifnotexists">@t[TranslationKeys.ScriptGenIncludeIfNotExists]</label>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="opt-dropcreate" @bind="_options.IncludeDropAndCreate" />
+                                    <label class="form-check-label small" for="opt-dropcreate">@t[TranslationKeys.ScriptGenIncludeDropAndCreate]</label>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="opt-fks" @bind="_options.IncludeForeignKeys" disabled="@(_options.ScriptType == ScriptType.DataOnly)" />
+                                    <label class="form-check-label small" for="opt-fks">@t[TranslationKeys.ScriptGenIncludeForeignKeys]</label>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="opt-indexes" @bind="_options.IncludeIndexes" disabled="@(_options.ScriptType == ScriptType.DataOnly)" />
+                                    <label class="form-check-label small" for="opt-indexes">@t[TranslationKeys.ScriptGenIncludeIndexes]</label>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="opt-constraints" @bind="_options.IncludeCheckConstraints" disabled="@(_options.ScriptType == ScriptType.DataOnly)" />
+                                    <label class="form-check-label small" for="opt-constraints">@t[TranslationKeys.ScriptGenIncludeCheckConstraints]</label>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="opt-triggers" @bind="_options.IncludeTriggers" disabled="@(_options.ScriptType == ScriptType.DataOnly)" />
+                                    <label class="form-check-label small" for="opt-triggers">@t[TranslationKeys.ScriptGenIncludeTriggers]</label>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="opt-comments" @bind="_options.IncludeComments" />
+                                    <label class="form-check-label small" for="opt-comments">@t[TranslationKeys.ScriptGenIncludeComments]</label>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="opt-use-db" @bind="_options.IncludeUseDatabase" />
+                                    <label class="form-check-label small" for="opt-use-db">@t[TranslationKeys.ScriptGenIncludeUseDatabase]</label>
+                                </div>
+                            </div>
+
+                            @if (_options.ScriptType != ScriptType.SchemaOnly)
+                            {
+                                <div class="col-12 mt-2 pt-2 border-top">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <label class="form-label small fw-semibold mb-0" for="max-rows">@t[TranslationKeys.ScriptGenMaxRows]</label>
+                                        <div class="form-check form-switch mb-0">
+                                            <input class="form-check-input" type="checkbox" id="opt-unlimited-rows"
+                                                   checked="@(_options.MaxDataRowsPerTable == 0)"
+                                                   @onchange="ToggleUnlimitedRows" />
+                                            <label class="form-check-label small" for="opt-unlimited-rows">@t[TranslationKeys.ScriptGenUnlimitedRows]</label>
+                                        </div>
+                                    </div>
+                                    <div class="input-group input-group-sm">
+                                        <input id="max-rows" type="number" class="form-control" min="1" step="100"
+                                               value="@(_options.MaxDataRowsPerTable == 0 ? 0 : _options.MaxDataRowsPerTable)"
+                                               @onchange="OnMaxRowsChanged"
+                                               disabled="@(_options.MaxDataRowsPerTable == 0)" />
+                                        <span class="input-group-text">
+                                            @if (_options.MaxDataRowsPerTable == 0)
+                                            {
+                                                <span class="text-success fw-semibold"><i class="bi bi-infinity me-1"></i>@t[TranslationKeys.ScriptGenUnlimitedRows]</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">@t[TranslationKeys.ScriptGenLines]</span>
+                                            }
+                                        </span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Object Selection Tree / Accordion -->
+                <div class="card shadow-sm border-0 mb-3">
+                    <div class="card-header bg-white py-3 border-bottom-0">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h2 class="h6 mb-0 fw-bold"><i class="bi bi-check2-square me-2 text-primary"></i>@t[TranslationKeys.ScriptGenSelectObjects]</h2>
+                            <span class="badge text-bg-primary">@_options.TotalSelectedCount</span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-primary" type="button" @onclick="SelectAllObjects">
+                                <i class="bi bi-check-all me-1"></i>@t[TranslationKeys.ScriptGenSelectAll]
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="DeselectAllObjects">
+                                <i class="bi bi-dash-square me-1"></i>@t[TranslationKeys.ScriptGenDeselectAll]
+                            </button>
+                            <div class="input-group input-group-sm flex-fill">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" placeholder="@t[TranslationKeys.ScriptGenFilterObjects]" @bind="_filterText" @bind:event="oninput" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body pt-0">
+                        <!-- Tables Category -->
+                        <div class="object-category-card">
+                            <div class="object-category-header" @onclick="() => _tablesExpanded = !_tablesExpanded">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi @(_tablesExpanded ? "bi-chevron-down" : "bi-chevron-right") text-muted small"></i>
+                                    <i class="bi bi-table text-primary"></i>
+                                    <span class="fw-semibold">@t[TranslationKeys.Tables]</span>
+                                    <span class="badge text-bg-secondary rounded-pill">@_options.SelectedTables.Count / @_tables.Count</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-1" @onclick:stopPropagation="true">
+                                    <button class="btn btn-link btn-sm text-decoration-none p-0 me-2" @onclick="SelectAllTables">@t[TranslationKeys.ScriptGenSelectAll]</button>
+                                    <button class="btn btn-link btn-sm text-decoration-none text-muted p-0" @onclick="DeselectAllTables">@t[TranslationKeys.ScriptGenDeselectAll]</button>
+                                </div>
+                            </div>
+                            @if (_tablesExpanded)
+                            {
+                                <div class="object-category-body">
+                                    @foreach (var table in FilteredTables)
+                                    {
+                                        var key = $"{table.SchemaName}.{table.TableName}";
+                                        var isChecked = _options.SelectedTables.Contains(key);
+                                        <div class="object-item-row">
+                                            <input class="form-check-input" type="checkbox" id="tbl-@key" checked="@isChecked" @onchange="e => ToggleTable(key, e)" />
+                                            <label class="form-check-label flex-fill text-truncate" for="tbl-@key">
+                                                <span class="badge text-bg-light border me-1">@table.SchemaName</span>
+                                                <span class="fw-medium">@table.TableName</span>
+                                                @if (table.RowCount > 0)
+                                                {
+                                                    <span class="text-muted ms-1 small">(@table.RowCount.ToString("N0") @t[TranslationKeys.ScriptGenRowsUnit])</span>
+                                                }
+                                            </label>
+                                        </div>
+                                    }
+                                    @if (!FilteredTables.Any())
+                                    {
+                                        <div class="text-muted small py-2 text-center">@t[TranslationKeys.ScriptGenNoMatchFilter]</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Views Category -->
+                        <div class="object-category-card">
+                            <div class="object-category-header" @onclick="() => _viewsExpanded = !_viewsExpanded">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi @(_viewsExpanded ? "bi-chevron-down" : "bi-chevron-right") text-muted small"></i>
+                                    <i class="bi bi-eye text-info"></i>
+                                    <span class="fw-semibold">@t[TranslationKeys.Views]</span>
+                                    <span class="badge text-bg-secondary rounded-pill">@_options.SelectedViews.Count / @_views.Count</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-1" @onclick:stopPropagation="true">
+                                    <button class="btn btn-link btn-sm text-decoration-none p-0 me-2" @onclick="SelectAllViews">@t[TranslationKeys.ScriptGenSelectAll]</button>
+                                    <button class="btn btn-link btn-sm text-decoration-none text-muted p-0" @onclick="DeselectAllViews">@t[TranslationKeys.ScriptGenDeselectAll]</button>
+                                </div>
+                            </div>
+                            @if (_viewsExpanded)
+                            {
+                                <div class="object-category-body">
+                                    @foreach (var view in FilteredViews)
+                                    {
+                                        var key = $"{view.SchemaName}.{view.ViewName}";
+                                        var isChecked = _options.SelectedViews.Contains(key);
+                                        <div class="object-item-row">
+                                            <input class="form-check-input" type="checkbox" id="vw-@key" checked="@isChecked" @onchange="e => ToggleView(key, e)" />
+                                            <label class="form-check-label flex-fill text-truncate" for="vw-@key">
+                                                <span class="badge text-bg-light border me-1">@view.SchemaName</span>
+                                                <span>@view.ViewName</span>
+                                                @if (view.IsEncrypted)
+                                                {
+                                                    <i class="bi bi-lock-fill text-warning ms-1" title="@t[TranslationKeys.CommonEncrypted]"></i>
+                                                }
+                                            </label>
+                                        </div>
+                                    }
+                                    @if (!FilteredViews.Any())
+                                    {
+                                        <div class="text-muted small py-2 text-center">@t[TranslationKeys.ScriptGenNoMatchFilter]</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Stored Procedures Category -->
+                        <div class="object-category-card">
+                            <div class="object-category-header" @onclick="() => _procsExpanded = !_procsExpanded">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi @(_procsExpanded ? "bi-chevron-down" : "bi-chevron-right") text-muted small"></i>
+                                    <i class="bi bi-terminal text-success"></i>
+                                    <span class="fw-semibold">@t[TranslationKeys.StoredProcedures]</span>
+                                    <span class="badge text-bg-secondary rounded-pill">@_options.SelectedProcedures.Count / @_procedures.Count</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-1" @onclick:stopPropagation="true">
+                                    <button class="btn btn-link btn-sm text-decoration-none p-0 me-2" @onclick="SelectAllProcedures">@t[TranslationKeys.ScriptGenSelectAll]</button>
+                                    <button class="btn btn-link btn-sm text-decoration-none text-muted p-0" @onclick="DeselectAllProcedures">@t[TranslationKeys.ScriptGenDeselectAll]</button>
+                                </div>
+                            </div>
+                            @if (_procsExpanded)
+                            {
+                                <div class="object-category-body">
+                                    @foreach (var proc in FilteredProcedures)
+                                    {
+                                        var key = $"{proc.SchemaName}.{proc.ProcedureName}";
+                                        var isChecked = _options.SelectedProcedures.Contains(key);
+                                        <div class="object-item-row">
+                                            <input class="form-check-input" type="checkbox" id="pr-@key" checked="@isChecked" @onchange="e => ToggleProcedure(key, e)" />
+                                            <label class="form-check-label flex-fill text-truncate" for="pr-@key">
+                                                <span class="badge text-bg-light border me-1">@proc.SchemaName</span>
+                                                <span>@proc.ProcedureName</span>
+                                                @if (proc.IsEncrypted)
+                                                {
+                                                    <i class="bi bi-lock-fill text-warning ms-1" title="@t[TranslationKeys.CommonEncrypted]"></i>
+                                                }
+                                            </label>
+                                        </div>
+                                    }
+                                    @if (!FilteredProcedures.Any())
+                                    {
+                                        <div class="text-muted small py-2 text-center">@t[TranslationKeys.ScriptGenNoMatchFilter]</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Functions Category -->
+                        <div class="object-category-card">
+                            <div class="object-category-header" @onclick="() => _funcsExpanded = !_funcsExpanded">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi @(_funcsExpanded ? "bi-chevron-down" : "bi-chevron-right") text-muted small"></i>
+                                    <i class="bi bi-braces text-warning"></i>
+                                    <span class="fw-semibold">@t[TranslationKeys.Functions]</span>
+                                    <span class="badge text-bg-secondary rounded-pill">@_options.SelectedFunctions.Count / @_functions.Count</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-1" @onclick:stopPropagation="true">
+                                    <button class="btn btn-link btn-sm text-decoration-none p-0 me-2" @onclick="SelectAllFunctions">@t[TranslationKeys.ScriptGenSelectAll]</button>
+                                    <button class="btn btn-link btn-sm text-decoration-none text-muted p-0" @onclick="DeselectAllFunctions">@t[TranslationKeys.ScriptGenDeselectAll]</button>
+                                </div>
+                            </div>
+                            @if (_funcsExpanded)
+                            {
+                                <div class="object-category-body">
+                                    @foreach (var func in FilteredFunctions)
+                                    {
+                                        var key = $"{func.SchemaName}.{func.FunctionName}";
+                                        var isChecked = _options.SelectedFunctions.Contains(key);
+                                        <div class="object-item-row">
+                                            <input class="form-check-input" type="checkbox" id="fn-@key" checked="@isChecked" @onchange="e => ToggleFunction(key, e)" />
+                                            <label class="form-check-label flex-fill text-truncate" for="fn-@key">
+                                                <span class="badge text-bg-light border me-1">@func.SchemaName</span>
+                                                <span>@func.FunctionName</span>
+                                                @if (func.IsEncrypted)
+                                                {
+                                                    <i class="bi bi-lock-fill text-warning ms-1" title="@t[TranslationKeys.CommonEncrypted]"></i>
+                                                }
+                                            </label>
+                                        </div>
+                                    }
+                                    @if (!FilteredFunctions.Any())
+                                    {
+                                        <div class="text-muted small py-2 text-center">@t[TranslationKeys.ScriptGenNoMatchFilter]</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Triggers Category -->
+                        <div class="object-category-card">
+                            <div class="object-category-header" @onclick="() => _triggersExpanded = !_triggersExpanded">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi @(_triggersExpanded ? "bi-chevron-down" : "bi-chevron-right") text-muted small"></i>
+                                    <i class="bi bi-lightning-charge text-danger"></i>
+                                    <span class="fw-semibold">@t[TranslationKeys.Triggers]</span>
+                                    <span class="badge text-bg-secondary rounded-pill">@_options.SelectedTriggers.Count / @_triggers.Count</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-1" @onclick:stopPropagation="true">
+                                    <button class="btn btn-link btn-sm text-decoration-none p-0 me-2" @onclick="SelectAllTriggers">@t[TranslationKeys.ScriptGenSelectAll]</button>
+                                    <button class="btn btn-link btn-sm text-decoration-none text-muted p-0" @onclick="DeselectAllTriggers">@t[TranslationKeys.ScriptGenDeselectAll]</button>
+                                </div>
+                            </div>
+                            @if (_triggersExpanded)
+                            {
+                                <div class="object-category-body">
+                                    @foreach (var trigger in FilteredTriggers)
+                                    {
+                                        var key = $"{trigger.SchemaName}.{trigger.TriggerName}";
+                                        var isChecked = _options.SelectedTriggers.Contains(key);
+                                        <div class="object-item-row">
+                                            <input class="form-check-input" type="checkbox" id="tr-@key" checked="@isChecked" @onchange="e => ToggleTrigger(key, e)" />
+                                            <label class="form-check-label flex-fill text-truncate" for="tr-@key">
+                                                <span class="badge text-bg-light border me-1">@trigger.SchemaName</span>
+                                                <span>@trigger.TriggerName</span>
+                                            </label>
+                                        </div>
+                                    }
+                                    @if (!FilteredTriggers.Any())
+                                    {
+                                        <div class="text-muted small py-2 text-center">@t[TranslationKeys.ScriptGenNoMatchFilter]</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Schemas Category -->
+                        <div class="object-category-card">
+                            <div class="object-category-header" @onclick="() => _schemasExpanded = !_schemasExpanded">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi @(_schemasExpanded ? "bi-chevron-down" : "bi-chevron-right") text-muted small"></i>
+                                    <i class="bi bi-folder text-secondary"></i>
+                                    <span class="fw-semibold">@t[TranslationKeys.Schemas]</span>
+                                    <span class="badge text-bg-secondary rounded-pill">@_options.SelectedSchemas.Count / @_schemas.Count</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-1" @onclick:stopPropagation="true">
+                                    <button class="btn btn-link btn-sm text-decoration-none p-0 me-2" @onclick="SelectAllSchemas">@t[TranslationKeys.ScriptGenSelectAll]</button>
+                                    <button class="btn btn-link btn-sm text-decoration-none text-muted p-0" @onclick="DeselectAllSchemas">@t[TranslationKeys.ScriptGenDeselectAll]</button>
+                                </div>
+                            </div>
+                            @if (_schemasExpanded)
+                            {
+                                <div class="object-category-body">
+                                    @foreach (var schema in FilteredSchemas)
+                                    {
+                                        var isChecked = _options.SelectedSchemas.Contains(schema.SchemaName);
+                                        <div class="object-item-row">
+                                            <input class="form-check-input" type="checkbox" id="sch-@schema.SchemaName" checked="@isChecked" @onchange="e => ToggleSchema(schema.SchemaName, e)" />
+                                            <label class="form-check-label flex-fill text-truncate" for="sch-@schema.SchemaName">
+                                                <span>@schema.SchemaName</span>
+                                                @if (!string.IsNullOrWhiteSpace(schema.OwnerName))
+                                                {
+                                                    <span class="text-muted small ms-1">(Owner: @schema.OwnerName)</span>
+                                                }
+                                            </label>
+                                        </div>
+                                    }
+                                    @if (!FilteredSchemas.Any())
+                                    {
+                                        <div class="text-muted small py-2 text-center">No schemas match filter</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Generation Action & SQL Output -->
+            <div class="col-xl-7 col-lg-6">
+                <div class="card shadow-sm border-0 sql-output-container">
+                    <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <h2 class="h6 mb-0 fw-bold"><i class="bi bi-file-earmark-code me-1 text-primary"></i>@t[TranslationKeys.ScriptGenOutputTitle]</h2>
+                            @if (!string.IsNullOrWhiteSpace(_generatedScript))
+                            {
+                                <span class="badge text-bg-light border">@_scriptLinesCount.ToString("N0") @t[TranslationKeys.ScriptGenLines]</span>
+                                <span class="badge text-bg-light border">@_scriptSizeKb KB</span>
+                            }
+                        </div>
+
+                        <!-- Action Toolbar -->
+                        <div class="d-flex flex-wrap gap-2">
+                            @if (!string.IsNullOrWhiteSpace(_generatedScript))
+                            {
+                                <button class="btn btn-sm btn-outline-success" type="button" @onclick="CopyToClipboard">
+                                    <i class="bi @(_isCopied ? "bi-check2" : "bi-clipboard") me-1"></i>
+                                    @(_isCopied ? t[TranslationKeys.ScriptGenCopied] : t[TranslationKeys.ScriptGenCopyClipboard])
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary" type="button" @onclick="DownloadSqlFile">
+                                    <i class="bi bi-download me-1"></i>@t[TranslationKeys.ScriptGenDownloadFile]
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" type="button" @onclick="ClearOutput" title="@t[TranslationKeys.ScriptGenClear]">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            }
+
+                            <!-- Main Generate Button -->
+                            <button class="btn btn-primary btn-sm px-3 d-flex align-items-center gap-1"
+                                    type="button"
+                                    @onclick="GenerateScript"
+                                    disabled="@(_isGenerating || _options.TotalSelectedCount == 0)">
+                                @if (_isGenerating)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                    <span>@t[TranslationKeys.ScriptGenGenerating]</span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-play-fill fs-5"></i>
+                                    <span>@t[TranslationKeys.ScriptGenGenerateButton]</span>
+                                }
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-3 d-flex flex-column flex-fill">
+                        @if (_isGenerating)
+                        {
+                            <div class="sql-placeholder-box flex-fill">
+                                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
+                                <h3 class="h5 fw-bold mb-1">@t[TranslationKeys.ScriptGenGenerating]</h3>
+                                <p class="text-muted mb-0">@_progressMessage</p>
+                            </div>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(_generatedScript))
+                        {
+                            <textarea readonly spellcheck="false" class="form-control sql-editor-area flex-fill">@_generatedScript</textarea>
+                        }
+                        else
+                        {
+                            <div class="sql-placeholder-box flex-fill">
+                                <i class="bi bi-code-slash fs-1 text-primary mb-3"></i>
+                                <h3 class="h5 fw-bold mb-1">@t[TranslationKeys.ScriptGenOutputTitle]</h3>
+                                <p class="text-muted small mb-3">Select objects and options, then click "@t[TranslationKeys.ScriptGenGenerateButton]"</p>
+                                <button class="btn btn-primary" type="button" @onclick="GenerateScript" disabled="@(_options.TotalSelectedCount == 0)">
+                                    <i class="bi bi-play-fill me-1"></i>@t[TranslationKeys.ScriptGenGenerateButton]
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ServerConfiguration> _serverConfigurations = new();
+    private ServerConfiguration? _selectedServer;
+    private Guid? _selectedServerId;
+    private List<string> _databases = new();
+    private string? _selectedDatabase;
+    private DatabaseManager? _databaseManager;
+
+    private List<SchemaOperation.Information> _schemas = new();
+    private List<TableOperation.Information> _tables = new();
+    private List<ViewOperation.Information> _views = new();
+    private List<StoredProcedureOperation.Information> _procedures = new();
+    private List<FunctionOperation.Information> _functions = new();
+    private List<TriggerOperation.Information> _triggers = new();
+
+    private ScriptingOptions _options = new();
+    private string _filterText = string.Empty;
+    private string _generatedScript = string.Empty;
+    private int _scriptLinesCount;
+    private int _scriptCharsCount;
+    private double _scriptSizeKb;
+    private bool _isGenerating;
+    private string _progressMessage = string.Empty;
+    private bool _isCopied;
+    private BprMessage? _bprMessage;
+
+    private bool _isLoadingServers;
+    private bool _isLoadingDatabases;
+    private bool _isLoadingObjects;
+
+    private bool _tablesExpanded = true;
+    private bool _viewsExpanded = true;
+    private bool _procsExpanded = true;
+    private bool _funcsExpanded = true;
+    private bool _triggersExpanded = true;
+    private bool _schemasExpanded = false;
+
+    // Filtered Object Lists
+    private IEnumerable<TableOperation.Information> FilteredTables =>
+        string.IsNullOrWhiteSpace(_filterText)
+            ? _tables
+            : _tables.Where(t => t.TableName.Contains(_filterText, StringComparison.OrdinalIgnoreCase) ||
+                                 t.SchemaName.Contains(_filterText, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<ViewOperation.Information> FilteredViews =>
+        string.IsNullOrWhiteSpace(_filterText)
+            ? _views
+            : _views.Where(v => v.ViewName.Contains(_filterText, StringComparison.OrdinalIgnoreCase) ||
+                                v.SchemaName.Contains(_filterText, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<StoredProcedureOperation.Information> FilteredProcedures =>
+        string.IsNullOrWhiteSpace(_filterText)
+            ? _procedures
+            : _procedures.Where(p => p.ProcedureName.Contains(_filterText, StringComparison.OrdinalIgnoreCase) ||
+                                     p.SchemaName.Contains(_filterText, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<FunctionOperation.Information> FilteredFunctions =>
+        string.IsNullOrWhiteSpace(_filterText)
+            ? _functions
+            : _functions.Where(f => f.FunctionName.Contains(_filterText, StringComparison.OrdinalIgnoreCase) ||
+                                    f.SchemaName.Contains(_filterText, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<TriggerOperation.Information> FilteredTriggers =>
+        string.IsNullOrWhiteSpace(_filterText)
+            ? _triggers
+            : _triggers.Where(tr => tr.TriggerName.Contains(_filterText, StringComparison.OrdinalIgnoreCase) ||
+                                    tr.SchemaName.Contains(_filterText, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<SchemaOperation.Information> FilteredSchemas =>
+        string.IsNullOrWhiteSpace(_filterText)
+            ? _schemas
+            : _schemas.Where(s => s.SchemaName.Contains(_filterText, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        TranslationFactory.LanguageChanged += OnLanguageChanged;
+        await LoadServerConfigurations();
+    }
+
+    private void OnLanguageChanged(Language language)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadServerConfigurations()
+    {
+        _isLoadingServers = true;
+        try
+        {
+            _serverConfigurations = ServerConfiguration.LoadAllFromEncryptedFile(false)
+                .Where(c => c.Id.HasValue)
+                .OrderBy(GetServerDisplayName)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _serverConfigurations.Clear();
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.ScriptGenErrLoadServers, ex.Message));
+        }
+        finally
+        {
+            _isLoadingServers = false;
+        }
+        await Task.CompletedTask;
+    }
+
+    private async Task OnServerSelected()
+    {
+        _selectedServer = _selectedServerId.HasValue
+            ? _serverConfigurations.FirstOrDefault(c => c.Id == _selectedServerId)
+            : null;
+
+        _selectedDatabase = null;
+        _databases.Clear();
+        ClearObjects();
+        ClearOutput();
+
+        if (_selectedServer is not null)
+        {
+            _databaseManager = DatabaseManagerFactory.Create(_selectedServer);
+            await LoadDatabases();
+        }
+        else
+        {
+            _databaseManager = null;
+        }
+    }
+
+    private async Task LoadDatabases()
+    {
+        if (_databaseManager is null) return;
+        _isLoadingDatabases = true;
+        try
+        {
+            var result = await _databaseManager.GetDatabases();
+            if (result.operationResult.Success)
+            {
+                _databases = result.databases.OrderBy(db => db).ToList();
+            }
+            else
+            {
+                _bprMessage = BprMessage.Error(result.operationResult.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.ScriptGenErrLoadDatabases, ex.Message));
+        }
+        finally
+        {
+            _isLoadingDatabases = false;
+        }
+    }
+
+    private async Task OnDatabaseSelected()
+    {
+        ClearObjects();
+        ClearOutput();
+
+        if (string.IsNullOrWhiteSpace(_selectedDatabase) || _databaseManager is null)
+            return;
+
+        await LoadDatabaseObjects();
+    }
+
+    private async Task LoadDatabaseObjects()
+    {
+        if (_databaseManager is null || string.IsNullOrWhiteSpace(_selectedDatabase)) return;
+
+        _isLoadingObjects = true;
+        try
+        {
+            var dbName = _selectedDatabase;
+
+            // Load Schemas
+            var schemaResult = await _databaseManager.GetSchemaList(dbName);
+            if (schemaResult.operationResult.Success)
+                _schemas = schemaResult.schemas.OrderBy(s => s.SchemaName).ToList();
+
+            // Load Tables
+            var tableResult = await _databaseManager.GetTableList(dbName);
+            if (tableResult.operationResult.Success)
+                _tables = tableResult.tables.OrderBy(t => t.SchemaName).ThenBy(t => t.TableName).ToList();
+
+            // Load Views
+            var viewResult = await _databaseManager.GetViews(dbName);
+            if (viewResult.operationResult.Success)
+                _views = viewResult.views.OrderBy(v => v.SchemaName).ThenBy(v => v.ViewName).ToList();
+
+            // Load Stored Procedures
+            var procResult = await _databaseManager.GetProcedures(dbName);
+            if (procResult.operationResult.Success)
+                _procedures = procResult.procedures.OrderBy(p => p.SchemaName).ThenBy(p => p.ProcedureName).ToList();
+
+            // Load Functions
+            var funcResult = await _databaseManager.GetFunctions(dbName);
+            if (funcResult.operationResult.Success)
+                _functions = funcResult.functions.OrderBy(f => f.SchemaName).ThenBy(f => f.FunctionName).ToList();
+
+            // Load Triggers
+            var trigResult = await _databaseManager.GetTriggers(dbName);
+            if (trigResult.operationResult.Success)
+                _triggers = trigResult.triggers.OrderBy(tr => tr.SchemaName).ThenBy(tr => tr.TriggerName).ToList();
+
+            // Select all by default
+            SelectAllObjects();
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.ScriptGenErrLoadObjects, ex.Message));
+        }
+        finally
+        {
+            _isLoadingObjects = false;
+        }
+    }
+
+    private void SetScriptType(ScriptType type)
+    {
+        _options.ScriptType = type;
+    }
+
+    private void SelectAllObjects()
+    {
+        SelectAllTables();
+        SelectAllViews();
+        SelectAllProcedures();
+        SelectAllFunctions();
+        SelectAllTriggers();
+        SelectAllSchemas();
+    }
+
+    private void DeselectAllObjects()
+    {
+        _options.SelectedTables.Clear();
+        _options.SelectedViews.Clear();
+        _options.SelectedProcedures.Clear();
+        _options.SelectedFunctions.Clear();
+        _options.SelectedTriggers.Clear();
+        _options.SelectedSchemas.Clear();
+    }
+
+    private void SelectAllTables()
+    {
+        foreach (var t in _tables)
+            _options.SelectedTables.Add($"{t.SchemaName}.{t.TableName}");
+    }
+
+    private void DeselectAllTables()
+    {
+        _options.SelectedTables.Clear();
+    }
+
+    private void SelectAllViews()
+    {
+        foreach (var v in _views)
+            _options.SelectedViews.Add($"{v.SchemaName}.{v.ViewName}");
+    }
+
+    private void DeselectAllViews()
+    {
+        _options.SelectedViews.Clear();
+    }
+
+    private void SelectAllProcedures()
+    {
+        foreach (var p in _procedures)
+            _options.SelectedProcedures.Add($"{p.SchemaName}.{p.ProcedureName}");
+    }
+
+    private void DeselectAllProcedures()
+    {
+        _options.SelectedProcedures.Clear();
+    }
+
+    private void SelectAllFunctions()
+    {
+        foreach (var f in _functions)
+            _options.SelectedFunctions.Add($"{f.SchemaName}.{f.FunctionName}");
+    }
+
+    private void DeselectAllFunctions()
+    {
+        _options.SelectedFunctions.Clear();
+    }
+
+    private void SelectAllTriggers()
+    {
+        foreach (var tr in _triggers)
+            _options.SelectedTriggers.Add($"{tr.SchemaName}.{tr.TriggerName}");
+    }
+
+    private void DeselectAllTriggers()
+    {
+        _options.SelectedTriggers.Clear();
+    }
+
+    private void SelectAllSchemas()
+    {
+        foreach (var s in _schemas)
+            _options.SelectedSchemas.Add(s.SchemaName);
+    }
+
+    private void DeselectAllSchemas()
+    {
+        _options.SelectedSchemas.Clear();
+    }
+
+    private void ToggleTable(string key, ChangeEventArgs e)
+    {
+        if (e.Value is bool isChecked && isChecked)
+            _options.SelectedTables.Add(key);
+        else
+            _options.SelectedTables.Remove(key);
+    }
+
+    private void ToggleView(string key, ChangeEventArgs e)
+    {
+        if (e.Value is bool isChecked && isChecked)
+            _options.SelectedViews.Add(key);
+        else
+            _options.SelectedViews.Remove(key);
+    }
+
+    private void ToggleProcedure(string key, ChangeEventArgs e)
+    {
+        if (e.Value is bool isChecked && isChecked)
+            _options.SelectedProcedures.Add(key);
+        else
+            _options.SelectedProcedures.Remove(key);
+    }
+
+    private void ToggleFunction(string key, ChangeEventArgs e)
+    {
+        if (e.Value is bool isChecked && isChecked)
+            _options.SelectedFunctions.Add(key);
+        else
+            _options.SelectedFunctions.Remove(key);
+    }
+
+    private void ToggleTrigger(string key, ChangeEventArgs e)
+    {
+        if (e.Value is bool isChecked && isChecked)
+            _options.SelectedTriggers.Add(key);
+        else
+            _options.SelectedTriggers.Remove(key);
+    }
+
+    private void ToggleSchema(string schemaName, ChangeEventArgs e)
+    {
+        if (e.Value is bool isChecked && isChecked)
+            _options.SelectedSchemas.Add(schemaName);
+        else
+            _options.SelectedSchemas.Remove(schemaName);
+    }
+
+    private async Task GenerateScript()
+    {
+        if (_databaseManager is null || string.IsNullOrWhiteSpace(_selectedDatabase))
+        {
+            _bprMessage = BprMessage.Warning(TranslationFactory.Current[TranslationKeys.ScriptGenSelectDatabasePrompt]);
+            return;
+        }
+
+        if (_options.TotalSelectedCount == 0)
+        {
+            _bprMessage = BprMessage.Warning(TranslationFactory.Current[TranslationKeys.ScriptGenNoObjectsSelected]);
+            return;
+        }
+
+        _isGenerating = true;
+        _progressMessage = TranslationFactory.Current[TranslationKeys.ScriptGenInitializing];
+        ClearMessage();
+
+        try
+        {
+            var service = new SqlScriptGeneratorService(_databaseManager);
+            var progress = new Progress<string>(msg =>
+            {
+                _progressMessage = msg;
+                InvokeAsync(StateHasChanged);
+            });
+
+            var script = await service.GenerateScriptAsync(_selectedDatabase, _options, progress);
+            _generatedScript = script;
+            _scriptLinesCount = string.IsNullOrEmpty(script) ? 0 : script.Split('\n').Length;
+            _scriptCharsCount = script?.Length ?? 0;
+            _scriptSizeKb = script is null ? 0 : Math.Round(Encoding.UTF8.GetByteCount(script) / 1024.0, 1);
+
+            _bprMessage = BprMessage.Success(TranslationFactory.Current.Get(
+                TranslationKeys.ScriptGenGeneratedSuccess,
+                _scriptLinesCount.ToString("N0"),
+                _scriptSizeKb.ToString("N1")));
+
+            Logger.LogInformation("ScriptGenerator",
+                $"SQL script generated successfully for database [{_selectedDatabase}] ({_scriptLinesCount:N0} lines, {_scriptSizeKb:N1} KB, Mode: {_options.ScriptType})",
+                serverName: _selectedServer?.Server.ServerName,
+                databaseName: _selectedDatabase);
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.ScriptGenErrGenerationFailed, ex.Message));
+            Logger.LogError("ScriptGenerator",
+                $"SQL script generation failed for database [{_selectedDatabase}]: {ex.Message}",
+                ex,
+                serverName: _selectedServer?.Server.ServerName,
+                databaseName: _selectedDatabase);
+        }
+        finally
+        {
+            _isGenerating = false;
+        }
+    }
+
+    private async Task CopyToClipboard()
+    {
+        if (string.IsNullOrWhiteSpace(_generatedScript)) return;
+
+        try
+        {
+            var success = await JSRuntime.InvokeAsync<bool>("window.copyTextToClipboard", _generatedScript);
+            if (success)
+            {
+                _isCopied = true;
+                Logger.LogInformation("ScriptGenerator",
+                    $"SQL script copied to clipboard ({_scriptLinesCount:N0} lines, {_scriptSizeKb:N1} KB)",
+                    serverName: _selectedServer?.Server.ServerName,
+                    databaseName: _selectedDatabase);
+
+                _ = Task.Delay(2500).ContinueWith(_ =>
+                {
+                    _isCopied = false;
+                    InvokeAsync(StateHasChanged);
+                });
+            }
+        }
+        catch
+        {
+            // Fallback
+        }
+    }
+
+    private async Task DownloadSqlFile()
+    {
+        if (string.IsNullOrWhiteSpace(_generatedScript) || string.IsNullOrWhiteSpace(_selectedDatabase)) return;
+
+        var filename = $"{_selectedDatabase}_{_options.ScriptType}_{DateTime.Now:yyyyMMdd_HHmmss}.sql";
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("window.downloadTextFile", filename, _generatedScript);
+            Logger.LogInformation("ScriptGenerator",
+                $"SQL script downloaded as '{filename}' ({_scriptLinesCount:N0} lines, {_scriptSizeKb:N1} KB)",
+                serverName: _selectedServer?.Server.ServerName,
+                databaseName: _selectedDatabase);
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.ScriptGenErrDownloadFailed, ex.Message));
+            Logger.LogError("ScriptGenerator",
+                $"Failed to download script file '{filename}': {ex.Message}",
+                ex,
+                serverName: _selectedServer?.Server.ServerName,
+                databaseName: _selectedDatabase);
+        }
+    }
+
+    private void ClearOutput()
+    {
+        _generatedScript = string.Empty;
+        _scriptLinesCount = 0;
+        _scriptCharsCount = 0;
+        _scriptSizeKb = 0;
+        _isCopied = false;
+    }
+
+    private void ClearObjects()
+    {
+        _schemas.Clear();
+        _tables.Clear();
+        _views.Clear();
+        _procedures.Clear();
+        _functions.Clear();
+        _triggers.Clear();
+        DeselectAllObjects();
+    }
+
+    private int _previousMaxRows = 1000;
+
+    private void ToggleUnlimitedRows(ChangeEventArgs e)
+    {
+        var isUnlimited = e.Value is bool b && b;
+        if (isUnlimited)
+        {
+            if (_options.MaxDataRowsPerTable > 0)
+                _previousMaxRows = _options.MaxDataRowsPerTable;
+            _options.MaxDataRowsPerTable = 0;
+        }
+        else
+        {
+            _options.MaxDataRowsPerTable = _previousMaxRows > 0 ? _previousMaxRows : 1000;
+        }
+    }
+
+    private void OnMaxRowsChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+        {
+            if (val <= 0)
+            {
+                _options.MaxDataRowsPerTable = 0;
+            }
+            else
+            {
+                _options.MaxDataRowsPerTable = val;
+                _previousMaxRows = val;
+            }
+        }
+    }
+
+    private void ClearAll()
+    {
+        _selectedServerId = null;
+        _selectedServer = null;
+        _databaseManager = null;
+        _databases.Clear();
+        _selectedDatabase = null;
+        _filterText = string.Empty;
+        _options = new ScriptingOptions();
+        _previousMaxRows = 1000;
+        ClearObjects();
+        ClearOutput();
+        ClearMessage();
+    }
+
+    private void ResetOptions()
+    {
+        var tables = new HashSet<string>(_options.SelectedTables, StringComparer.OrdinalIgnoreCase);
+        var views = new HashSet<string>(_options.SelectedViews, StringComparer.OrdinalIgnoreCase);
+        var procs = new HashSet<string>(_options.SelectedProcedures, StringComparer.OrdinalIgnoreCase);
+        var funcs = new HashSet<string>(_options.SelectedFunctions, StringComparer.OrdinalIgnoreCase);
+        var triggers = new HashSet<string>(_options.SelectedTriggers, StringComparer.OrdinalIgnoreCase);
+        var schemas = new HashSet<string>(_options.SelectedSchemas, StringComparer.OrdinalIgnoreCase);
+
+        _previousMaxRows = 1000;
+        _options = new ScriptingOptions
+        {
+            SelectedTables = tables,
+            SelectedViews = views,
+            SelectedProcedures = procs,
+            SelectedFunctions = funcs,
+            SelectedTriggers = triggers,
+            SelectedSchemas = schemas
+        };
+    }
+
+    private async Task RefreshServers()
+    {
+        ClearAll();
+        await LoadServerConfigurations();
+    }
+
+    private void ClearMessage()
+    {
+        _bprMessage = null;
+    }
+
+    private static string GetServerDisplayName(ServerConfiguration configuration)
+    {
+        return string.IsNullOrWhiteSpace(configuration.Server.Alias)
+            ? configuration.Server.ServerName
+            : $"{configuration.Server.Alias} ({configuration.Server.ServerName})";
+    }
+
+    public void Dispose()
+    {
+        TranslationFactory.LanguageChanged -= OnLanguageChanged;
+    }
+}

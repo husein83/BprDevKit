@@ -272,7 +272,7 @@ else
         }
         catch (Exception exception)
         {
-            _bprMessage = BprMessage.Error($"Unable to load the columns of {reference.FullName}: {exception.Message}");
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.FkPanelErrLoadRefColumns, reference.FullName, exception.Message));
         }
     }
 
@@ -351,7 +351,7 @@ else
         }
         catch (Exception exception)
         {
-            _bprMessage = BprMessage.Error($"Unable to complete the operation: {exception.Message}");
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.CommonOperationFailed, exception.Message));
         }
         finally { _isSaving = false; }
     }

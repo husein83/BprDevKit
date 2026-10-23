@@ -255,7 +255,7 @@
                 : await Manager.AlterColumn(BuildAlter());
             await Complete(result);
         }
-        catch (Exception exception) { ShowResult(OperationResult.ErrorResult($"Unable to save the column: {exception.Message}", exception)); }
+        catch (Exception exception) { ShowResult(OperationResult.ErrorResult(TranslationFactory.Current.Get(TranslationKeys.ColErrSaveColumn, exception.Message), exception)); }
         finally { _isSaving = false; }
     }
 
@@ -305,7 +305,7 @@
             });
             await Complete(result);
         }
-        catch (Exception exception) { ShowResult(OperationResult.ErrorResult($"Unable to drop the column: {exception.Message}", exception)); }
+        catch (Exception exception) { ShowResult(OperationResult.ErrorResult(TranslationFactory.Current.Get(TranslationKeys.ColErrDropColumn, exception.Message), exception)); }
         finally { _isSaving = false; }
     }
 
