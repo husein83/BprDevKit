@@ -35,7 +35,18 @@
             <span class="home-action-arrow" aria-hidden="true">@(t.IsRtl ? "←" : "→")</span>
         </a>
 
-        <a class="home-action-card settings-action" href="server-management">
+        <a class="home-action-card datamodel-action" href="data-model-generator">
+            <span class="home-action-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.4 16.6-4.6-4.6 4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0 4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
+            </span>
+            <span class="home-action-body">
+                <strong>@t[TranslationKeys.DataModelTitle]</strong>
+                <small>@t[TranslationKeys.HomeDataModelCardDesc]</small>
+            </span>
+            <span class="home-action-arrow" aria-hidden="true">@(t.IsRtl ? "←" : "→")</span>
+        </a>
+
+        <a class="home-action-card settings-action" href="configuration-setting">
             <span class="home-action-icon">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.25a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Zm0 2.25c.8 0 1.57-.16 2.27-.45l1.6 1.6-1.2 2.08 1.55 2.68 2.4-.62 1.2 2.08-1.74 1.74-2.08-1.2-2.68 1.55.62 2.4H10.8l.62-2.4-2.68-1.55-2.08 1.2-1.74-1.74 1.2-2.08-1.55-2.68-2.4.62v-2.4l2.4.62 1.55-2.68-1.2-2.08 1.74-1.74 2.08 1.2c.7-.29 1.47-.45 2.27-.45Zm0 2.5a2.25 2.25 0 1 0 0 4.5 2.25 2.25 0 0 0 0-4.5Z" /></svg>
             </span>

@@ -21,6 +21,7 @@ builder.Services.AddSingleton<ISqlObjectDecryptor, SqlObjectDecryptor>();
 builder.Services.AddSingleton<BprDevKit.Utility.Logging.IBprLogger>(BprDevKit.Utility.Logging.BprLogger.Instance);
 builder.Services.AddScoped<DatabaseManager>();
 builder.Services.AddSingleton<DatabaseManagerFactory>();
+builder.Services.AddSingleton<BprDevKit.DatabaseManagement.Services.DataModels.DataModelGeneratorService>();
 
 var app = builder.Build();
 

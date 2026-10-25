@@ -1,0 +1,189 @@
+@using AppConfig = BprDevKit.Config.ApplicationConfiguration
+@using BprDevKit.Config
+@using BprDevKit.Utility
+@using BprDevKit.Localization
+@inject ITranslationFactory TranslationFactory
+@implements IDisposable
+
+@{
+    var t = TranslationFactory.Current;
+}
+
+<div class="application-configuration-section">
+    <!-- Header -->
+    <div class="mb-4">
+        <h3 class="h5 fw-bold mb-1">
+            <i class="bi bi-gear-fill text-primary me-2"></i>@t[TranslationKeys.ApplicationSettings]
+        </h3>
+        <p class="text-muted small mb-0">@t[TranslationKeys.ActiveLanguageAndLogs]</p>
+    </div>
+
+    @if (_bprMessage != null && !string.IsNullOrWhiteSpace(_bprMessage.Message))
+    {
+        <div class="settings-alert alert @_bprMessage.AlertCssClass alert-dismissible fade show mb-4" role="alert">
+            <i class="bi @_bprMessage.IconCssClass me-2"></i> @_bprMessage.Message
+            <button type="button" class="btn-close" @onclick="() => _bprMessage = null"></button>
+        </div>
+    }
+
+    <!-- Application Configuration Tabbed Form -->
+    <div class="settings-editor card shadow-sm border-0 mb-4">
+        <!-- Tabs Header for Application Settings -->
+        <ul class="nav nav-tabs px-4 pt-3 bg-light-subtle" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link @(_appActiveTab == "general" ? "active fw-bold" : "")" @onclick='() => SetAppActiveTab("general")'>
+                    <i class="bi bi-globe2 me-1"></i> @t[TranslationKeys.ServerGeneralLanguageTab]
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(_appActiveTab == "logging" ? "active fw-bold" : "")" @onclick='() => SetAppActiveTab("logging")'>
+                    <i class="bi bi-bell-fill me-1"></i> @t[TranslationKeys.Logging]
+                </button>
+            </li>
+        </ul>
+
+        <div class="card-body p-4">
+            @if (_appActiveTab == "general")
+            {
+                <!-- Tab 1: General Settings -->
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">@t[TranslationKeys.Language]</label>
+                        <select class="form-select" @bind="_appConfig.Language">
+                            <option value="@Language.English">@t[TranslationKeys.English]</option>
+                            <option value="@Language.Persian">@t[TranslationKeys.Persian]</option>
+                        </select>
+                        <small class="text-muted mt-1 d-block">@t[TranslationKeys.ServerLanguageHelp]</small>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="card bg-light-subtle border p-3 rounded-3">
+                            <h6 class="fw-bold mb-2 text-primary"><i class="bi bi-fonts me-2"></i>@t[TranslationKeys.FontSettingsHelp]</h6>
+                            <div class="row g-3 mt-1">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">@t[TranslationKeys.PersianFont]</label>
+                                    <input type="text" class="form-control" @bind="_appConfig.PersianFont" placeholder="AppFontFa" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">@t[TranslationKeys.EnglishFont]</label>
+                                    <input type="text" class="form-control" @bind="_appConfig.EnglishFont" placeholder="AppFontEn" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (_appActiveTab == "logging")
+            {
+                <!-- Tab 2: Logging Settings -->
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">@t[TranslationKeys.LogLevel]</label>
+                        <select class="form-select" @bind="_appConfig.Logging.LogLevel">
+                            @foreach (var level in Enum.GetValues<LogLevel>())
+                            {
+                                <option value="@level">@level</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">@t[TranslationKeys.EnableConsoleLogging]</label>
+                        <div class="form-check form-switch pt-1">
+                            <input type="checkbox" class="form-check-input" id="enableConsoleLogging" @bind="_appConfig.Logging.EnableConsoleLogging" />
+                            <label class="form-check-label fw-bold" for="enableConsoleLogging">@t[TranslationKeys.Enable]</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">@t[TranslationKeys.EnableFileLogging]</label>
+                        <div class="form-check form-switch pt-1">
+                            <input type="checkbox" class="form-check-input" id="enableFileLogging" @bind="_appConfig.Logging.EnableFileLogging" />
+                            <label class="form-check-label fw-bold" for="enableFileLogging">@t[TranslationKeys.Enable]</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">@t[TranslationKeys.ServerMaxLogFileSize]</label>
+                        <input type="number" class="form-control" @bind="_appConfig.Logging.MaxLogFileSizeMB" min="1" max="100" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">@t[TranslationKeys.ServerLogRetentionDays]</label>
+                        <input type="number" class="form-control" @bind="_appConfig.Logging.RetentionDays" min="1" max="365" />
+                    </div>
+                </div>
+            }
+
+            <!-- Action Buttons for Application Settings -->
+            <div class="d-flex justify-content-between align-items-center border-top mt-4 pt-4">
+                <button class="btn btn-outline-secondary" type="button" @onclick="LoadApplicationConfig">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>@t[TranslationKeys.Refresh]
+                </button>
+                <button class="btn btn-success px-5 py-2 shadow-sm" type="button" @onclick="SaveApplicationConfig">
+                    <i class="bi bi-check-lg me-1"></i> @t[TranslationKeys.SaveAppSettings]
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnConfigurationChanged { get; set; }
+
+    private string _appActiveTab = "general";
+    private AppConfig _appConfig = new();
+    private BprMessage? _bprMessage;
+
+    public Language CurrentLanguage => _appConfig.Language;
+    public LogLevel CurrentLogLevel => _appConfig.Logging.LogLevel;
+    public bool IsFileLoggingEnabled => _appConfig.Logging.EnableFileLogging;
+
+    protected override async Task OnInitializedAsync()
+    {
+        TranslationFactory.LanguageChanged += OnLanguageChanged;
+        LoadApplicationConfig();
+        await Task.CompletedTask;
+    }
+
+    private void OnLanguageChanged(Language language)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void SetAppActiveTab(string tab)
+    {
+        _appActiveTab = tab;
+        StateHasChanged();
+    }
+
+    public void LoadApplicationConfig()
+    {
+        try
+        {
+            AppConfig.LoadConfig();
+            _appConfig = AppConfig.Config;
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.CommonOperationFailed, ex.Message));
+        }
+    }
+
+    private void SaveApplicationConfig()
+    {
+        try
+        {
+            TranslationFactory.SetLanguage(_appConfig.Language);
+            AppConfig.SaveChanges(_appConfig);
+            _bprMessage = BprMessage.Success(TranslationFactory.Current[TranslationKeys.SaveAppSettings]);
+            OnConfigurationChanged.InvokeAsync();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.CommonOperationFailed, ex.Message));
+        }
+    }
+
+    public void Dispose()
+    {
+        TranslationFactory.LanguageChanged -= OnLanguageChanged;
+    }
+}

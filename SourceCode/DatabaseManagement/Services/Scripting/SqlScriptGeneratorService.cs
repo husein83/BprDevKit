@@ -703,7 +703,20 @@ namespace BprDevKit.DatabaseManagement.Services.Scripting
                 {
                     defaultVal = $"({defaultVal})";
                 }
-                sb.Append($" DEFAULT {defaultVal}");
+
+                string constraintName;
+                if (!string.IsNullOrWhiteSpace(col.DefaultConstraintName) &&
+                    !col.DefaultConstraintName.StartsWith("DF__", StringComparison.OrdinalIgnoreCase))
+                {
+                    constraintName = col.DefaultConstraintName.Trim();
+                }
+                else
+                {
+                    var tbl = !string.IsNullOrWhiteSpace(col.TableName) ? col.TableName : "Table";
+                    constraintName = $"DF_{tbl}_{col.ColumnName}";
+                }
+
+                sb.Append($" CONSTRAINT [{constraintName}] DEFAULT {defaultVal}");
             }
 
             return sb.ToString();

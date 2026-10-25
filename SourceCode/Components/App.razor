@@ -61,6 +61,36 @@
                 return false;
             }
         };
+
+        window.downloadBase64File = function (filename, base64Content, contentType) {
+            try {
+                contentType = contentType || 'application/zip';
+                var byteCharacters = atob(base64Content);
+                var byteArrays = [];
+                for (var offset = 0; offset < byteCharacters.length; offset += 512) {
+                    var slice = byteCharacters.slice(offset, offset + 512);
+                    var byteNumbers = new Array(slice.length);
+                    for (var i = 0; i < slice.length; i++) {
+                        byteNumbers[i] = slice.charCodeAt(i);
+                    }
+                    var byteArray = new Uint8Array(byteNumbers);
+                    byteArrays.push(byteArray);
+                }
+                var blob = new Blob(byteArrays, { type: contentType });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                return true;
+            } catch (err) {
+                console.error("Binary download failed:", err);
+                return false;
+            }
+        };
     </script>
 </body>
 

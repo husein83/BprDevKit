@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace BprDevKit.Utility
 {
@@ -6,6 +6,7 @@ namespace BprDevKit.Utility
     {
         ApplicationConfiguration,
         ServerConfiguration,
+        ModelGeneratorConfiguration,
     }
 
     public enum LogLevel

@@ -1,0 +1,179 @@
+@page "/configuration-setting"
+@page "/server-management"
+@page "/settings"
+@using BprDevKit.Config
+@using BprDevKit.Utility
+@using BprDevKit.Localization
+@inject NavigationManager NavigationManager
+@inject ITranslationFactory TranslationFactory
+@implements IDisposable
+@rendermode InteractiveServer
+
+@{
+    var t = TranslationFactory.Current;
+}
+
+<div class="container-fluid settings-page py-4 px-lg-5">
+    <div class="row">
+        <div class="col-12">
+            <!-- Hero Header -->
+            <div class="settings-hero mb-4">
+                <p class="settings-eyebrow mb-1">@t[TranslationKeys.ConfigurationSettingDashboard]</p>
+                <h1 class="h2 mb-1">@t[TranslationKeys.ConfigurationSettingTitle]</h1>
+                <p class="mb-0">@t[TranslationKeys.ConfigurationSettingSubtitle]</p>
+            </div>
+
+            <!-- Top Dashboard Overview Cards (3 Cards) -->
+            <div class="row g-3 mb-4">
+                <!-- Card 1: Server Configuration -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm p-3 config-summary-card @(_activeTab == "server" ? "active-card" : "")"
+                         @onclick='() => SetTab("server")'>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="card-icon-wrapper icon-server">
+                                <i class="bi bi-server"></i>
+                            </div>
+                            <div class="flex-fill">
+                                <span class="text-muted small fw-semibold text-uppercase">@t[TranslationKeys.ServerConfigurationTab]</span>
+                                <h4 class="h5 fw-bold mb-0 mt-1">@_serversCount @t[TranslationKeys.Server]</h4>
+                            </div>
+                            <i class="bi @(t.IsRtl ? "bi-chevron-left" : "bi-chevron-right") text-muted"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2: Application Configuration -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm p-3 config-summary-card @(_activeTab == "application" ? "active-card" : "")"
+                         @onclick='() => SetTab("application")'>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="card-icon-wrapper icon-app">
+                                <i class="bi bi-gear-fill"></i>
+                            </div>
+                            <div class="flex-fill">
+                                <span class="text-muted small fw-semibold text-uppercase">@t[TranslationKeys.ApplicationConfigurationTab]</span>
+                                <h4 class="h5 fw-bold mb-0 mt-1">@(_appConfig.Language == Language.Persian ? t[TranslationKeys.Persian] : t[TranslationKeys.English])</h4>
+                            </div>
+                            <i class="bi @(t.IsRtl ? "bi-chevron-left" : "bi-chevron-right") text-muted"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 3: Model Generator Configuration -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm p-3 config-summary-card @(_activeTab == "modelgenerator" ? "active-card" : "")"
+                         @onclick='() => SetTab("modelgenerator")'>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="card-icon-wrapper icon-models">
+                                <i class="bi bi-boxes"></i>
+                            </div>
+                            <div class="flex-fill">
+                                <span class="text-muted small fw-semibold text-uppercase">@t[TranslationKeys.ModelGeneratorConfigurationTab]</span>
+                                <h4 class="h5 fw-bold mb-0 mt-1">@_profilesCount @t[TranslationKeys.DataModelProfiles]</h4>
+                            </div>
+                            <i class="bi @(t.IsRtl ? "bi-chevron-left" : "bi-chevron-right") text-muted"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Active Tab Content -->
+            <div class="tab-content">
+                @if (_activeTab == "server")
+                {
+                    <ServerConfiguration @ref="_serverConfigComponent" OnConfigurationChanged="UpdateDashboardStats" />
+                }
+                else if (_activeTab == "application")
+                {
+                    <ApplicationConfiguration @ref="_appConfigComponent" OnConfigurationChanged="UpdateDashboardStats" />
+                }
+                else if (_activeTab == "modelgenerator")
+                {
+                    <ModelGeneratorConfiguration @ref="_modelGenConfigComponent" OnConfigurationChanged="UpdateDashboardStats" />
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _activeTab = "server";
+
+    private ServerConfiguration? _serverConfigComponent;
+    private ApplicationConfiguration? _appConfigComponent;
+    private ModelGeneratorConfiguration? _modelGenConfigComponent;
+
+    private int _serversCount = 0;
+    private int _profilesCount = 0;
+    private BprDevKit.Config.ApplicationConfiguration _appConfig = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        TranslationFactory.LanguageChanged += OnLanguageChanged;
+        CheckQueryParameters();
+        UpdateDashboardStats();
+        await Task.CompletedTask;
+    }
+
+    protected override void OnParametersSet()
+    {
+        CheckQueryParameters();
+    }
+
+    private void OnLanguageChanged(Language language)
+    {
+        UpdateDashboardStats();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void CheckQueryParameters()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = uri.Query;
+
+        if (query.Contains("tab=models", StringComparison.OrdinalIgnoreCase) ||
+            query.Contains("tab=modelgenerator", StringComparison.OrdinalIgnoreCase) ||
+            query.Contains("tab=datamodels", StringComparison.OrdinalIgnoreCase))
+        {
+            _activeTab = "modelgenerator";
+        }
+        else if (query.Contains("tab=app", StringComparison.OrdinalIgnoreCase) ||
+                 query.Contains("tab=application", StringComparison.OrdinalIgnoreCase))
+        {
+            _activeTab = "application";
+        }
+        else if (query.Contains("tab=server", StringComparison.OrdinalIgnoreCase))
+        {
+            _activeTab = "server";
+        }
+    }
+
+    private void SetTab(string tab)
+    {
+        _activeTab = tab;
+        NavigationManager.NavigateTo($"/configuration-setting?tab={tab}", replace: true);
+        StateHasChanged();
+    }
+
+    private void UpdateDashboardStats()
+    {
+        try
+        {
+            _serversCount = BprDevKit.Config.ServerConfiguration.LoadAllFromEncryptedFile(false).Count;
+            _profilesCount = BprDevKit.Config.ModelGeneratorConfiguration.LoadAllProfiles().Count;
+            BprDevKit.Config.ApplicationConfiguration.LoadConfig();
+            _appConfig = BprDevKit.Config.ApplicationConfiguration.Config;
+            StateHasChanged();
+        }
+        catch
+        {
+            // Fallback
+        }
+    }
+
+    public void Dispose()
+    {
+        TranslationFactory.LanguageChanged -= OnLanguageChanged;
+    }
+}

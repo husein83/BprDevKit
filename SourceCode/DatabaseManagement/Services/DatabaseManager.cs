@@ -1515,6 +1515,7 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                 IsPrimaryKey = row.GetBoolean("IsPrimaryKey"),
                 Collation = row.GetNullableString("Collation"),
                 DefaultValue = row.GetNullableString("DefaultValue"),
+                DefaultConstraintName = row.GetNullableString("DefaultConstraintName"),
                 ComputedFormula = row.GetNullableString("ComputedFormula"),
                 IsPersisted = row.GetBoolean("IsPersisted"),
                 Description = row.GetNullableString("Description")

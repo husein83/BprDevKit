@@ -1,0 +1,147 @@
+.settings-page {
+    max-width: 1500px;
+    margin: 0 auto;
+    color: #1e293b;
+}
+
+.settings-hero {
+    position: relative;
+    overflow: hidden;
+    padding: 1.75rem 2rem;
+    color: #f8fafc;
+    border-radius: 1.2rem;
+    background:
+        radial-gradient(circle at 88% 12%, rgba(110, 231, 183, 0.3), transparent 28%),
+        linear-gradient(125deg, #0f172a, #0f766e 62%, #047857);
+    box-shadow: 0 20px 45px rgba(15, 118, 110, 0.16);
+}
+
+.settings-hero::after {
+    position: absolute;
+    right: -2rem;
+    bottom: -4rem;
+    width: 12rem;
+    height: 12rem;
+    content: "";
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.6rem rgba(255, 255, 255, 0.04);
+}
+
+.settings-hero > * { position: relative; z-index: 1; }
+.settings-hero h1 { color: #fff; font-weight: 750; letter-spacing: -0.035em; }
+.settings-hero > div > p:last-child { color: #ccfbf1; }
+
+.settings-eyebrow {
+    color: #99f6e4;
+    font-size: 0.75rem;
+    font-weight: 750;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+/* Dashboard Summary Cards */
+.config-summary-card {
+    cursor: pointer;
+    transition: all 0.22s ease-in-out;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.config-summary-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08) !important;
+    border-color: #cbd5e1;
+}
+
+.config-summary-card.active-card {
+    border-color: #0d9488 !important;
+    background: #f0fdfa !important;
+    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.25), 0 12px 28px rgba(15, 23, 42, 0.08) !important;
+}
+
+.card-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+}
+
+.icon-server {
+    background: linear-gradient(135deg, rgba(13, 148, 136, 0.15), rgba(16, 185, 129, 0.2));
+    color: #0f766e;
+}
+
+.icon-app {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(99, 102, 241, 0.2));
+    color: #2563eb;
+}
+
+.icon-models {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(236, 72, 153, 0.2));
+    color: #7c3aed;
+}
+
+/* Nav Tabs */
+.config-nav-tabs {
+    border-bottom: 2px solid #e2e8f0;
+    gap: 0.5rem;
+}
+
+.config-nav-tabs .nav-link {
+    color: #64748b;
+    font-weight: 600;
+    border: none;
+    border-radius: 0.6rem 0.6rem 0 0;
+    padding: 0.75rem 1.4rem;
+    transition: all 0.18s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.config-nav-tabs .nav-link:hover {
+    color: #0f766e;
+    background: rgba(240, 253, 250, 0.6);
+}
+
+.config-nav-tabs .nav-link.active {
+    color: #0f766e;
+    background: transparent;
+    border-bottom: 3px solid #0f766e;
+    font-weight: 700;
+}
+
+.settings-alert {
+    border: 0;
+    border-radius: 0.8rem;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.settings-server-list,
+.settings-editor {
+    overflow: hidden;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 1rem;
+    box-shadow: 0 16px 35px rgba(15, 23, 42, 0.06) !important;
+}
+
+.settings-server-list thead th {
+    padding-top: 0.9rem;
+    padding-bottom: 0.9rem;
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 750;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.settings-server-list tbody tr { transition: background-color 0.16s ease; }
+.settings-server-list tbody tr:hover { background: #f0fdfa; }
+.settings-server-list tbody td { padding-top: 0.85rem; padding-bottom: 0.85rem; }
+.settings-server-list .font-monospace { color: #0f766e; font-weight: 650; }
+.settings-server-list .badge { padding: 0.45rem 0.6rem; font-weight: 600; }
+.settings-server-list .btn-group .btn { min-width: 2.25rem; border-radius: 0.45rem !important; }

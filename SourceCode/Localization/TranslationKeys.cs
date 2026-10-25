@@ -43,7 +43,6 @@ namespace BprDevKit.Localization
         public const string Status = "Common.Status";
 
         // Navigation & Workspace
-        public const string ActiveServer = "Nav.ActiveServer";
         public const string SelectServer = "Nav.SelectServer";
         public const string NoServerSelected = "Nav.NoServerSelected";
 
@@ -72,6 +71,16 @@ namespace BprDevKit.Localization
         public const string DefaultValue = "Column.DefaultValue";
         public const string AutoName = "Column.AutoName";
 
+        // Configuration Setting
+        public const string ConfigurationSettingTitle = "ConfigSetting.Title";
+        public const string ConfigurationSettingSubtitle = "ConfigSetting.Subtitle";
+        public const string ConfigurationSettingDashboard = "ConfigSetting.Dashboard";
+        public const string ServerConfigurationTab = "ConfigSetting.ServerTab";
+        public const string ApplicationConfigurationTab = "ConfigSetting.ApplicationTab";
+        public const string ModelGeneratorConfigurationTab = "ConfigSetting.ModelGeneratorTab";
+        public const string ActiveLanguageAndLogs = "ConfigSetting.ActiveLanguageAndLogs";
+        public const string ModelProfilesCount = "ConfigSetting.ModelProfilesCount";
+
         // Server Settings
         public const string ServerSettings = "Server.Settings";
         public const string AddNewServer = "Server.AddNewServer";
@@ -99,9 +108,10 @@ namespace BprDevKit.Localization
         public const string Enable = "Common.Enable";
         public const string Disable = "Common.Disable";
         public const string SaveChanges = "Common.SaveChanges";
+        public const string Select = "Common.Select";
         public const string Database = "Common.Database";
+        public const string Server = "Common.Server";
         public const string Type = "Common.Type";
-        public const string ServerConfigWorkspace = "Server.ConfigWorkspace";
         public const string ServerTitle = "Server.Title";
         public const string ServerSubtitle = "Server.Subtitle";
         public const string ServerNoServersFound = "Server.NoServersFound";
@@ -135,11 +145,8 @@ namespace BprDevKit.Localization
         public const string ServerMinPoolSize = "Server.MinPoolSize";
         public const string ServerMaxPoolSize = "Server.MaxPoolSize";
         public const string ServerEncryptConnection = "Server.EncryptConnection";
-        public const string ServerApplicationName = "Server.ApplicationName";
         public const string ServerTestingConnection = "Server.TestingConnection";
-        public const string ServerTestConnectionSuccess = "Server.TestConnectionSuccess";
         public const string ServerTestConnectionFailed = "Server.TestConnectionFailed";
-        public const string ServerLatency = "Server.Latency";
         public const string ServerVersion = "Server.Version";
 
         // Home Page
@@ -217,9 +224,6 @@ namespace BprDevKit.Localization
         public const string SchemaTabSelectDbToManage = "SchemaTab.SelectDbToManage";
         public const string SchemaTabLoadingSchemas = "SchemaTab.LoadingSchemas";
         public const string SchemaTabNoSchemasFound = "SchemaTab.NoSchemasFound";
-        public const string SchemaTabTransferObjects = "SchemaTab.TransferObjects";
-        public const string SchemaTabRename = "SchemaTab.Rename";
-        public const string SchemaTabNewName = "SchemaTab.NewName";
         public const string SchemaTabCreateInDb = "SchemaTab.CreateInDb";
         public const string SchemaTabBuiltIn = "SchemaTab.BuiltIn";
         public const string SchemaTabViewObjects = "SchemaTab.ViewObjects";
@@ -239,14 +243,12 @@ namespace BprDevKit.Localization
         public const string TableTabSubtitle = "TableTab.Subtitle";
         public const string TableTabCreateTable = "TableTab.CreateTable";
         public const string TableTabAllSchemas = "TableTab.AllSchemas";
-        public const string TableTabSearchPlaceholder = "TableTab.SearchPlaceholder";
         public const string TableTabFileGroup = "TableTab.FileGroup";
         public const string TableTabDbDefault = "TableTab.DbDefault";
         public const string TableTabSelectDbToManage = "TableTab.SelectDbToManage";
         public const string TableTabLoadingTables = "TableTab.LoadingTables";
         public const string TableTabNoTablesFound = "TableTab.NoTablesFound";
         public const string TableTabNoMatchFilter = "TableTab.NoMatchFilter";
-        public const string TableTabTableDetails = "TableTab.TableDetails";
         public const string TableTabCreateInDb = "TableTab.CreateInDb";
         public const string TableTabRows = "TableTab.Rows";
         public const string TableTabRenameOrDesc = "TableTab.RenameOrDesc";
@@ -262,12 +264,10 @@ namespace BprDevKit.Localization
         public const string TableTabDropDependentFks = "TableTab.DropDependentFks";
 
         // Panels: Columns, Indexes, ForeignKeys
-        public const string ColPanelColumns = "ColPanel.Columns";
         public const string ColPanelAddColumn = "ColPanel.AddColumn";
         public const string ColPanelEditColumn = "ColPanel.EditColumn";
         public const string ColPanelCannotChangeType = "ColPanel.CannotChangeType";
         public const string ColPanelSize = "ColPanel.Size";
-        public const string ColPanelDimensions = "ColPanel.Dimensions";
         public const string ColPanelDefaultExpr = "ColPanel.DefaultExpr";
         public const string ColPanelNotNullWarning = "ColPanel.NotNullWarning";
         public const string ColPanelAlterWarning = "ColPanel.AlterWarning";
@@ -296,12 +296,10 @@ namespace BprDevKit.Localization
         public const string IdxPanelTableFileGroup = "IdxPanel.TableFileGroup";
         public const string IdxPanelPkWarning = "IdxPanel.PkWarning";
         public const string IdxPanelDropTitle = "IdxPanel.DropTitle";
-        public const string IdxPanelDropClusteredWarning = "IdxPanel.DropClusteredWarning";
         public const string IdxPanelDropRegularWarning = "IdxPanel.DropRegularWarning";
         public const string IdxPanelDropButton = "IdxPanel.DropButton";
         public const string IdxPanelNoIndexes = "IdxPanel.NoIndexes";
         public const string IdxPanelIncluded = "IdxPanel.Included";
-        public const string IdxPanelFill = "IdxPanel.Fill";
         public const string IdxPanelRenameTitle = "IdxPanel.RenameTitle";
         public const string IdxPanelNewName = "IdxPanel.NewName";
         public const string IdxPanelKeyConstraintWarning = "IdxPanel.KeyConstraintWarning";
@@ -316,10 +314,6 @@ namespace BprDevKit.Localization
         public const string FkPanelAddPair = "FkPanel.AddPair";
         public const string FkPanelOnDelete = "FkPanel.OnDelete";
         public const string FkPanelOnUpdate = "FkPanel.OnUpdate";
-        public const string FkPanelNoAction = "FkPanel.NoAction";
-        public const string FkPanelCascade = "FkPanel.Cascade";
-        public const string FkPanelSetNull = "FkPanel.SetNull";
-        public const string FkPanelSetDefault = "FkPanel.SetDefault";
         public const string FkPanelCreateOn = "FkPanel.CreateOn";
         public const string FkPanelSelectCol = "FkPanel.SelectCol";
         public const string FkPanelSelectRefCol = "FkPanel.SelectRefCol";
@@ -328,10 +322,8 @@ namespace BprDevKit.Localization
         public const string FkPanelDropTitle = "FkPanel.DropTitle";
         public const string FkPanelDropWarning = "FkPanel.DropWarning";
         public const string FkPanelNoFks = "FkPanel.NoFks";
-        public const string FkPanelStatus = "FkPanel.Status";
         public const string FkPanelEnabled = "FkPanel.Enabled";
         public const string FkPanelDisabled = "FkPanel.Disabled";
-        public const string FkPanelUntrusted = "FkPanel.Untrusted";
         public const string FkPanelDirection = "FkPanel.Direction";
         public const string FkPanelRelation = "FkPanel.Relation";
         public const string FkPanelOutgoing = "FkPanel.Outgoing";
@@ -363,10 +355,8 @@ namespace BprDevKit.Localization
         public const string ViewTabDefinition = "ViewTab.Definition";
         public const string ViewTabWithEncryption = "ViewTab.WithEncryption";
         public const string ViewTabTestQuery = "ViewTab.TestQuery";
-        public const string ViewTabEditTitle = "ViewTab.EditTitle";
         public const string ViewTabDropTitle = "ViewTab.DropTitle";
         public const string ViewTabDropConfirm = "ViewTab.DropConfirm";
-        public const string ViewTabTesting = "ViewTab.Testing";
         public const string ViewTabTestResults = "ViewTab.TestResults";
 
         // Stored Procedure Management Tab
@@ -378,7 +368,6 @@ namespace BprDevKit.Localization
         public const string ProcTabNoMatchFilter = "ProcTab.NoMatchFilter";
         public const string ProcTabBody = "ProcTab.Body";
         public const string ProcTabWithEncryption = "ProcTab.WithEncryption";
-        public const string ProcTabEditTitle = "ProcTab.EditTitle";
         public const string ProcTabDropTitle = "ProcTab.DropTitle";
         public const string ProcTabDropConfirm = "ProcTab.DropConfirm";
 
@@ -391,7 +380,6 @@ namespace BprDevKit.Localization
         public const string FuncTabNoMatchFilter = "FuncTab.NoMatchFilter";
         public const string FuncTabBody = "FuncTab.Body";
         public const string FuncTabWithEncryption = "FuncTab.WithEncryption";
-        public const string FuncTabEditTitle = "FuncTab.EditTitle";
         public const string FuncTabDropTitle = "FuncTab.DropTitle";
         public const string FuncTabDropConfirm = "FuncTab.DropConfirm";
 
@@ -439,8 +427,6 @@ namespace BprDevKit.Localization
         public const string LogsSubtitle = "Logs.Subtitle";
         public const string LogsLiveStream = "Logs.LiveStream";
         public const string LogsAutoScroll = "Logs.AutoScroll";
-        public const string LogsPause = "Logs.Pause";
-        public const string LogsResume = "Logs.Resume";
         public const string LogsClear = "Logs.Clear";
         public const string LogsOpenFolder = "Logs.OpenFolder";
         public const string LogsAllLevels = "Logs.AllLevels";
@@ -454,10 +440,8 @@ namespace BprDevKit.Localization
         public const string LogsDetails = "Logs.Details";
         public const string LogsNoLogs = "Logs.NoLogs";
         public const string LogsTotalCount = "Logs.TotalCount";
-        public const string LogsExport = "Logs.Export";
         public const string LogsLiveSession = "Logs.LiveSession";
         public const string LogsImport = "Logs.Import";
-        public const string LogsFileSelect = "Logs.FileSelect";
         public const string LogsViewingFile = "Logs.ViewingFile";
 
         // SQL Script Generator
@@ -481,7 +465,6 @@ namespace BprDevKit.Localization
         public const string ScriptGenIncludeComments = "ScriptGen.IncludeComments";
         public const string ScriptGenIncludeUseDatabase = "ScriptGen.IncludeUseDatabase";
         public const string ScriptGenMaxRows = "ScriptGen.MaxRows";
-        public const string ScriptGenMaxRowsHelp = "ScriptGen.MaxRowsHelp";
         public const string ScriptGenUnlimitedRows = "ScriptGen.UnlimitedRows";
         public const string ScriptGenSelectObjects = "ScriptGen.SelectObjects";
         public const string ScriptGenSelectAll = "ScriptGen.SelectAll";
@@ -494,13 +477,9 @@ namespace BprDevKit.Localization
         public const string ScriptGenDownloadFile = "ScriptGen.DownloadFile";
         public const string ScriptGenNoObjectsSelected = "ScriptGen.NoObjectsSelected";
         public const string ScriptGenOutputTitle = "ScriptGen.OutputTitle";
-        public const string ScriptGenTotalObjects = "ScriptGen.TotalObjects";
         public const string ScriptGenFilterObjects = "ScriptGen.FilterObjects";
         public const string ScriptGenLines = "ScriptGen.Lines";
-        public const string ScriptGenCharacters = "ScriptGen.Characters";
-        public const string ScriptGenSizeKb = "ScriptGen.SizeKb";
         public const string ScriptGenClear = "ScriptGen.Clear";
-        public const string ScriptGenNoObjectsFound = "ScriptGen.NoObjectsFound";
         public const string ScriptGenLoadingObjects = "ScriptGen.LoadingObjects";
         public const string ScriptGenNoMatchFilter = "ScriptGen.NoMatchFilter";
         public const string ScriptGenInitializing = "ScriptGen.Initializing";
@@ -526,8 +505,6 @@ namespace BprDevKit.Localization
         public const string ServerLoadError = "Server.LoadError";
         public const string ServerNameRequired = "Server.NameRequired";
         public const string ServerNotFound = "Server.NotFound";
-        public const string ServerAppSettingsSaved = "Server.AppSettingsSaved";
-        public const string ServerAppSettingsError = "Server.AppSettingsError";
 
         // Database Errors
         public const string DbErrLoadDatabases = "Db.ErrLoadDatabases";
@@ -565,5 +542,201 @@ namespace BprDevKit.Localization
         public const string ColFractionalPrecision = "Col.FractionalPrecision";
         public const string ColVectorDimensions = "Col.VectorDimensions";
         public const string ScriptGenResetTooltip = "ScriptGen.ResetTooltip";
+
+        // Phase 4: Data Model Generator
+        public const string DataModelTitle = "DataModel.Title";
+        public const string DataModelSubtitle = "DataModel.Subtitle";
+        public const string DataModelSelectServer = "DataModel.SelectServer";
+        public const string DataModelSelectDatabase = "DataModel.SelectDatabase";
+        public const string DataModelSelectTables = "DataModel.SelectTables";
+        public const string DataModelLanguage = "DataModel.Language";
+        public const string DataModelOptions = "DataModel.Options";
+        public const string DataModelGenerate = "DataModel.Generate";
+        public const string DataModelGenerating = "DataModel.Generating";
+        public const string DataModelSelectAll = "DataModel.SelectAll";
+        public const string DataModelDeselectAll = "DataModel.DeselectAll";
+        public const string DataModelSearchPlaceholder = "DataModel.SearchPlaceholder";
+        public const string DataModelNoTablesSelected = "DataModel.NoTablesSelected";
+        public const string DataModelNoMatchFilter = "DataModel.NoMatchFilter";
+        public const string DataModelTotalModels = "DataModel.TotalModels";
+        public const string DataModelLines = "DataModel.Lines";
+        public const string DataModelCharacters = "DataModel.Characters";
+        public const string DataModelSizeKb = "DataModel.SizeKb";
+        public const string DataModelCopyClipboard = "DataModel.CopyClipboard";
+        public const string DataModelCopied = "DataModel.Copied";
+        public const string DataModelDownloadFile = "DataModel.DownloadFile";
+        public const string DataModelDownloadZip = "DataModel.DownloadZip";
+        public const string DataModelOutputTitle = "DataModel.OutputTitle";
+        public const string DataModelClear = "DataModel.Clear";
+        public const string DataModelCommonSettings = "DataModel.CommonSettings";
+        public const string DataModelPropertyNaming = "DataModel.PropertyNaming";
+        public const string DataModelRemovePrefixes = "DataModel.RemovePrefixes";
+        public const string DataModelSingularize = "DataModel.Singularize";
+        public const string DataModelIncludeNavigation = "DataModel.IncludeNavigation";
+        public const string DataModelIncludeDocComments = "DataModel.IncludeDocComments";
+        public const string DataModelNamingOriginal = "DataModel.NamingOriginal";
+        public const string DataModelNamingPascal = "DataModel.NamingPascal";
+        public const string DataModelNamingCamel = "DataModel.NamingCamel";
+        public const string DataModelNamingSnake = "DataModel.NamingSnake";
+
+        // C# Options
+        public const string DataModelCsTypeKind = "DataModel.CsTypeKind";
+        public const string DataModelCsClass = "DataModel.CsClass";
+        public const string DataModelCsRecord = "DataModel.CsRecord";
+        public const string DataModelCsStruct = "DataModel.CsStruct";
+        public const string DataModelCsAccessor = "DataModel.CsAccessor";
+        public const string DataModelCsGetSet = "DataModel.CsGetSet";
+        public const string DataModelCsGetInit = "DataModel.CsGetInit";
+        public const string DataModelCsNamespace = "DataModel.CsNamespace";
+        public const string DataModelCsNullableRef = "DataModel.CsNullableRef";
+        public const string DataModelCsDataAnnotations = "DataModel.CsDataAnnotations";
+        public const string DataModelCsJsonAttributes = "DataModel.CsJsonAttributes";
+        public const string DataModelCsEfTableAttributes = "DataModel.CsEfTableAttributes";
+        public const string DataModelCsGenerateDbContext = "DataModel.CsGenerateDbContext";
+        public const string DataModelCsDbContextName = "DataModel.CsDbContextName";
+
+        // Profiles
+        public const string DataModelSelectProfileToProceed = "DataModel.SelectProfileToProceed";
+        public const string DataModelManageProfilesInSettings = "DataModel.ManageProfilesInSettings";
+        public const string DataModelStep1Server = "DataModel.Step1Server";
+        public const string DataModelStep2Database = "DataModel.Step2Database";
+        public const string DataModelStep3Profile = "DataModel.Step3Profile";
+        public const string DataModelNoProfileSelected = "DataModel.NoProfileSelected";
+        public const string DataModelCreateProfilePrompt = "DataModel.CreateProfilePrompt";
+        public const string DataModelProfile = "DataModel.Profile";
+        public const string DataModelProfiles = "DataModel.Profiles";
+        public const string DataModelProfileSelect = "DataModel.ProfileSelect";
+        public const string DataModelProfileSaveAs = "DataModel.ProfileSaveAs";
+        public const string DataModelProfileName = "DataModel.ProfileName";
+        public const string DataModelProfileSaveSuccess = "DataModel.ProfileSaveSuccess";
+        public const string DataModelProfileDeleteSuccess = "DataModel.ProfileDeleteSuccess";
+        public const string DataModelProfileGlobal = "DataModel.ProfileGlobal";
+
+        // Structure & Regions
+        public const string DataModelCsStructureTab = "DataModel.CsStructureTab";
+        public const string DataModelCsNamespaceTab = "DataModel.CsNamespaceTab";
+        public const string DataModelCsAttributesTab = "DataModel.CsAttributesTab";
+        public const string DataModelCsNavFkTab = "DataModel.CsNavFkTab";
+        public const string DataModelCsTransformTab = "DataModel.CsTransformTab";
+        public const string DataModelCsCustomSnippetTab = "DataModel.CsCustomSnippetTab";
+        public const string DataModelSchemaAccessTab = "DataModel.SchemaAccessTab";
+        public const string DataModelEnableSchemaAccess = "DataModel.EnableSchemaAccess";
+        public const string DataModelSchemaAccessHelp = "DataModel.SchemaAccessHelp";
+        public const string DataModelAddSchemaRule = "DataModel.AddSchemaRule";
+        public const string DataModelSourceSchema = "DataModel.SourceSchema";
+        public const string DataModelAllowedTargetSchemas = "DataModel.AllowedTargetSchemas";
+        public const string DataModelIsolatedSchema = "DataModel.IsolatedSchema";
+        public const string DataModelFetchSchemasFromDb = "DataModel.FetchSchemasFromDb";
+        public const string SelectServerFirstForDatabase = "DataModel.SelectServerFirstForDatabase";
+        public const string AllDatabases = "DataModel.AllDatabases";
+
+        public const string DataModelCsBaseClass = "DataModel.CsBaseClass";
+        public const string DataModelCsInterfaces = "DataModel.CsInterfaces";
+        public const string DataModelCsIsPartial = "DataModel.CsIsPartial";
+        public const string DataModelCsUseNameof = "DataModel.CsUseNameof";
+        public const string DataModelCsIncludeIndexes = "DataModel.CsIncludeIndexes";
+        public const string DataModelCsUseRegions = "DataModel.CsUseRegions";
+        public const string DataModelCsIncludeConstructor = "DataModel.CsIncludeConstructor";
+        public const string DataModelCsIncludeConstants = "DataModel.CsIncludeConstants";
+        public const string DataModelCsIncludeTableSchemaOverrides = "DataModel.CsIncludeTableSchemaOverrides";
+        public const string DataModelCsOverrideProperties = "DataModel.CsOverrideProperties";
+        public const string DataModelCsNavigationStyle = "DataModel.CsNavigationStyle";
+        public const string DataModelCsNavEnterprise = "DataModel.CsNavEnterprise";
+        public const string DataModelCsNavStandard = "DataModel.CsNavStandard";
+        public const string DataModelCsUseFullNamespaceForNav = "DataModel.CsUseFullNamespaceForNav";
+        public const string DataModelCsMakeCollectionsNullable = "DataModel.CsMakeCollectionsNullable";
+        public const string DataModelCsCustomUsings = "DataModel.CsCustomUsings";
+        public const string DataModelCsEnableCustomFk = "DataModel.CsEnableCustomFk";
+        public const string DataModelCsEnableCustomPk = "DataModel.CsEnableCustomPk";
+        public const string DataModelCsCustomColumnRules = "DataModel.CsCustomColumnRules";
+        public const string DataModelCsStringInit = "DataModel.CsStringInit";
+        public const string DataModelCsStringNullForgiving = "DataModel.CsStringNullForgiving";
+        public const string DataModelCsStringEmpty = "DataModel.CsStringEmpty";
+        public const string DataModelCsStringNone = "DataModel.CsStringNone";
+        public const string DataModelCsCustomSnippet = "DataModel.CsCustomSnippet";
+
+        // Transformation Engine
+        public const string DataModelTransformAddRule = "DataModel.TransformAddRule";
+        public const string DataModelTransformRuleName = "DataModel.TransformRuleName";
+        public const string DataModelTransformColPattern = "DataModel.TransformColPattern";
+        public const string DataModelTransformTypePattern = "DataModel.TransformTypePattern";
+        public const string DataModelTransformActionType = "DataModel.TransformActionType";
+        public const string DataModelTransformNotMappedHelper = "DataModel.TransformNotMappedHelper";
+        public const string DataModelTransformCustomGetterSetter = "DataModel.TransformCustomGetterSetter";
+        public const string DataModelTransformTypeOverride = "DataModel.TransformTypeOverride";
+        public const string DataModelTransformHelperPropName = "DataModel.TransformHelperPropName";
+        public const string DataModelTransformTargetType = "DataModel.TransformTargetType";
+        public const string DataModelTransformGetter = "DataModel.TransformGetter";
+        public const string DataModelTransformSetter = "DataModel.TransformSetter";
+        public const string DataModelTransformUsing = "DataModel.TransformUsing";
+        public const string DataModelTransformNoRules = "DataModel.TransformNoRules";
+
+        // Generic other languages
+        public const string DataModelBaseClass = "DataModel.BaseClass";
+        public const string DataModelCustomImports = "DataModel.CustomImports";
+        public const string DataModelCustomSnippet = "DataModel.CustomSnippet";
+
+        // Python Options
+        public const string DataModelPyStyle = "DataModel.PyStyle";
+        public const string DataModelPyPydantic = "DataModel.PyPydantic";
+        public const string DataModelPyDataclass = "DataModel.PyDataclass";
+        public const string DataModelPySqlAlchemy = "DataModel.PySqlAlchemy";
+        public const string DataModelPyTypedDict = "DataModel.PyTypedDict";
+        public const string DataModelPySnakeCase = "DataModel.PySnakeCase";
+        public const string DataModelPyOptional = "DataModel.PyOptional";
+        public const string DataModelPyDocstrings = "DataModel.PyDocstrings";
+
+        // Dart Options
+        public const string DataModelDartStyle = "DataModel.DartStyle";
+        public const string DataModelDartPlain = "DataModel.DartPlain";
+        public const string DataModelDartJsonSerializable = "DataModel.DartJsonSerializable";
+        public const string DataModelDartFreezed = "DataModel.DartFreezed";
+        public const string DataModelDartNullSafety = "DataModel.DartNullSafety";
+        public const string DataModelDartFinalFields = "DataModel.DartFinalFields";
+        public const string DataModelDartCopyWith = "DataModel.DartCopyWith";
+
+        // Java Options
+        public const string DataModelJavaStyle = "DataModel.JavaStyle";
+        public const string DataModelJavaPojo = "DataModel.JavaPojo";
+        public const string DataModelJavaRecord = "DataModel.JavaRecord";
+        public const string DataModelJavaLombok = "DataModel.JavaLombok";
+        public const string DataModelJavaJpa = "DataModel.JavaJpa";
+        public const string DataModelJavaPackage = "DataModel.JavaPackage";
+        public const string DataModelJavaJackson = "DataModel.JavaJackson";
+        public const string DataModelJavaValidation = "DataModel.JavaValidation";
+        public const string DataModelJavaSerializable = "DataModel.JavaSerializable";
+
+        // Namespace & Constants
+        public const string DataModelNamespaceMode = "DataModel.NamespaceMode";
+        public const string DataModelNamespaceModeSingle = "DataModel.NamespaceModeSingle";
+        public const string DataModelNamespaceModePerSchema = "DataModel.NamespaceModePerSchema";
+        public const string DataModelNamespaceSingleHelp = "DataModel.NamespaceSingleHelp";
+        public const string DataModelSchemaNamespacePattern = "DataModel.SchemaNamespacePattern";
+        public const string DataModelExplicitSchemaNamespaces = "DataModel.ExplicitSchemaNamespaces";
+        public const string DataModelAddConstant = "DataModel.AddConstant";
+        public const string DataModelConstantModifier = "DataModel.ConstantModifier";
+        public const string DataModelConstantType = "DataModel.ConstantType";
+        public const string DataModelConstantName = "DataModel.ConstantName";
+        public const string DataModelConstantValue = "DataModel.ConstantValue";
+
+        // Override Members
+        public const string DataModelCsIncludeOverrides = "DataModel.CsIncludeOverrides";
+        public const string DataModelAddOverride = "DataModel.AddOverride";
+        public const string DataModelOverrideKind = "DataModel.OverrideKind";
+        public const string DataModelOverrideProperty = "DataModel.OverrideProperty";
+        public const string DataModelOverrideMethod = "DataModel.OverrideMethod";
+        public const string DataModelOverrideReturnType = "DataModel.OverrideReturnType";
+        public const string DataModelOverrideName = "DataModel.OverrideName";
+        public const string DataModelOverrideParams = "DataModel.OverrideParams";
+        public const string DataModelOverrideExpression = "DataModel.OverrideExpression";
+        public const string DataModelOverrideBody = "DataModel.OverrideBody";
+
+        // Schema Selection
+        public const string DataModelSelectSchema = "DataModel.SelectSchema";
+        public const string DataModelSelectTargetSchemaPrompt = "DataModel.SelectTargetSchemaPrompt";
+        public const string DataModelSchemaAccessServerDbRequired = "DataModel.SchemaAccessServerDbRequired";
+
+        // Home Card
+        public const string HomeDataModelCardDesc = "Home.DataModelCardDesc";
     }
 }

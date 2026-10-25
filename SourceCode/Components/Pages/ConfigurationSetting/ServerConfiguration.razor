@@ -1,0 +1,659 @@
+@using ServerConfig = BprDevKit.Config.ServerConfiguration
+@using BprDevKit.Config
+@using BprDevKit.Utility
+@using BprDevKit.Localization
+@using BprDevKit.DatabaseManagement.Services
+@using System.IO
+@inject ITranslationFactory TranslationFactory
+@inject IDatabaseConnectionFactory ConnectionFactory
+@implements IDisposable
+
+@{
+    var t = TranslationFactory.Current;
+}
+
+<div class="server-configuration-section">
+    <!-- Action Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="h5 fw-bold mb-1">
+                <i class="bi bi-server text-primary me-2"></i>@t[TranslationKeys.ServerSettings]
+            </h3>
+            <p class="text-muted small mb-0">@t[TranslationKeys.ServerSubtitle]</p>
+        </div>
+        @if (!_showAddForm)
+        {
+            <button class="btn btn-primary shadow-sm" @onclick="OpenAddServerForm">
+                <i class="bi bi-plus-lg me-1"></i> @t[TranslationKeys.AddNewServer]
+            </button>
+        }
+    </div>
+
+    @if (_bprMessage != null && !string.IsNullOrWhiteSpace(_bprMessage.Message))
+    {
+        <div class="settings-alert alert @_bprMessage.AlertCssClass alert-dismissible fade show mb-4" role="alert">
+            <i class="bi @_bprMessage.IconCssClass me-2"></i> @_bprMessage.Message
+            <button type="button" class="btn-close" @onclick="ClearMessage"></button>
+        </div>
+    }
+
+    @if (!_showAddForm)
+    {
+        <!-- Saved Servers List -->
+        <div class="settings-server-list card shadow-sm border-0 mb-4">
+            <div class="card-body p-0">
+                @if (_savedServers.Count == 0)
+                {
+                    <div class="settings-empty-state text-center p-5">
+                        <i class="bi bi-server text-muted display-4"></i>
+                        <p class="text-muted mt-3 mb-0">@t[TranslationKeys.ServerNoServersFound]</p>
+                        <button class="btn btn-primary btn-sm mt-3" @onclick="OpenAddServerForm">
+                            <i class="bi bi-plus-lg me-1"></i> @t[TranslationKeys.AddNewServer]
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">@t[TranslationKeys.ServerOrAlias]</th>
+                                    <th>@t[TranslationKeys.DatabaseEngine]</th>
+                                    <th>@t[TranslationKeys.DefaultDatabase]</th>
+                                    <th>@t[TranslationKeys.Authentication]</th>
+                                    <th>@t[TranslationKeys.Created]</th>
+                                    <th>@t[TranslationKeys.LastModified]</th>
+                                    <th class="text-end pe-4">@t[TranslationKeys.Actions]</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var server in _savedServers)
+                                {
+                                    <tr>
+                                        <td class="ps-4">
+                                            <div class="fw-bold">@(string.IsNullOrEmpty(server.Server.Alias) ? server.Server.ServerName : server.Server.Alias)</div>
+                                            <small class="text-muted font-monospace">@server.Server.ServerName</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary-subtle text-secondary font-monospace">@server.Server.DatabaseServerType</span>
+                                        </td>
+                                        <td class="font-monospace">@server.Server.DefaultDatabase</td>
+                                        <td>
+                                            <span class="badge @(server.Server.UseWindowsAuth ? "bg-info-subtle text-info" : "bg-warning-subtle text-warning")">
+                                                @(server.Server.UseWindowsAuth ? t[TranslationKeys.WindowsAuth] : t[TranslationKeys.SqlAuth])
+                                            </span>
+                                        </td>
+                                        <td class="text-muted small">@server.CreateDate.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
+                                        <td class="text-muted small">
+                                            @if (server.LastModifiedDate.HasValue)
+                                            {
+                                                @server.LastModifiedDate.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm")
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted fst-italic">—</span>
+                                            }
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-secondary" @onclick="() => EditServer(server)" title="@t[TranslationKeys.Edit]">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger" @onclick="() => ConfirmDeleteServer(server)" title="@t[TranslationKeys.Delete]">
+                                                    <i class="bi bi-trash3"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (_showDeleteConfirmation && _serverToDelete != null)
+        {
+            <!-- Delete Confirmation Modal -->
+            <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow">
+                        <div class="modal-header border-bottom-0 pb-0">
+                            <h5 class="modal-title text-danger">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>@t[TranslationKeys.ConfirmDelete]
+                            </h5>
+                            <button type="button" class="btn-close" @onclick="CancelDeleteConfirmation"></button>
+                        </div>
+                        <div class="modal-body py-4">
+                            <p class="mb-0">
+                                @t.Get(TranslationKeys.ConfirmDeleteText, _serverToDelete.Server.ServerName)
+                            </p>
+                        </div>
+                        <div class="modal-footer border-top-0 pt-0">
+                            <button class="btn btn-outline-secondary" @onclick="CancelDeleteConfirmation">
+                                <i class="bi bi-x-lg me-1"></i> @t[TranslationKeys.Cancel]
+                            </button>
+                            <button class="btn btn-danger" @onclick="DeleteServerConfirmed">
+                                <i class="bi bi-trash3 me-1"></i> @t[TranslationKeys.YesDelete]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <!-- Main Tabbed Form for Server Configuration -->
+        <div class="settings-editor card shadow border-0 mb-4">
+            <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
+                <h4 class="m-0 text-primary">
+                    <i class="bi bi-sliders"></i> @(_isEditMode ? t[TranslationKeys.ServerEditTitle] : t[TranslationKeys.ServerNewTitle])
+                </h4>
+                <button type="button" class="btn-close" @onclick="CancelForm"></button>
+            </div>
+
+            <!-- Tabs Header for Server Settings -->
+            <ul class="nav nav-tabs px-4 pt-3 bg-light-subtle" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link @(_activeTab == "connection" ? "active fw-bold" : "")" @onclick='() => SetActiveTab("connection")'>
+                        <i class="bi bi-plug-fill me-1"></i> @t[TranslationKeys.ServerConnectionTab]
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link @(_activeTab == "database" ? "active fw-bold" : "")" @onclick='() => SetActiveTab("database")'>
+                        <i class="bi bi-database-fill-gear me-1"></i> @t[TranslationKeys.ServerDatabaseDefaultsTab]
+                    </button>
+                </li>
+            </ul>
+
+            <div class="card-body p-4">
+                @if (_activeTab == "connection")
+                {
+                    <!-- Tab 1: Connection -->
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">@t[TranslationKeys.ServerName] *</label>
+                            <input type="text" class="form-control" @bind="_currentConfig.Server.ServerName" placeholder="e.g. localhost\SQLEXPRESS" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">@t[TranslationKeys.ServerAlias]</label>
+                            <input type="text" class="form-control" @bind="_currentConfig.Server.Alias" placeholder="e.g. Production DB" />
+                        </div>
+                        @{
+                            var caps = DatabaseProviderMetadata.GetCapabilities(_currentConfig.Server.DatabaseServerType);
+                        }
+
+                        <div class="col-md-4">
+                            <label class="form-label">@t[TranslationKeys.DatabaseEngine]</label>
+                            <select class="form-select" value="@_currentConfig.Server.DatabaseServerType" @onchange="OnServerTypeChanged">
+                                @foreach (var type in Enum.GetValues<DatabaseServerType>())
+                                {
+                                    <option value="@type">@DatabaseProviderMetadata.GetCapabilities(type).DisplayName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">@t[TranslationKeys.DefaultDatabase]</label>
+                            <input type="text" class="form-control font-monospace" @bind="_currentConfig.Server.DefaultDatabase" placeholder="@caps.DefaultDatabase" />
+                        </div>
+                        @if (caps.SupportsPort)
+                        {
+                            <div class="col-md-4">
+                                <label class="form-label">@t[TranslationKeys.Port]</label>
+                                <input type="number" class="form-control" @bind="_currentConfig.Server.Port" placeholder="@caps.DefaultPort" />
+                            </div>
+                        }
+
+                        @if (_currentConfig.Server.DatabaseServerType == DatabaseServerType.Sqlite)
+                        {
+                            <div class="col-12">
+                                <div class="alert alert-info py-2 small mb-0">
+                                    <i class="bi bi-info-circle me-1"></i> @t[TranslationKeys.ServerSqliteNotice]
+                                </div>
+                            </div>
+                        }
+
+                        @if (caps.SupportsWindowsAuth)
+                        {
+                            <div class="col-12 my-2">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" id="winAuth" @bind="_currentConfig.Server.UseWindowsAuth" />
+                                    <label class="form-check-label fw-bold" for="winAuth">@t[TranslationKeys.ServerWindowsAuthSwitch]</label>
+                                </div>
+                            </div>
+                        }
+
+                        @if (caps.SupportsCredentials && !_currentConfig.Server.UseWindowsAuth)
+                        {
+                            <div class="col-md-6">
+                                <label class="form-label">@t[TranslationKeys.Username]</label>
+                                <input type="text" class="form-control" @bind="_currentConfig.Server.Username" placeholder="@caps.DefaultUsername" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">@t[TranslationKeys.Password]</label>
+                                <input type="password" class="form-control" @bind="_currentConfig.Server.Password" />
+                            </div>
+                        }
+
+                        <div class="col-md-6">
+                            <label class="form-label">@t[TranslationKeys.ConnectionTimeout]</label>
+                            <input type="number" class="form-control" @bind="_currentConfig.Server.ConnectionTimeoutSeconds" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">@t[TranslationKeys.CommandTimeout]</label>
+                            <input type="number" class="form-control" @bind="_currentConfig.Server.CommandTimeout" />
+                        </div>
+                        @if (_currentConfig.Server.DatabaseServerType == DatabaseServerType.SqlServer)
+                        {
+                            <div class="col-12 mt-2">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="trustCert" @bind="_currentConfig.Server.TrustServerCertificate" />
+                                    <label class="form-check-label" for="trustCert">@t[TranslationKeys.TrustServerCertificate]</label>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="col-12 mt-3">
+                            <div class="card bg-light-subtle border rounded-3 p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="fw-bold mb-0 text-primary">
+                                        <i class="bi bi-gear-wide-connected me-2"></i>@t[TranslationKeys.ServerAdvancedSettings]
+                                    </h6>
+                                </div>
+                                <div class="row g-3 mt-1">
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch pt-2">
+                                            <input type="checkbox" class="form-check-input" id="enablePooling" @bind="_currentConfig.Server.Pooling" />
+                                            <label class="form-check-label fw-semibold" for="enablePooling">@t[TranslationKeys.ServerPooling]</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch pt-2">
+                                            <input type="checkbox" class="form-check-input" id="encryptConn" @bind="_currentConfig.Server.Encrypt" />
+                                            <label class="form-check-label fw-semibold" for="encryptConn">@t[TranslationKeys.ServerEncryptConnection]</label>
+                                        </div>
+                                    </div>
+                                    @if (_currentConfig.Server.Pooling)
+                                    {
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold">@t[TranslationKeys.ServerMinPoolSize]</label>
+                                            <input type="number" class="form-control form-control-sm" @bind="_currentConfig.Server.MinPoolSize" min="0" max="1000" />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold">@t[TranslationKeys.ServerMaxPoolSize]</label>
+                                            <input type="number" class="form-control form-control-sm" @bind="_currentConfig.Server.MaxPoolSize" min="1" max="10000" />
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (_activeTab == "database")
+                {
+                    <!-- Tab 2: Database Defaults -->
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">@t[TranslationKeys.ServerMaxSchemaName]</label>
+                            <input type="number" class="form-control" @bind="_currentConfig.Database.MaxSchemaNameLength" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">@t[TranslationKeys.ServerMaxTableName]</label>
+                            <input type="number" class="form-control" @bind="_currentConfig.Database.MaxTableNameLength" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">@t[TranslationKeys.ServerMaxColumnName]</label>
+                            <input type="number" class="form-control" @bind="_currentConfig.Database.MaxColumnNameLength" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">@t[TranslationKeys.ServerMaxIndexName]</label>
+                            <input type="number" class="form-control" @bind="_currentConfig.Database.MaxIndexNameLength" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">@t[TranslationKeys.ServerMaxForeignKeyName]</label>
+                            <input type="number" class="form-control" @bind="_currentConfig.Database.MaxForeignKeyNameLength" />
+                        </div>
+
+                        <h6 class="mt-4 text-secondary"><i class="bi bi-file-earmark-binary"></i> @t[TranslationKeys.ServerFileManagementDefaults]</h6>
+                        <div class="col-md-3">
+                            <label class="form-label">@t[TranslationKeys.ServerDataFileSize]</label>
+                            <input type="number" class="form-control" @bind="_currentConfig.Database.DefaultDataFileSizeMB" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">@t[TranslationKeys.ServerLogFileSize]</label>
+                            <input type="number" class="form-control" @bind="_currentConfig.Database.DefaultLogFileSizeMB" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">@t[TranslationKeys.ServerFileGrowth]</label>
+                            <input type="number" class="form-control" @bind="_currentConfig.Database.DefaultFileGrowthMB" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">@t[TranslationKeys.ServerLogGrowth]</label>
+                            <input type="number" class="form-control" @bind="_currentConfig.Database.DefaultLogFileGrowthMB" />
+                        </div>
+                    </div>
+                }
+
+                @if (_connectionTestResult is not null)
+                {
+                    <div class="alert @(_connectionTestResult.Success ? "alert-success" : "alert-danger") d-flex align-items-start gap-2 mt-4 mb-0" role="alert">
+                        <i class="bi @(_connectionTestResult.Success ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") fs-5 mt-1"></i>
+                        <div class="flex-grow-1">
+                            <div class="d-flex flex-wrap align-items-center gap-2 justify-content-between">
+                                <div class="fw-bold">@_connectionTestResult.Message</div>
+                                @if (_connectionTestResult.Success)
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                        <i class="bi bi-stopwatch me-1"></i>@_connectionTestResult.LatencyMs ms
+                                    </span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(_connectionTestResult.ServerVersion))
+                            {
+                                <div class="small mt-1 text-muted">
+                                    <strong>@t[TranslationKeys.ServerVersion]:</strong> @_connectionTestResult.ServerVersion
+                                </div>
+                            }
+                            @if (!_connectionTestResult.Success && !string.IsNullOrWhiteSpace(_connectionTestResult.ErrorDetails))
+                            {
+                                <div class="mt-2">
+                                    <button class="btn btn-link btn-sm p-0 text-decoration-none text-danger" type="button" @onclick="() => _showTestErrorDetails = !_showTestErrorDetails">
+                                        <i class="bi @(_showTestErrorDetails ? "bi-chevron-up" : "bi-chevron-down") me-1"></i>@(_showTestErrorDetails ? "Hide Error Details" : "Show Error Details")
+                                    </button>
+                                    @if (_showTestErrorDetails)
+                                    {
+                                        <pre class="bg-dark text-light p-2 rounded small font-monospace mt-1 mb-0" style="max-height: 200px; overflow-y: auto; font-size: 0.75rem;">@_connectionTestResult.ErrorDetails</pre>
+                                    }
+                                </div>
+                            }
+                        </div>
+                        <button type="button" class="btn-close ms-auto" @onclick="() => _connectionTestResult = null"></button>
+                    </div>
+                }
+
+                <!-- Action Buttons for Server Configuration -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-top mt-4 pt-4">
+                    <button class="btn btn-outline-info px-4 py-2" type="button" @onclick="TestCurrentConnection" disabled="@(_isTestingConnection || string.IsNullOrWhiteSpace(_currentConfig.Server.ServerName))">
+                        @if (_isTestingConnection)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>@t[TranslationKeys.ServerTestingConnection]
+                        }
+                        else
+                        {
+                            <i class="bi bi-activity me-1"></i>@t[TranslationKeys.TestConnection]
+                        }
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary px-4 py-2" type="button" @onclick="CancelForm">@t[TranslationKeys.Cancel]</button>
+                        <button class="btn btn-success px-5 py-2 shadow-sm" type="button" @onclick="SaveServerConfig">
+                            <i class="bi bi-check-lg me-1"></i> @t[TranslationKeys.SaveServerConfig]
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback OnConfigurationChanged { get; set; }
+
+    private List<ServerConfig> _savedServers = new();
+    private ServerConfig _currentConfig = new();
+    private bool _showAddForm = false;
+    private bool _isEditMode = false;
+    private string _activeTab = "connection";
+    private BprMessage? _bprMessage = null;
+    private string _selectedConfigPath = string.Empty;
+
+    // Delete confirmation
+    private bool _showDeleteConfirmation = false;
+    private ServerConfig? _serverToDelete = null;
+
+    // Connection testing
+    private bool _isTestingConnection = false;
+    private ConnectionTestResult? _connectionTestResult;
+    private bool _showTestErrorDetails = false;
+
+    public int SavedServersCount => _savedServers.Count;
+
+    protected override async Task OnInitializedAsync()
+    {
+        TranslationFactory.LanguageChanged += OnLanguageChanged;
+        LoadSavedServers();
+        await Task.CompletedTask;
+    }
+
+    private void OnLanguageChanged(Language language)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void SetActiveTab(string tab)
+    {
+        _activeTab = tab;
+        StateHasChanged();
+    }
+
+    private void ClearMessage()
+    {
+        _bprMessage = null;
+    }
+
+    private void LoadSavedServers()
+    {
+        _savedServers.Clear();
+        try
+        {
+            var configs = ServerConfig.LoadAllFromEncryptedFile(false);
+            if (configs.HasAny())
+            {
+                _savedServers.AddRange(configs);
+            }
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.ServerLoadError, ex.Message));
+        }
+    }
+
+    public void OpenAddServerForm()
+    {
+        _currentConfig = new ServerConfig();
+
+        // Populate system defaults from Constants
+        _currentConfig.Server.DefaultDatabase = "master";
+        _currentConfig.Server.UseWindowsAuth = true;
+        _currentConfig.Server.DatabaseServerType = DatabaseServerType.SqlServer;
+        _currentConfig.Server.ConnectionTimeoutSeconds = Constants.DatabaseConnectionTimeoutSeconds;
+        _currentConfig.Server.CommandTimeout = Constants.DatabaseCommandTimeoutSeconds;
+        _currentConfig.Database.MaxDatabaseNameLength = Constants.MaxDatabaseNameLength;
+        _currentConfig.Database.MaxSchemaNameLength = Constants.MaxSchemaNameLength;
+        _currentConfig.Database.MaxTableNameLength = Constants.MaxTableNameLength;
+        _currentConfig.Database.MaxColumnNameLength = Constants.MaxColumnNameLength;
+        _currentConfig.Database.MaxIndexNameLength = Constants.MaxIndexNameLength;
+        _currentConfig.Database.MaxForeignKeyNameLength = Constants.MaxForeignKeyNameLength;
+        _currentConfig.Database.DefaultDataFileSizeMB = Constants.DefaultInitialDataSizeMB;
+        _currentConfig.Database.DefaultLogFileSizeMB = Constants.DefaultInitialLogSizeMB;
+        _currentConfig.Database.DefaultFileGrowthMB = Constants.DefaultFileGrowthMB;
+        _currentConfig.Database.DefaultLogFileGrowthMB = Constants.DefaultLogFileGrowthMB;
+
+        _isEditMode = false;
+        _showAddForm = true;
+        _activeTab = "connection";
+        _bprMessage = null;
+        _connectionTestResult = null;
+        StateHasChanged();
+    }
+
+    private void OnServerTypeChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<DatabaseServerType>(e.Value?.ToString(), out var selectedType))
+        {
+            _currentConfig.Server.DatabaseServerType = selectedType;
+            var caps = DatabaseProviderMetadata.GetCapabilities(selectedType);
+
+            _currentConfig.Server.DefaultDatabase = caps.DefaultDatabase;
+
+            if (caps.SupportsPort)
+            {
+                _currentConfig.Server.Port = caps.DefaultPort;
+            }
+            else
+            {
+                _currentConfig.Server.Port = null;
+            }
+
+            if (!caps.SupportsWindowsAuth)
+            {
+                _currentConfig.Server.UseWindowsAuth = false;
+            }
+
+            if (caps.SupportsCredentials && string.IsNullOrWhiteSpace(_currentConfig.Server.Username))
+            {
+                _currentConfig.Server.Username = caps.DefaultUsername;
+            }
+        }
+    }
+
+    private async Task TestCurrentConnection()
+    {
+        if (string.IsNullOrWhiteSpace(_currentConfig.Server.ServerName)) return;
+
+        _isTestingConnection = true;
+        _connectionTestResult = null;
+        _showTestErrorDetails = false;
+        StateHasChanged();
+
+        try
+        {
+            _connectionTestResult = await ConnectionFactory.TestConnectionAsync(_currentConfig);
+        }
+        catch (Exception ex)
+        {
+            _connectionTestResult = new ConnectionTestResult
+            {
+                Success = false,
+                Message = TranslationFactory.Current[TranslationKeys.ServerTestConnectionFailed],
+                ErrorDetails = ex.ToString()
+            };
+        }
+        finally
+        {
+            _isTestingConnection = false;
+            StateHasChanged();
+        }
+    }
+
+    private void EditServer(ServerConfig config)
+    {
+        _currentConfig = config;
+        _isEditMode = true;
+        _showAddForm = true;
+        _activeTab = "connection";
+        _bprMessage = null;
+        _connectionTestResult = null;
+        StateHasChanged();
+    }
+
+    private void CancelForm()
+    {
+        _showAddForm = false;
+        _isEditMode = false;
+        _currentConfig = new ServerConfig();
+        _connectionTestResult = null;
+        StateHasChanged();
+    }
+
+    private void SaveServerConfig()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(_currentConfig.Server.ServerName))
+            {
+                _bprMessage = BprMessage.Warning(TranslationFactory.Current[TranslationKeys.ServerNameRequired]);
+                return;
+            }
+
+            if (_isEditMode)
+            {
+                _currentConfig.EntityState = EntityState.Modified;
+            }
+            else
+            {
+                _currentConfig.EntityState = EntityState.Added;
+            }
+
+            ServerConfig.SaveChanges(_currentConfig);
+            string serverTitle = string.IsNullOrWhiteSpace(_currentConfig.Server.Alias)
+                ? _currentConfig.Server.ServerName
+                : $"{_currentConfig.Server.Alias} ({_currentConfig.Server.ServerName})";
+
+            _bprMessage = BprMessage.Success(TranslationFactory.Current.Get(TranslationKeys.ServerSavedSuccess, serverTitle));
+            _showAddForm = false;
+            _isEditMode = false;
+            LoadSavedServers();
+            OnConfigurationChanged.InvokeAsync();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.ServerSaveError, ex.Message));
+        }
+    }
+
+    private void DeleteServer(ServerConfig config)
+    {
+        try
+        {
+            if (config.HasAny() && config.Id.HasValue && ServerConfig.TryDeleteServerById(config.Id.Value))
+            {
+                _bprMessage = BprMessage.Success(TranslationFactory.Current.Get(TranslationKeys.ServerDeletedSuccess, config.Server.ServerName));
+                LoadSavedServers();
+                OnConfigurationChanged.InvokeAsync();
+            }
+            else
+            {
+                _bprMessage = BprMessage.Warning(TranslationFactory.Current[TranslationKeys.ServerNotFound]);
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.ServerDeleteError, ex.Message));
+            StateHasChanged();
+        }
+    }
+
+    private void ConfirmDeleteServer(ServerConfig config)
+    {
+        _serverToDelete = config;
+        _showDeleteConfirmation = true;
+        StateHasChanged();
+    }
+
+    private void CancelDeleteConfirmation()
+    {
+        _showDeleteConfirmation = false;
+        _serverToDelete = null;
+        StateHasChanged();
+    }
+
+    private void DeleteServerConfirmed()
+    {
+        if (_serverToDelete != null)
+        {
+            DeleteServer(_serverToDelete);
+        }
+        CancelDeleteConfirmation();
+    }
+
+    public void Dispose()
+    {
+        TranslationFactory.LanguageChanged -= OnLanguageChanged;
+    }
+}

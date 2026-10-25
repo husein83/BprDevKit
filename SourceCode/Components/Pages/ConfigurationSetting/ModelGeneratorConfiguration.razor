@@ -1,0 +1,1773 @@
+@using System.Text.Json
+@using BprDevKit.Config
+@using BprDevKit.DatabaseManagement.Services.DataModels
+@using BprDevKit.Localization
+@using BprDevKit.Utility
+@using ModelGenConfig = BprDevKit.Config.ModelGeneratorConfiguration
+@using ServerConfig = BprDevKit.Config.ServerConfiguration
+@using BprDevKit.DatabaseManagement.Services
+@inject ITranslationFactory TranslationFactory
+@inject DatabaseManagerFactory DatabaseManagerFactory
+
+@{
+    var t = TranslationFactory.Current;
+}
+
+<div class="model-generator-configuration-section">
+    <!-- Header / Action Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="h5 fw-bold mb-1">
+                <i class="bi bi-boxes text-primary me-2"></i>@t[TranslationKeys.ModelGeneratorConfigurationTab]
+            </h3>
+            <p class="text-muted small mb-0">@t[TranslationKeys.ModelProfilesCount]</p>
+        </div>
+
+        @if (!_isEditingProfile)
+        {
+            <button class="btn btn-primary shadow-sm" type="button" @onclick="CreateNewProfile">
+                <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.DataModelProfileSaveAs]
+            </button>
+        }
+        else
+        {
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary" type="button" @onclick="CancelEditing">
+                    @t[TranslationKeys.Cancel]
+                </button>
+                <button class="btn btn-success shadow-sm" type="button" @onclick="SaveCurrentProfile" disabled="@string.IsNullOrWhiteSpace(_editingProfile.ProfileName)">
+                    <i class="bi bi-check-lg me-1"></i>@t[TranslationKeys.Save]
+                </button>
+            </div>
+        }
+    </div>
+
+    <BprAlert Message="@_panelMessage" OnDismiss="() => _panelMessage = null" />
+
+    @if (!_isEditingProfile)
+    {
+        <!-- Profiles List View -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-5">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" class="form-control" placeholder="@t[TranslationKeys.Search]..." @bind="_filterText" @bind:event="oninput" />
+                </div>
+            </div>
+        </div>
+
+        @if (FilteredProfiles.Count == 0)
+        {
+            <div class="text-center py-5 text-muted card border shadow-sm">
+                <i class="bi bi-bookmark-x display-4 opacity-50 d-block mb-3"></i>
+                <h3 class="h6 mb-2">@t[TranslationKeys.DataModelNoProfileSelected]</h3>
+                <p class="small mb-3 text-muted">@t[TranslationKeys.DataModelCreateProfilePrompt]</p>
+                <div>
+                    <button class="btn btn-primary btn-sm px-3" type="button" @onclick="CreateNewProfile">
+                        <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.DataModelProfileSaveAs]
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="row g-3">
+                @foreach (var prof in FilteredProfiles)
+                {
+                    var isGlobal = !prof.ServerId.HasValue && string.IsNullOrWhiteSpace(prof.DatabaseName);
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100 border shadow-sm">
+                            <div class="card-body p-3 d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h3 class="h6 fw-bold mb-0 text-primary text-truncate" title="@prof.ProfileName">
+                                        @prof.ProfileName
+                                    </h3>
+                                    <span class="badge text-bg-light border font-monospace">@prof.Options.Language</span>
+                                </div>
+
+                                <div class="small text-muted mb-3 flex-fill">
+                                    <div class="mb-1">
+                                        <i class="bi bi-hdd-network me-1"></i>
+                                        @(string.IsNullOrWhiteSpace(prof.ServerName) ? t[TranslationKeys.DataModelProfileGlobal] : prof.ServerName)
+                                    </div>
+                                    <div class="mb-1">
+                                        <i class="bi bi-database me-1"></i>
+                                        @(string.IsNullOrWhiteSpace(prof.DatabaseName) ? t[TranslationKeys.DataModelProfileGlobal] : prof.DatabaseName)
+                                    </div>
+                                    @if (prof.Options.Language == DataModelLanguage.CSharp && prof.Options.CSharp.TransformRules.Count > 0)
+                                    {
+                                        <div class="mt-2">
+                                            <span class="badge text-bg-info-subtle text-info">
+                                                @prof.Options.CSharp.TransformRules.Count Transform Rules
+                                            </span>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                    <span class="small text-muted">
+                                        @(prof.LastModifiedDate?.ToLocalTime().ToString("yyyy/MM/dd") ?? prof.CreateDate.ToLocalTime().ToString("yyyy/MM/dd"))
+                                    </span>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" type="button" @onclick="() => EditProfile(prof)" title="@t[TranslationKeys.Edit]">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        <button class="btn btn-outline-secondary" type="button" @onclick="() => CloneProfile(prof)" title="Clone Profile">
+                                            <i class="bi bi-copy"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" type="button" @onclick="() => DeleteProfile(prof)" title="@t[TranslationKeys.Delete]">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <!-- Profile Editor View -->
+        <div class="profile-editor card shadow-sm border-0 p-4 mb-4">
+            <!-- Profile Metadata -->
+            <div class="row g-3 mb-4 p-3 bg-light rounded border">
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelProfileName] *</label>
+                    <input type="text" class="form-control form-control-sm" placeholder="e.g. EF Core Domain Entities" @bind="_editingProfile.ProfileName" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.ServerName] (Optional)</label>
+                    <select class="form-select form-select-sm" @bind="_editingProfile.ServerId" @bind:after="OnProfileServerChanged">
+                        <option value="">-- @t[TranslationKeys.DataModelProfileGlobal] --</option>
+                        @foreach (var s in _servers)
+                        {
+                            <option value="@s.Id">@s.Server.ServerName</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.Database] (Optional)</label>
+                    @if (!_editingProfile.ServerId.HasValue)
+                    {
+                        <select class="form-select form-select-sm" disabled>
+                            <option value="">-- @t[TranslationKeys.DataModelProfileGlobal] (@t[TranslationKeys.AllDatabases]) --</option>
+                        </select>
+                        <small class="text-muted d-block mt-1">@t[TranslationKeys.SelectServerFirstForDatabase]</small>
+                    }
+                    else if (_isLoadingDatabases)
+                    {
+                        <div class="d-flex align-items-center gap-2 py-1">
+                            <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                            <span class="small text-muted">@t[TranslationKeys.Loading]...</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <select class="form-select form-select-sm" @bind="_editingProfile.DatabaseName" @bind:after="OnProfileDatabaseChanged">
+                            <option value="">-- @t[TranslationKeys.DataModelProfileGlobal] (@t[TranslationKeys.AllDatabases]) --</option>
+                            @foreach (var db in _profileDatabases)
+                            {
+                                <option value="@db">@db</option>
+                            }
+                        </select>
+                    }
+                </div>
+            </div>
+
+            <!-- Language Selector -->
+            <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 border-bottom pb-2">
+                <label class="form-label small fw-bold mb-0">@t[TranslationKeys.DataModelLanguage]</label>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn @(_editingProfile.Options.Language == DataModelLanguage.CSharp ? "btn-primary" : "btn-outline-secondary")"
+                            type="button" @onclick="() => _editingProfile.Options.Language = DataModelLanguage.CSharp">
+                        C# (.NET)
+                    </button>
+                    <button class="btn @(_editingProfile.Options.Language == DataModelLanguage.Python ? "btn-primary" : "btn-outline-secondary")"
+                            type="button" @onclick="() => _editingProfile.Options.Language = DataModelLanguage.Python">
+                        Python
+                    </button>
+                    <button class="btn @(_editingProfile.Options.Language == DataModelLanguage.Dart ? "btn-primary" : "btn-outline-secondary")"
+                            type="button" @onclick="() => _editingProfile.Options.Language = DataModelLanguage.Dart">
+                        Dart (Flutter)
+                    </button>
+                    <button class="btn @(_editingProfile.Options.Language == DataModelLanguage.Java ? "btn-primary" : "btn-outline-secondary")"
+                            type="button" @onclick="() => _editingProfile.Options.Language = DataModelLanguage.Java">
+                        Java
+                    </button>
+                </div>
+            </div>
+
+            @if (_editingProfile.Options.Language == DataModelLanguage.CSharp)
+            {
+                <!-- C# Sub-Tabs -->
+                <ul class="nav nav-tabs mb-4">
+                    <li class="nav-item">
+                        <button class="nav-link @(_csActiveTab == "structure" ? "active fw-bold" : "")" type="button" @onclick='() => _csActiveTab = "structure"'>
+                            <i class="bi bi-box me-1"></i>@t[TranslationKeys.DataModelCsStructureTab]
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link position-relative @(_csActiveTab == "schemaAccess" ? "active fw-bold" : "")" type="button" @onclick='() => SetCsActiveTab("schemaAccess")'>
+                            <i class="bi bi-shield-check me-1"></i>@t[TranslationKeys.DataModelSchemaAccessTab]
+                            @if (_editingProfile.Options.EnableSchemaAccessControl && _editingProfile.Options.SchemaAccessRules.Count > 0)
+                            {
+                                <span class="badge rounded-pill bg-primary ms-1">@_editingProfile.Options.SchemaAccessRules.Count</span>
+                            }
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @(_csActiveTab == "namespace" ? "active fw-bold" : "")" type="button" @onclick='() => _csActiveTab = "namespace"'>
+                            <i class="bi bi-diagram-2 me-1"></i>@t[TranslationKeys.DataModelCsNamespaceTab]
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @(_csActiveTab == "attributes" ? "active fw-bold" : "")" type="button" @onclick='() => _csActiveTab = "attributes"'>
+                            <i class="bi bi-tags me-1"></i>@t[TranslationKeys.DataModelCsAttributesTab]
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @(_csActiveTab == "navigation" ? "active fw-bold" : "")" type="button" @onclick='() => _csActiveTab = "navigation"'>
+                            <i class="bi bi-bezier2 me-1"></i>@t[TranslationKeys.DataModelCsNavFkTab]
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link position-relative @(_csActiveTab == "transform" ? "active fw-bold" : "")" type="button" @onclick='() => _csActiveTab = "transform"'>
+                            <i class="bi bi-magic me-1"></i>@t[TranslationKeys.DataModelCsTransformTab]
+                            @if (_editingProfile.Options.CSharp.TransformRules.Count > 0)
+                            {
+                                <span class="badge rounded-pill bg-danger ms-1">@_editingProfile.Options.CSharp.TransformRules.Count</span>
+                            }
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @(_csActiveTab == "customSnippet" ? "active fw-bold" : "")" type="button" @onclick='() => _csActiveTab = "customSnippet"'>
+                            <i class="bi bi-code-slash me-1"></i>@t[TranslationKeys.DataModelCsCustomSnippetTab]
+                        </button>
+                    </li>
+                </ul>
+
+                @if (_csActiveTab == "structure")
+                {
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsTypeKind]</label>
+                            <select class="form-select form-select-sm" @bind="_editingProfile.Options.CSharp.TypeKind">
+                                <option value="class">@t[TranslationKeys.DataModelCsClass]</option>
+                                <option value="record">@t[TranslationKeys.DataModelCsRecord]</option>
+                                <option value="struct">@t[TranslationKeys.DataModelCsStruct]</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsAccessor]</label>
+                            <select class="form-select form-select-sm" @bind="_editingProfile.Options.CSharp.PropertyAccessor">
+                                <option value="get_set">@t[TranslationKeys.DataModelCsGetSet]</option>
+                                <option value="get_init">@t[TranslationKeys.DataModelCsGetInit]</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsStringInit]</label>
+                            <select class="form-select form-select-sm" @bind="_editingProfile.Options.CSharp.StringInitialization">
+                                <option value="EmptyString">@t[TranslationKeys.DataModelCsStringEmpty]</option>
+                                <option value="NullForgiving">@t[TranslationKeys.DataModelCsStringNullForgiving]</option>
+                                <option value="None">@t[TranslationKeys.DataModelCsStringNone]</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsBaseClass]</label>
+                            <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. EntityBase" @bind="_editingProfile.Options.CSharp.BaseClass" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsInterfaces]</label>
+                            <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. IAuditable, IEntity" @bind="_editingProfile.Options.CSharp.Interfaces" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsOverrideProperties]</label>
+                            <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. Id, CreatedDate" @bind="_editingProfile.Options.CSharp.OverrideProperties" />
+                        </div>
+
+                        <div class="col-12"><hr class="my-2" /></div>
+
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cs-p-partial" @bind="_editingProfile.Options.CSharp.IsPartial" />
+                                <label class="form-check-label small" for="cs-p-partial">@t[TranslationKeys.DataModelCsIsPartial]</label>
+                            </div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cs-p-null-ref" @bind="_editingProfile.Options.CSharp.NullableReferenceTypes" />
+                                <label class="form-check-label small" for="cs-p-null-ref">@t[TranslationKeys.DataModelCsNullableRef]</label>
+                            </div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cs-p-regions" @bind="_editingProfile.Options.CSharp.UseRegions" />
+                                <label class="form-check-label small fw-bold" for="cs-p-regions">@t[TranslationKeys.DataModelCsUseRegions]</label>
+                            </div>
+
+                            @if (_editingProfile.Options.CSharp.UseRegions)
+                            {
+                                <div class="ps-3 border-start mb-2">
+                                    <div class="form-check form-switch mb-1">
+                                        <input class="form-check-input" type="checkbox" id="cs-p-ctor" @bind="_editingProfile.Options.CSharp.IncludeConstructor" />
+                                        <label class="form-check-label small" for="cs-p-ctor">@t[TranslationKeys.DataModelCsIncludeConstructor]</label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cs-p-dbcontext" @bind="_editingProfile.Options.CSharp.GenerateDbContext" />
+                                <label class="form-check-label small fw-semibold" for="cs-p-dbcontext">@t[TranslationKeys.DataModelCsGenerateDbContext]</label>
+                            </div>
+                            @if (_editingProfile.Options.CSharp.GenerateDbContext)
+                            {
+                                <div class="ps-3 border-start mb-2">
+                                    <label class="form-label small mb-1">@t[TranslationKeys.DataModelCsDbContextName]</label>
+                                    <input type="text" class="form-control form-control-sm font-monospace" @bind="_editingProfile.Options.CSharp.DbContextName" />
+                                </div>
+                            }
+                        </div>
+
+                        <!-- User-defined Class Constants -->
+                        <div class="col-12 mt-3">
+                            <div class="card p-3 border shadow-sm bg-white rounded-3">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" type="checkbox" id="cs-p-consts" @bind="_editingProfile.Options.CSharp.IncludeConstants" @bind:after="EnsureInitialConstants" />
+                                        <label class="form-check-label small fw-bold" for="cs-p-consts">@t[TranslationKeys.DataModelCsIncludeConstants]</label>
+                                    </div>
+                                    @if (_editingProfile.Options.CSharp.IncludeConstants)
+                                    {
+                                        <button class="btn btn-xs btn-outline-primary" type="button" @onclick="AddConstant">
+                                            <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.DataModelAddConstant]
+                                        </button>
+                                    }
+                                </div>
+
+                                @if (_editingProfile.Options.CSharp.IncludeConstants)
+                                {
+                                    <div class="small text-muted mb-2">
+                                        Available tokens: <code>{TableName}</code>, <code>{SchemaName}</code>, <code>{ClassName}</code>, <code>{Database}</code>
+                                    </div>
+                                    @if (_editingProfile.Options.CSharp.Constants.Count > 0)
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered align-middle small mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th style="width: 120px;">@t[TranslationKeys.DataModelConstantModifier]</th>
+                                                        <th style="width: 110px;">@t[TranslationKeys.DataModelConstantType]</th>
+                                                        <th style="width: 200px;">@t[TranslationKeys.DataModelConstantName]</th>
+                                                        <th>@t[TranslationKeys.DataModelConstantValue]</th>
+                                                        <th style="width: 45px;"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var c in _editingProfile.Options.CSharp.Constants)
+                                                    {
+                                                        var item = c;
+                                                        <tr>
+                                                            <td>
+                                                                <select class="form-select form-select-sm" @bind="item.AccessModifier">
+                                                                    <option value="public">public</option>
+                                                                    <option value="private">private</option>
+                                                                    <option value="internal">internal</option>
+                                                                    <option value="protected">protected</option>
+                                                                </select>
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="string" @bind="item.Type" />
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="TABLE_NAME" @bind="item.Name" />
+                                                            </td>
+                                                            <td>
+                                                                <textarea class="form-control form-control-sm font-monospace" rows="1" style="min-height: 31px; resize: vertical;" placeholder='"{TableName}"' @bind="item.ValueTemplate"></textarea>
+                                                            </td>
+                                                            <td class="text-center">
+                                                                <button class="btn btn-link btn-sm text-danger p-0" type="button" @onclick="() => RemoveConstant(item)">
+                                                                    <i class="bi bi-trash3"></i>
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+
+                        <!-- User-defined Class Overrides (Properties & Methods) -->
+                        <div class="col-12 mt-3">
+                            <div class="card p-3 border shadow-sm bg-white rounded-3">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" type="checkbox" id="cs-p-overrides-switch" @bind="_editingProfile.Options.CSharp.IncludeOverrides" @bind:after="EnsureInitialOverrides" />
+                                        <label class="form-check-label small fw-bold" for="cs-p-overrides-switch">@t[TranslationKeys.DataModelCsIncludeOverrides]</label>
+                                    </div>
+                                    @if (_editingProfile.Options.CSharp.IncludeOverrides)
+                                    {
+                                        <button class="btn btn-xs btn-outline-primary" type="button" @onclick="AddOverride">
+                                            <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.DataModelAddOverride]
+                                        </button>
+                                    }
+                                </div>
+
+                                @if (_editingProfile.Options.CSharp.IncludeOverrides)
+                                {
+                                    <div class="small text-muted mb-2">
+                                        Available tokens: <code>{TableName}</code>, <code>{SchemaName}</code>, <code>{ClassName}</code>, <code>{Database}</code>
+                                    </div>
+                                    @if (_editingProfile.Options.CSharp.Overrides.Count > 0)
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered align-middle small mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th style="width: 105px;">@t[TranslationKeys.DataModelConstantModifier]</th>
+                                                        <th style="width: 110px;">@t[TranslationKeys.DataModelOverrideKind]</th>
+                                                        <th style="width: 110px;">@t[TranslationKeys.DataModelOverrideReturnType]</th>
+                                                        <th style="width: 160px;">@t[TranslationKeys.DataModelOverrideName]</th>
+                                                        <th style="width: 150px;">@t[TranslationKeys.DataModelOverrideParams]</th>
+                                                        <th style="width: 80px;" class="text-center" title="@t[TranslationKeys.DataModelOverrideExpression]">@t[TranslationKeys.DataModelOverrideExpression]</th>
+                                                        <th>@t[TranslationKeys.DataModelOverrideBody]</th>
+                                                        <th style="width: 45px;"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var ov in _editingProfile.Options.CSharp.Overrides)
+                                                    {
+                                                        var item = ov;
+                                                        <tr>
+                                                            <td>
+                                                                <select class="form-select form-select-sm" @bind="item.AccessModifier">
+                                                                    <option value="public">public</option>
+                                                                    <option value="protected">protected</option>
+                                                                    <option value="internal">internal</option>
+                                                                </select>
+                                                            </td>
+                                                            <td>
+                                                                <select class="form-select form-select-sm" @bind="item.MemberKind">
+                                                                    <option value="Property">@t[TranslationKeys.DataModelOverrideProperty]</option>
+                                                                    <option value="Method">@t[TranslationKeys.DataModelOverrideMethod]</option>
+                                                                </select>
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="string" @bind="item.ReturnType" />
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="TableName" @bind="item.Name" />
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. int id" @bind="item.Parameters" disabled="@(item.MemberKind != "Method")" />
+                                                            </td>
+                                                            <td class="text-center">
+                                                                <input class="form-check-input" type="checkbox" @bind="item.IsExpressionBodied" title="@t[TranslationKeys.DataModelOverrideExpression]" />
+                                                            </td>
+                                                            <td>
+                                                                <textarea class="form-control form-control-sm font-monospace" rows="2" style="min-height: 38px; resize: vertical;" placeholder='@(item.IsExpressionBodied ? "\"{TableName}\"" : "return \"{TableName}\";")' @bind="item.Body"></textarea>
+                                                            </td>
+                                                            <td class="text-center">
+                                                                <button class="btn btn-link btn-sm text-danger p-0" type="button" @onclick="() => RemoveOverride(item)">
+                                                                    <i class="bi bi-trash3"></i>
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (_csActiveTab == "schemaAccess")
+                {
+                    <div class="card p-3 border shadow-sm bg-white rounded-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <div>
+                                <div class="form-check form-switch mb-1">
+                                    <input class="form-check-input" type="checkbox" id="enableSchemaAccess" @bind="_editingProfile.Options.EnableSchemaAccessControl" />
+                                    <label class="form-check-label fw-bold" for="enableSchemaAccess">@t[TranslationKeys.DataModelEnableSchemaAccess]</label>
+                                </div>
+                                <p class="text-muted small mb-0">@t[TranslationKeys.DataModelSchemaAccessHelp]</p>
+                            </div>
+                            @if (_editingProfile.Options.EnableSchemaAccessControl)
+                            {
+                                <div class="d-flex gap-2">
+                                    @if (_editingProfile.ServerId.HasValue && !string.IsNullOrWhiteSpace(_editingProfile.DatabaseName))
+                                    {
+                                        <button class="btn btn-outline-primary btn-sm" type="button" @onclick="DetectSchemasFromDb" disabled="@_isLoadingSchemas">
+                                            @if (_isLoadingSchemas)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-arrow-repeat me-1"></i>
+                                            }
+                                            @t[TranslationKeys.DataModelFetchSchemasFromDb]
+                                        </button>
+                                    }
+                                    <button class="btn btn-primary btn-sm" type="button" @onclick="OpenAddSchemaRuleModal" disabled="@(!_editingProfile.ServerId.HasValue || string.IsNullOrWhiteSpace(_editingProfile.DatabaseName) || _dbSchemas.Count == 0)">
+                                        <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.DataModelAddSchemaRule]
+                                    </button>
+                                </div>
+                            }
+                        </div>
+
+                        @if (_editingProfile.Options.EnableSchemaAccessControl)
+                        {
+                            @if (!_editingProfile.ServerId.HasValue || string.IsNullOrWhiteSpace(_editingProfile.DatabaseName))
+                            {
+                                <div class="alert alert-warning py-2 px-3 small d-flex align-items-center gap-2 mb-3">
+                                    <i class="bi bi-exclamation-triangle-fill fs-5 text-warning"></i>
+                                    <span>@t[TranslationKeys.DataModelSchemaAccessServerDbRequired]</span>
+                                </div>
+                            }
+                            else if (_dbSchemas.Count == 0)
+                            {
+                                <div class="alert alert-info py-2 px-3 small d-flex align-items-center justify-content-between gap-2 mb-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="bi bi-info-circle-fill fs-5 text-info"></i>
+                                        <span>Click to fetch database schemas from <strong>@_editingProfile.DatabaseName</strong>.</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-info text-white" type="button" @onclick="DetectSchemasFromDb" disabled="@_isLoadingSchemas">
+                                        <i class="bi bi-download me-1"></i>@t[TranslationKeys.DataModelFetchSchemasFromDb]
+                                    </button>
+                                </div>
+                            }
+
+                            @if (_showAddSchemaRuleModal && _dbSchemas.Count > 0)
+                            {
+                                <div class="card p-3 mb-3 border-primary shadow-sm bg-light-subtle">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="small fw-bold text-primary">
+                                            <i class="bi bi-shield-plus me-1"></i>@t[TranslationKeys.DataModelAddSchemaRule]
+                                        </span>
+                                        <button class="btn btn-sm btn-link text-muted p-0" type="button" @onclick="() => _showAddSchemaRuleModal = false">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
+
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-md-5">
+                                            <label class="form-label small mb-1 fw-semibold">@t[TranslationKeys.DataModelSourceSchema] *</label>
+                                            <select class="form-select form-select-sm font-monospace" @bind="_newSourceSchema">
+                                                <option value="">-- @t[TranslationKeys.DataModelSelectSchema] --</option>
+                                                @foreach (var s in _dbSchemas)
+                                                {
+                                                    <option value="@s">@s</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-md-7">
+                                            <label class="form-label small mb-1 fw-semibold">@t[TranslationKeys.DataModelAllowedTargetSchemas]</label>
+                                            <div class="input-group input-group-sm">
+                                                <select class="form-select font-monospace" @bind="_modalSelectedTargetSchema">
+                                                    <option value="">-- @t[TranslationKeys.DataModelSelectTargetSchemaPrompt] --</option>
+                                                    @foreach (var s in _dbSchemas.Where(x => !string.Equals(x, _newSourceSchema, StringComparison.OrdinalIgnoreCase) && !_modalSelectedTargetSchemasList.Contains(x, StringComparer.OrdinalIgnoreCase)))
+                                                    {
+                                                        <option value="@s">@s</option>
+                                                    }
+                                                </select>
+                                                <button class="btn btn-outline-primary" type="button" @onclick="AddModalTargetSchema" disabled="@string.IsNullOrWhiteSpace(_modalSelectedTargetSchema)">
+                                                    <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.Add]
+                                                </button>
+                                            </div>
+                                            @if (_modalSelectedTargetSchemasList.Count > 0)
+                                            {
+                                                <div class="d-flex flex-wrap gap-1 mt-2">
+                                                    @foreach (var target in _modalSelectedTargetSchemasList)
+                                                    {
+                                                        var targetSchema = target;
+                                                        <span class="badge text-bg-primary-subtle text-primary border font-monospace d-inline-flex align-items-center gap-1">
+                                                            @targetSchema
+                                                            <i class="bi bi-x cursor-pointer" @onclick="() => _modalSelectedTargetSchemasList.Remove(targetSchema)"></i>
+                                                        </span>
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <small class="text-muted d-block mt-1">@t[TranslationKeys.DataModelIsolatedSchema]</small>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="() => _showAddSchemaRuleModal = false">
+                                            @t[TranslationKeys.Cancel]
+                                        </button>
+                                        <button class="btn btn-primary btn-sm" type="button" @onclick="SaveSchemaRule" disabled="@string.IsNullOrWhiteSpace(_newSourceSchema)">
+                                            <i class="bi bi-check-lg me-1"></i>@t[TranslationKeys.Save]
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (_editingProfile.Options.SchemaAccessRules.Count == 0)
+                            {
+                                <div class="p-4 text-center text-muted small bg-light rounded border">
+                                    <i class="bi bi-shield-slash fs-4 d-block mb-2 text-secondary opacity-50"></i>
+                                    No schema rules defined. Click "@t[TranslationKeys.DataModelAddSchemaRule]" or "@t[TranslationKeys.DataModelFetchSchemasFromDb]".
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="row g-3">
+                                    @foreach (var rule in _editingProfile.Options.SchemaAccessRules)
+                                    {
+                                        var currentRule = rule;
+                                        if (!_quickAddTarget.ContainsKey(currentRule.Id))
+                                        {
+                                            _quickAddTarget[currentRule.Id] = string.Empty;
+                                        }
+                                        <div class="col-md-6 col-lg-4">
+                                            <div class="card h-100 p-3 border shadow-sm bg-white">
+                                                <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <i class="bi bi-shield-shaded text-primary"></i>
+                                                        <strong class="font-monospace text-primary fs-6">[@currentRule.SourceSchema]</strong>
+                                                    </div>
+                                                    <button class="btn btn-link btn-sm text-danger p-0" type="button" @onclick="() => DeleteSchemaRule(currentRule)" title="@t[TranslationKeys.Delete]">
+                                                        <i class="bi bi-trash3"></i>
+                                                    </button>
+                                                </div>
+
+                                                <div class="small mb-3">
+                                                    <span class="text-muted d-block mb-1 fw-semibold">@t[TranslationKeys.DataModelAllowedTargetSchemas]:</span>
+                                                    @if (currentRule.AllowedTargetSchemas.Count == 0)
+                                                    {
+                                                        <span class="badge text-bg-secondary-subtle text-secondary border">
+                                                            <i class="bi bi-slash-circle me-1"></i>@t[TranslationKeys.DataModelIsolatedSchema]
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="d-flex flex-wrap gap-1">
+                                                            @foreach (var target in currentRule.AllowedTargetSchemas)
+                                                            {
+                                                                var targetSchema = target;
+                                                                <span class="badge text-bg-primary-subtle text-primary border font-monospace d-inline-flex align-items-center gap-1">
+                                                                    @targetSchema
+                                                                    <i class="bi bi-x cursor-pointer" @onclick="() => RemoveTargetSchemaFromRule(currentRule, targetSchema)"></i>
+                                                                </span>
+                                                            }
+                                                        </div>
+                                                    }
+                                                </div>
+
+                                                <div class="mt-auto pt-2 border-top">
+                                                    <div class="input-group input-group-sm">
+                                                        <select class="form-select font-monospace" @bind="_quickAddTarget[currentRule.Id]">
+                                                            <option value="">-- @t[TranslationKeys.DataModelSelectTargetSchemaPrompt] --</option>
+                                                            @foreach (var s in _dbSchemas.Where(x => !string.Equals(x, currentRule.SourceSchema, StringComparison.OrdinalIgnoreCase) && !currentRule.AllowedTargetSchemas.Contains(x, StringComparer.OrdinalIgnoreCase)))
+                                                            {
+                                                                <option value="@s">@s</option>
+                                                            }
+                                                        </select>
+                                                        <button class="btn btn-outline-primary" type="button" @onclick="() => AddTargetSchemaToRule(currentRule)" disabled="@string.IsNullOrWhiteSpace(_quickAddTarget[currentRule.Id])">
+                                                            <i class="bi bi-plus-lg"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+                else if (_csActiveTab == "namespace")
+                {
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label small fw-bold mb-2">@t[TranslationKeys.DataModelNamespaceMode]</label>
+                            <div class="btn-group btn-group-sm d-flex mb-3" style="max-width: 520px;">
+                                <button type="button" class="btn @(_editingProfile.Options.CSharp.NamespaceMode != "PerSchema" ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                                        @onclick='() => _editingProfile.Options.CSharp.NamespaceMode = "Single"'>
+                                    <i class="bi bi-box me-1"></i>@t[TranslationKeys.DataModelNamespaceModeSingle]
+                                </button>
+                                <button type="button" class="btn @(_editingProfile.Options.CSharp.NamespaceMode == "PerSchema" ? "btn-primary fw-bold" : "btn-outline-secondary")"
+                                        @onclick='() => _editingProfile.Options.CSharp.NamespaceMode = "PerSchema"'>
+                                    <i class="bi bi-diagram-3 me-1"></i>@t[TranslationKeys.DataModelNamespaceModePerSchema]
+                                </button>
+                            </div>
+                        </div>
+
+                        @if (_editingProfile.Options.CSharp.NamespaceMode != "PerSchema")
+                        {
+                            <div class="col-12">
+                                <div class="card p-3 bg-light border-0">
+                                    <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsNamespace]</label>
+                                    <input type="text" class="form-control form-control-sm font-monospace" placeholder="MyProject.Models" @bind="_editingProfile.Options.CSharp.Namespace" />
+                                    <div class="small text-muted mt-1">@t[TranslationKeys.DataModelNamespaceSingleHelp]</div>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="col-12">
+                                <div class="card p-3 bg-light border-0">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelSchemaNamespacePattern]</label>
+                                        <input type="text" class="form-control form-control-sm font-monospace" placeholder="{Database}.{Schema}.DataModel" @bind="_editingProfile.Options.CSharp.SchemaNamespacePattern" />
+                                        <div class="small text-muted mt-1">
+                                            Available tokens:
+                                            <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendSchemaNsToken("{Database}")'>{Database}</code>
+                                            <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendSchemaNsToken("{Schema}")'>{Schema}</code>
+                                            <code class="user-select-all cursor-pointer" @onclick='() => AppendSchemaNsToken("{Table}")'>{Table}</code>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="form-label small fw-semibold mb-0">@t[TranslationKeys.DataModelExplicitSchemaNamespaces]</label>
+                                        <button class="btn btn-xs btn-outline-primary" type="button" @onclick="AddSchemaNamespaceMapping">
+                                            <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.Add]
+                                        </button>
+                                    </div>
+
+                                    @if (_editingProfile.Options.CSharp.SchemaNamespaceMappings.Count > 0)
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered bg-white align-middle small mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th style="width: 35%;">@t[TranslationKeys.SchemaName]</th>
+                                                        <th>@t[TranslationKeys.DataModelCsNamespace]</th>
+                                                        <th style="width: 45px;"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var map in _editingProfile.Options.CSharp.SchemaNamespaceMappings)
+                                                    {
+                                                        var m = map;
+                                                        <tr>
+                                                            <td>
+                                                                @if (_dbSchemas.Count > 0)
+                                                                {
+                                                                    <select class="form-select form-select-sm font-monospace" @bind="m.SchemaName">
+                                                                        <option value="">-- @t[TranslationKeys.DataModelSelectSchema] --</option>
+                                                                        @foreach (var s in _dbSchemas)
+                                                                        {
+                                                                            <option value="@s">@s</option>
+                                                                        }
+                                                                    </select>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. SysMan" @bind="m.SchemaName" />
+                                                                }
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. BexSys.SysMan.DataModel" @bind="m.Namespace" />
+                                                            </td>
+                                                            <td class="text-center">
+                                                                <button class="btn btn-link btn-sm text-danger p-0" type="button" @onclick="() => RemoveSchemaNamespaceMapping(m)">
+                                                                    <i class="bi bi-trash3"></i>
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsCustomUsings]</label>
+                            <textarea class="form-control form-control-sm font-monospace" rows="4" placeholder="MyCompany.Data;&#10;MyCompany.Core;" @bind="_editingProfile.Options.CSharp.CustomUsings"></textarea>
+                        </div>
+                    </div>
+                }
+                else if (_csActiveTab == "attributes")
+                {
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cs-p-ann" @bind="_editingProfile.Options.CSharp.IncludeDataAnnotations" />
+                                <label class="form-check-label small" for="cs-p-ann">@t[TranslationKeys.DataModelCsDataAnnotations]</label>
+                            </div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cs-p-ef" @bind="_editingProfile.Options.CSharp.IncludeEfCoreTableAttributes" />
+                                <label class="form-check-label small" for="cs-p-ef">@t[TranslationKeys.DataModelCsEfTableAttributes]</label>
+                            </div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cs-p-nameof" @bind="_editingProfile.Options.CSharp.UseNameofInAttributes" />
+                                <label class="form-check-label small" for="cs-p-nameof">@t[TranslationKeys.DataModelCsUseNameof]</label>
+                            </div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cs-p-idx" @bind="_editingProfile.Options.CSharp.IncludeIndexesAsAttributes" />
+                                <label class="form-check-label small" for="cs-p-idx">@t[TranslationKeys.DataModelCsIncludeIndexes]</label>
+                            </div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cs-p-json" @bind="_editingProfile.Options.CSharp.IncludeJsonAttributes" />
+                                <label class="form-check-label small" for="cs-p-json">@t[TranslationKeys.DataModelCsJsonAttributes]</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <!-- Custom FK Attribute -->
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" id="cs-p-fk-attr" @bind="_editingProfile.Options.CSharp.EnableCustomFkAttribute" />
+                                <label class="form-check-label small fw-semibold" for="cs-p-fk-attr">@t[TranslationKeys.DataModelCsEnableCustomFk]</label>
+                            </div>
+                            @if (_editingProfile.Options.CSharp.EnableCustomFkAttribute)
+                            {
+                                <div class="ps-3 border-start mb-3">
+                                    <input type="text" class="form-control form-control-sm font-monospace mb-1" placeholder='[FkProperty(Name = "{FullFieldName}")]' @bind="_editingProfile.Options.CSharp.CustomFkAttributeTemplate" />
+                                    <div class="small text-muted">
+                                        Tokens:
+                                        <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendFkToken("{FullFieldName}")'>{FullFieldName}</code>
+                                        <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendFkToken("{PropertyName}")'>{PropertyName}</code>
+                                        <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendFkToken("{ColumnName}")'>{ColumnName}</code>
+                                        <code class="user-select-all cursor-pointer" @onclick='() => AppendFkToken("{TargetTable}")'>{TargetTable}</code>
+                                    </div>
+                                </div>
+                            }
+
+                            <!-- Custom PK Attribute -->
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" id="cs-p-pk-attr" @bind="_editingProfile.Options.CSharp.EnableCustomPkAttribute" />
+                                <label class="form-check-label small fw-semibold" for="cs-p-pk-attr">@t[TranslationKeys.DataModelCsEnableCustomPk]</label>
+                            </div>
+                            @if (_editingProfile.Options.CSharp.EnableCustomPkAttribute)
+                            {
+                                <div class="ps-3 border-start mb-3">
+                                    <input type="text" class="form-control form-control-sm font-monospace" placeholder="[Key]" @bind="_editingProfile.Options.CSharp.CustomPkAttributeTemplate" />
+                                </div>
+                            }
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsCustomColumnRules]</label>
+                            <textarea class="form-control form-control-sm font-monospace" rows="3" placeholder="*Date:[Auditable]&#10;uniqueidentifier:[GuidColumn]" @bind="_editingProfile.Options.CSharp.CustomColumnAttributeRules"></textarea>
+                        </div>
+                    </div>
+                }
+                else if (_csActiveTab == "navigation")
+                {
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsNavigationStyle]</label>
+                            <select class="form-select form-select-sm" @bind="_editingProfile.Options.CSharp.NavigationStyle">
+                                <option value="Standard">@t[TranslationKeys.DataModelCsNavStandard]</option>
+                                <option value="Enterprise">@t[TranslationKeys.DataModelCsNavEnterprise]</option>
+                            </select>
+                        </div>
+
+                        @if (_editingProfile.Options.CSharp.NavigationStyle == "Enterprise")
+                        {
+                            <div class="col-12">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="cs-p-nav-full-ns" @bind="_editingProfile.Options.CSharp.UseFullNamespaceForNavTypes" />
+                                    <label class="form-check-label small" for="cs-p-nav-full-ns">@t[TranslationKeys.DataModelCsUseFullNamespaceForNav]</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="cs-p-nav-null-colls" @bind="_editingProfile.Options.CSharp.MakeCollectionsNullable" />
+                                    <label class="form-check-label small" for="cs-p-nav-null-colls">@t[TranslationKeys.DataModelCsMakeCollectionsNullable]</label>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else if (_csActiveTab == "transform")
+                {
+                    <!-- Smart Property Transformations Engine -->
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button class="btn btn-sm btn-outline-primary" type="button" @onclick="() => AddQuickRule(QuickRuleType.JsonDictionary)">
+                            + JSON &rarr; Dictionary
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" type="button" @onclick="() => AddQuickRule(QuickRuleType.JsonDocument)">
+                            + JSON &rarr; JsonDocument
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" type="button" @onclick="() => AddQuickRule(QuickRuleType.Xml)">
+                            + XML &rarr; XElement
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" type="button" @onclick="() => AddQuickRule(QuickRuleType.CsvList)">
+                            + CSV &rarr; List&lt;string&gt;
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" type="button" @onclick="() => AddQuickRule(QuickRuleType.Enum)">
+                            + Int &rarr; Enum
+                        </button>
+                        <button class="btn btn-sm btn-success ms-auto" type="button" @onclick="OpenNewRuleModal">
+                            <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.DataModelTransformAddRule]
+                        </button>
+                    </div>
+
+                    @if (_showRuleModal)
+                    {
+                        <div class="card p-3 mb-3 border-primary shadow-sm bg-white">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small fw-bold text-primary">
+                                    <i class="bi bi-sliders2 me-1"></i>@(_isNewRule ? t[TranslationKeys.DataModelTransformAddRule] : "Edit Rule")
+                                </span>
+                                <button class="btn btn-sm btn-link text-muted p-0" type="button" @onclick="() => _showRuleModal = false">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-12">
+                                    <label class="form-label small mb-1">@t[TranslationKeys.DataModelTransformRuleName]</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="_editingRule.RuleName" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">@t[TranslationKeys.DataModelTransformColPattern]</label>
+                                    <input type="text" class="form-control form-control-sm font-monospace" placeholder="*Json" @bind="_editingRule.ColumnNamePattern" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">@t[TranslationKeys.DataModelTransformTypePattern]</label>
+                                    <input type="text" class="form-control form-control-sm font-monospace" placeholder="json" @bind="_editingRule.DataTypePattern" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">@t[TranslationKeys.DataModelTransformActionType]</label>
+                                    <select class="form-select form-select-sm" @bind="_editingRule.ActionType">
+                                        <option value="NotMappedHelper">@t[TranslationKeys.DataModelTransformNotMappedHelper]</option>
+                                        <option value="CustomGetterSetter">@t[TranslationKeys.DataModelTransformCustomGetterSetter]</option>
+                                        <option value="TypeOverride">@t[TranslationKeys.DataModelTransformTypeOverride]</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">@t[TranslationKeys.DataModelTransformTargetType]</label>
+                                    <input type="text" class="form-control form-control-sm font-monospace" placeholder="Dictionary<string, object?>?" @bind="_editingRule.TargetType" />
+                                </div>
+                                @if (_editingRule.ActionType == "NotMappedHelper")
+                                {
+                                    <div class="col-12">
+                                        <label class="form-label small mb-1">@t[TranslationKeys.DataModelTransformHelperPropName]</label>
+                                        <input type="text" class="form-control form-control-sm font-monospace" placeholder="{PropertyName}Data" @bind="_editingRule.HelperPropertyNameTemplate" />
+                                    </div>
+                                }
+                                <div class="col-12">
+                                    <label class="form-label small mb-1">@t[TranslationKeys.DataModelTransformGetter]</label>
+                                    <input type="text" class="form-control form-control-sm font-monospace" @bind="_editingRule.GetterTemplate" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small mb-1">@t[TranslationKeys.DataModelTransformSetter]</label>
+                                    <input type="text" class="form-control form-control-sm font-monospace" @bind="_editingRule.SetterTemplate" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small mb-1">@t[TranslationKeys.DataModelTransformUsing]</label>
+                                    <input type="text" class="form-control form-control-sm font-monospace" placeholder="System.Text.Json" @bind="_editingRule.RequiredUsing" />
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-end gap-2">
+                                <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="() => _showRuleModal = false">
+                                    @t[TranslationKeys.Cancel]
+                                </button>
+                                <button class="btn btn-primary btn-sm" type="button" @onclick="SaveRule">
+                                    <i class="bi bi-check-lg me-1"></i>@t[TranslationKeys.Save]
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+                    @if (_editingProfile.Options.CSharp.TransformRules.Count == 0)
+                    {
+                        <div class="p-4 text-center text-muted small bg-white rounded border">
+                            @t[TranslationKeys.DataModelTransformNoRules]
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="row g-2">
+                            @foreach (var rule in _editingProfile.Options.CSharp.TransformRules)
+                            {
+                                <div class="col-md-6">
+                                    <div class="card p-3 border shadow-sm bg-white">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <input class="form-check-input mt-0" type="checkbox" @bind="rule.IsEnabled" title="Enable/Disable" />
+                                                <strong class="small text-dark">@rule.RuleName</strong>
+                                            </div>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-link btn-sm text-primary p-0 me-2" type="button" @onclick="() => EditRule(rule)">
+                                                    <i class="bi bi-pencil-square"></i>
+                                                </button>
+                                                <button class="btn btn-link btn-sm text-danger p-0" type="button" @onclick="() => DeleteRule(rule)">
+                                                    <i class="bi bi-trash3"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="small text-muted font-monospace">
+                                            <span class="badge text-bg-light border me-1">@rule.ColumnNamePattern</span>
+                                            <span class="badge text-bg-secondary me-1">@rule.ActionType</span>
+                                            <span class="text-primary">@rule.TargetType</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+                else if (_csActiveTab == "customSnippet")
+                {
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsCustomSnippet]</label>
+                            <textarea class="form-control form-control-sm font-monospace" rows="8" placeholder="// Custom properties or methods&#10;public string FullTitle => $&quot;{Id} - {Title}&quot;;" @bind="_editingProfile.Options.CSharp.CustomClassBodySnippet"></textarea>
+                            <div class="small text-muted mt-1">
+                                Tokens: <code>{ClassName}</code>, <code>{TableName}</code>, <code>{SchemaName}</code>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else if (_editingProfile.Options.Language == DataModelLanguage.Python)
+            {
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelPyStyle]</label>
+                        <select class="form-select form-select-sm" @bind="_editingProfile.Options.Python.Style">
+                            <option value="pydantic">@t[TranslationKeys.DataModelPyPydantic]</option>
+                            <option value="dataclass">@t[TranslationKeys.DataModelPyDataclass]</option>
+                            <option value="sqlalchemy">@t[TranslationKeys.DataModelPySqlAlchemy]</option>
+                            <option value="typeddict">@t[TranslationKeys.DataModelPyTypedDict]</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelBaseClass]</label>
+                        <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. BaseEntity" @bind="_editingProfile.Options.Python.BaseClass" />
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="py-p-snake" @bind="_editingProfile.Options.Python.UseSnakeCaseProperties" />
+                            <label class="form-check-label small" for="py-p-snake">@t[TranslationKeys.DataModelPySnakeCase]</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="py-p-opt" @bind="_editingProfile.Options.Python.UseOptionalTypeHinting" />
+                            <label class="form-check-label small" for="py-p-opt">@t[TranslationKeys.DataModelPyOptional]</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="py-p-doc" @bind="_editingProfile.Options.Python.IncludeDocstrings" />
+                            <label class="form-check-label small" for="py-p-doc">@t[TranslationKeys.DataModelPyDocstrings]</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCustomImports]</label>
+                        <textarea class="form-control form-control-sm font-monospace" rows="3" placeholder="from myapp.core import BaseEntity" @bind="_editingProfile.Options.Python.CustomImports"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCustomSnippet]</label>
+                        <textarea class="form-control form-control-sm font-monospace" rows="4" placeholder="# Custom Python methods" @bind="_editingProfile.Options.Python.CustomClassBodySnippet"></textarea>
+                    </div>
+                </div>
+            }
+            else if (_editingProfile.Options.Language == DataModelLanguage.Dart)
+            {
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelDartStyle]</label>
+                        <select class="form-select form-select-sm" @bind="_editingProfile.Options.Dart.Style">
+                            <option value="plain">@t[TranslationKeys.DataModelDartPlain]</option>
+                            <option value="json_serializable">@t[TranslationKeys.DataModelDartJsonSerializable]</option>
+                            <option value="freezed">@t[TranslationKeys.DataModelDartFreezed]</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelBaseClass]</label>
+                        <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. BaseEntity" @bind="_editingProfile.Options.Dart.BaseClass" />
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="dart-p-null" @bind="_editingProfile.Options.Dart.NullSafety" />
+                            <label class="form-check-label small" for="dart-p-null">@t[TranslationKeys.DataModelDartNullSafety]</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="dart-p-final" @bind="_editingProfile.Options.Dart.FinalFields" />
+                            <label class="form-check-label small" for="dart-p-final">@t[TranslationKeys.DataModelDartFinalFields]</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="dart-p-copy" @bind="_editingProfile.Options.Dart.GenerateCopyWith" />
+                            <label class="form-check-label small" for="dart-p-copy">@t[TranslationKeys.DataModelDartCopyWith]</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCustomImports]</label>
+                        <textarea class="form-control form-control-sm font-monospace" rows="3" placeholder="import 'package:myapp/base.dart';" @bind="_editingProfile.Options.Dart.CustomImports"></textarea>
+                    </div>
+                </div>
+            }
+            else if (_editingProfile.Options.Language == DataModelLanguage.Java)
+            {
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelJavaStyle]</label>
+                        <select class="form-select form-select-sm" @bind="_editingProfile.Options.Java.Style">
+                            <option value="pojo">@t[TranslationKeys.DataModelJavaPojo]</option>
+                            <option value="record">@t[TranslationKeys.DataModelJavaRecord]</option>
+                            <option value="lombok">@t[TranslationKeys.DataModelJavaLombok]</option>
+                            <option value="jpa">@t[TranslationKeys.DataModelJavaJpa]</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelJavaPackage]</label>
+                        <input type="text" class="form-control form-control-sm font-monospace" @bind="_editingProfile.Options.Java.PackageName" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelBaseClass]</label>
+                        <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. BaseEntity" @bind="_editingProfile.Options.Java.BaseClass" />
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="java-p-ser" @bind="_editingProfile.Options.Java.ImplementSerializable" />
+                            <label class="form-check-label small" for="java-p-ser">@t[TranslationKeys.DataModelJavaSerializable]</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="java-p-valid" @bind="_editingProfile.Options.Java.IncludeValidationAnnotations" />
+                            <label class="form-check-label small" for="java-p-valid">@t[TranslationKeys.DataModelJavaValidation]</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="java-p-jackson" @bind="_editingProfile.Options.Java.IncludeJacksonAnnotations" />
+                            <label class="form-check-label small" for="java-p-jackson">@t[TranslationKeys.DataModelJavaJackson]</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCustomImports]</label>
+                        <textarea class="form-control form-control-sm font-monospace" rows="3" placeholder="import com.myapp.BaseEntity;" @bind="_editingProfile.Options.Java.CustomImports"></textarea>
+                    </div>
+                </div>
+            }
+
+            <!-- Common Settings Card -->
+            <div class="mt-4 p-3 bg-light rounded border">
+                <h4 class="h6 fw-bold mb-3 text-secondary">
+                    <i class="bi bi-gear me-1"></i>@t[TranslationKeys.DataModelCommonSettings]
+                </h4>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1">@t[TranslationKeys.DataModelPropertyNaming]</label>
+                        <select class="form-select form-select-sm" @bind="_editingProfile.Options.PropertyNaming">
+                            <option value="@NamingConvention.PascalCase">@t[TranslationKeys.DataModelNamingPascal]</option>
+                            <option value="@NamingConvention.CamelCase">@t[TranslationKeys.DataModelNamingCamel]</option>
+                            <option value="@NamingConvention.SnakeCase">@t[TranslationKeys.DataModelNamingSnake]</option>
+                            <option value="@NamingConvention.Original">@t[TranslationKeys.DataModelNamingOriginal]</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check form-switch mb-1">
+                            <input class="form-check-input" type="checkbox" id="p-rem-prefix" @bind="_editingProfile.Options.RemoveTablePrefixes" />
+                            <label class="form-check-label small" for="p-rem-prefix">@t[TranslationKeys.DataModelRemovePrefixes]</label>
+                        </div>
+                        @if (_editingProfile.Options.RemoveTablePrefixes)
+                        {
+                            <input type="text" class="form-control form-control-sm" placeholder="tbl_,tbl,vw_" @bind="_editingProfile.Options.TablePrefixes" />
+                        }
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="p-singularize" @bind="_editingProfile.Options.SingularizeClassNames" />
+                            <label class="form-check-label small" for="p-singularize">@t[TranslationKeys.DataModelSingularize]</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="p-nav" @bind="_editingProfile.Options.IncludeNavigationProperties" />
+                            <label class="form-check-label small" for="p-nav">@t[TranslationKeys.DataModelIncludeNavigation]</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="p-doc" @bind="_editingProfile.Options.IncludeDocumentationComments" />
+                            <label class="form-check-label small" for="p-doc">@t[TranslationKeys.DataModelIncludeDocComments]</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback OnConfigurationChanged { get; set; }
+
+    private List<DataModelProfile> _profiles = new();
+    private List<ServerConfig> _servers = new();
+    private bool _isEditingProfile = false;
+    private DataModelProfile _editingProfile = new();
+    private string _filterText = string.Empty;
+    private string _csActiveTab = "structure";
+    private BprMessage? _panelMessage;
+
+    // Database & Schema state
+    private List<string> _profileDatabases = new();
+    private bool _isLoadingDatabases = false;
+    private bool _showAddSchemaRuleModal = false;
+    private string _newSourceSchema = string.Empty;
+    private string _modalSelectedTargetSchema = string.Empty;
+    private List<string> _modalSelectedTargetSchemasList = new();
+    private bool _isLoadingSchemas = false;
+    private List<string> _dbSchemas = new();
+    private Dictionary<Guid, string> _quickAddTarget = new();
+
+    // Rule modal inside Profile editor
+    private bool _showRuleModal = false;
+    private PropertyTransformRule _editingRule = new();
+    private bool _isNewRule = true;
+
+    public int ProfilesCount => _profiles.Count;
+
+    private enum QuickRuleType
+    {
+        JsonDictionary,
+        JsonDocument,
+        Xml,
+        CsvList,
+        Enum
+    }
+
+    private List<DataModelProfile> FilteredProfiles =>
+        string.IsNullOrWhiteSpace(_filterText)
+            ? _profiles
+            : _profiles.Where(p =>
+                p.ProfileName.Contains(_filterText, StringComparison.OrdinalIgnoreCase) ||
+                (p.ServerName != null && p.ServerName.Contains(_filterText, StringComparison.OrdinalIgnoreCase)) ||
+                (p.DatabaseName != null && p.DatabaseName.Contains(_filterText, StringComparison.OrdinalIgnoreCase))
+            ).ToList();
+
+    protected override void OnInitialized()
+    {
+        LoadAllData();
+    }
+
+    public void LoadAllData()
+    {
+        try
+        {
+            _servers = ServerConfig.LoadAllFromEncryptedFile(false)
+                .Where(s => s.Id.HasValue)
+                .ToList();
+            _profiles = ModelGenConfig.LoadAllProfiles();
+        }
+        catch (Exception ex)
+        {
+            _panelMessage = BprMessage.Error(ex.Message);
+        }
+    }
+
+    public void CreateNewProfile()
+    {
+        _editingProfile = new DataModelProfile
+        {
+            ProfileName = string.Empty,
+            Options = new DataModelOptions()
+        };
+        _profileDatabases.Clear();
+        _isEditingProfile = true;
+        StateHasChanged();
+    }
+
+    private async Task EditProfile(DataModelProfile profile)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(profile);
+            _editingProfile = JsonSerializer.Deserialize<DataModelProfile>(json) ?? new DataModelProfile();
+            _isEditingProfile = true;
+
+            if (_editingProfile.ServerId.HasValue)
+            {
+                var s = _servers.FirstOrDefault(x => x.Id == _editingProfile.ServerId.Value);
+                if (s != null)
+                {
+                    await LoadDatabasesForServer(s);
+                    if (!string.IsNullOrWhiteSpace(_editingProfile.DatabaseName))
+                    {
+                        await DetectSchemasFromDb();
+                    }
+                }
+            }
+            else
+            {
+                _profileDatabases.Clear();
+                _dbSchemas.Clear();
+            }
+        }
+        catch
+        {
+            _editingProfile = profile;
+            _isEditingProfile = true;
+        }
+    }
+
+    private void CloneProfile(DataModelProfile profile)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(profile);
+            var clone = JsonSerializer.Deserialize<DataModelProfile>(json) ?? new DataModelProfile();
+            clone.Id = Guid.NewGuid();
+            clone.ProfileName = profile.ProfileName + " (Copy)";
+            clone.CreateDate = DateTime.UtcNow;
+            clone.LastModifiedDate = null;
+            ModelGenConfig.SaveProfile(clone);
+            LoadAllData();
+            OnConfigurationChanged.InvokeAsync();
+            _panelMessage = BprMessage.Success(TranslationFactory.Current[TranslationKeys.DataModelProfileSaveSuccess]);
+        }
+        catch (Exception ex)
+        {
+            _panelMessage = BprMessage.Error(ex.Message);
+        }
+    }
+
+    private void DeleteProfile(DataModelProfile profile)
+    {
+        try
+        {
+            ModelGenConfig.DeleteProfile(profile.Id);
+            LoadAllData();
+            OnConfigurationChanged.InvokeAsync();
+            _panelMessage = BprMessage.Information(TranslationFactory.Current[TranslationKeys.DataModelProfileDeleteSuccess]);
+        }
+        catch (Exception ex)
+        {
+            _panelMessage = BprMessage.Error(ex.Message);
+        }
+    }
+
+    private void CancelEditing()
+    {
+        _isEditingProfile = false;
+        _editingProfile = new DataModelProfile();
+    }
+
+    private void SaveCurrentProfile()
+    {
+        if (string.IsNullOrWhiteSpace(_editingProfile.ProfileName))
+        {
+            _panelMessage = BprMessage.Warning(TranslationFactory.Current[TranslationKeys.DataModelProfileName]);
+            return;
+        }
+
+        try
+        {
+            if (_editingProfile.ServerId.HasValue)
+            {
+                var s = _servers.FirstOrDefault(x => x.Id == _editingProfile.ServerId.Value);
+                _editingProfile.ServerName = s?.Server.ServerName;
+            }
+            else
+            {
+                _editingProfile.ServerName = null;
+            }
+
+            ModelGenConfig.SaveProfile(_editingProfile);
+            _panelMessage = BprMessage.Success(TranslationFactory.Current[TranslationKeys.DataModelProfileSaveSuccess]);
+            _isEditingProfile = false;
+            LoadAllData();
+            OnConfigurationChanged.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            _panelMessage = BprMessage.Error(ex.Message);
+        }
+    }
+
+    private async Task OnProfileServerChanged()
+    {
+        _profileDatabases.Clear();
+        _editingProfile.DatabaseName = null;
+        _dbSchemas.Clear();
+
+        if (_editingProfile.ServerId.HasValue)
+        {
+            var s = _servers.FirstOrDefault(x => x.Id == _editingProfile.ServerId.Value);
+            _editingProfile.ServerName = s?.Server.ServerName;
+            if (s != null)
+            {
+                await LoadDatabasesForServer(s);
+            }
+        }
+        else
+        {
+            _editingProfile.ServerName = null;
+        }
+    }
+
+    private async Task OnProfileDatabaseChanged()
+    {
+        _dbSchemas.Clear();
+        if (_editingProfile.ServerId.HasValue && !string.IsNullOrWhiteSpace(_editingProfile.DatabaseName))
+        {
+            await DetectSchemasFromDb();
+        }
+    }
+
+    private async Task SetCsActiveTab(string tab)
+    {
+        _csActiveTab = tab;
+        if (tab == "schemaAccess" && _dbSchemas.Count == 0 && _editingProfile.ServerId.HasValue && !string.IsNullOrWhiteSpace(_editingProfile.DatabaseName))
+        {
+            await DetectSchemasFromDb();
+        }
+    }
+
+    private async Task LoadDatabasesForServer(ServerConfig server)
+    {
+        _isLoadingDatabases = true;
+        _profileDatabases.Clear();
+        try
+        {
+            var manager = DatabaseManagerFactory.Create(server);
+            var (res, dbs) = await manager.GetDatabases();
+            if (res.Success && dbs != null)
+            {
+                _profileDatabases = dbs.OrderBy(d => d).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            _panelMessage = BprMessage.Warning($"Could not load databases from server: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingDatabases = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OpenAddSchemaRuleModal()
+    {
+        _newSourceSchema = _dbSchemas.FirstOrDefault(s => !_editingProfile.Options.SchemaAccessRules.Any(r => string.Equals(r.SourceSchema, s, StringComparison.OrdinalIgnoreCase))) ?? _dbSchemas.FirstOrDefault() ?? string.Empty;
+        _modalSelectedTargetSchema = string.Empty;
+        _modalSelectedTargetSchemasList.Clear();
+        _showAddSchemaRuleModal = true;
+    }
+
+    private void AddModalTargetSchema()
+    {
+        if (!string.IsNullOrWhiteSpace(_modalSelectedTargetSchema))
+        {
+            var trimmed = _modalSelectedTargetSchema.Trim();
+            if (!_modalSelectedTargetSchemasList.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+            {
+                _modalSelectedTargetSchemasList.Add(trimmed);
+            }
+            _modalSelectedTargetSchema = string.Empty;
+        }
+    }
+
+    private void SaveSchemaRule()
+    {
+        if (string.IsNullOrWhiteSpace(_newSourceSchema)) return;
+
+        var source = _newSourceSchema.Trim();
+        var existing = _editingProfile.Options.SchemaAccessRules.FirstOrDefault(r => string.Equals(r.SourceSchema, source, StringComparison.OrdinalIgnoreCase));
+        if (existing == null)
+        {
+            existing = new SchemaAccessRule
+            {
+                SourceSchema = source
+            };
+            _editingProfile.Options.SchemaAccessRules.Add(existing);
+        }
+
+        foreach (var target in _modalSelectedTargetSchemasList)
+        {
+            if (!existing.AllowedTargetSchemas.Any(x => string.Equals(x, target, StringComparison.OrdinalIgnoreCase)))
+            {
+                existing.AllowedTargetSchemas.Add(target);
+            }
+        }
+
+        _showAddSchemaRuleModal = false;
+        StateHasChanged();
+    }
+
+    private void DeleteSchemaRule(SchemaAccessRule rule)
+    {
+        _editingProfile.Options.SchemaAccessRules.Remove(rule);
+        StateHasChanged();
+    }
+
+    private void RemoveTargetSchemaFromRule(SchemaAccessRule rule, string target)
+    {
+        rule.AllowedTargetSchemas.RemoveAll(x => string.Equals(x, target, StringComparison.OrdinalIgnoreCase));
+        StateHasChanged();
+    }
+
+    private void AddTargetSchemaToRule(SchemaAccessRule rule)
+    {
+        if (_quickAddTarget.TryGetValue(rule.Id, out var target) && !string.IsNullOrWhiteSpace(target))
+        {
+            var trimmed = target.Trim();
+            if (!rule.AllowedTargetSchemas.Any(x => string.Equals(x, trimmed, StringComparison.OrdinalIgnoreCase)))
+            {
+                rule.AllowedTargetSchemas.Add(trimmed);
+            }
+            _quickAddTarget[rule.Id] = string.Empty;
+            StateHasChanged();
+        }
+    }
+
+    private void OnQuickAddKeyDown(KeyboardEventArgs e, SchemaAccessRule rule)
+    {
+        if (e.Key == "Enter")
+        {
+            AddTargetSchemaToRule(rule);
+        }
+    }
+
+    private async Task DetectSchemasFromDb()
+    {
+        if (!_editingProfile.ServerId.HasValue || string.IsNullOrWhiteSpace(_editingProfile.DatabaseName))
+            return;
+
+        var server = _servers.FirstOrDefault(x => x.Id == _editingProfile.ServerId.Value);
+        if (server == null) return;
+
+        _isLoadingSchemas = true;
+        try
+        {
+            var manager = DatabaseManagerFactory.Create(server);
+            var (res, schemas) = await manager.GetSchemas(_editingProfile.DatabaseName);
+            if (res.Success && schemas != null)
+            {
+                _dbSchemas = schemas.OrderBy(s => s).ToList();
+
+                foreach (var s in _dbSchemas)
+                {
+                    if (!_editingProfile.Options.SchemaAccessRules.Any(r => string.Equals(r.SourceSchema, s, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        _editingProfile.Options.SchemaAccessRules.Add(new SchemaAccessRule
+                        {
+                            SourceSchema = s,
+                            AllowedTargetSchemas = new List<string>()
+                        });
+                    }
+                }
+                _panelMessage = BprMessage.Success($"Loaded {_dbSchemas.Count} schemas from database.");
+            }
+            else
+            {
+                _panelMessage = BprMessage.Warning(res.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            _panelMessage = BprMessage.Warning($"Failed to load schemas: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingSchemas = false;
+            StateHasChanged();
+        }
+    }
+
+    private void AddQuickRule(QuickRuleType type)
+    {
+        var rule = type switch
+        {
+            QuickRuleType.JsonDictionary => new PropertyTransformRule
+            {
+                RuleName = "JSON to Dictionary",
+                ColumnNamePattern = "*Json",
+                DataTypePattern = "json",
+                ActionType = "NotMappedHelper",
+                HelperPropertyNameTemplate = "{PropertyName}Data",
+                TargetType = "Dictionary<string, object?>?",
+                GetterTemplate = "string.IsNullOrWhiteSpace({PropertyName}) ? null : JsonSerializer.Deserialize<Dictionary<string, object?>>({PropertyName})",
+                SetterTemplate = "{PropertyName} = value == null ? null : JsonSerializer.Serialize(value);",
+                RequiredUsing = "System.Text.Json"
+            },
+            QuickRuleType.JsonDocument => new PropertyTransformRule
+            {
+                RuleName = "JSON to JsonDocument",
+                ColumnNamePattern = "*Payload",
+                DataTypePattern = "json",
+                ActionType = "NotMappedHelper",
+                HelperPropertyNameTemplate = "{PropertyName}Doc",
+                TargetType = "JsonDocument?",
+                GetterTemplate = "string.IsNullOrWhiteSpace({PropertyName}) ? null : JsonDocument.Parse({PropertyName})",
+                SetterTemplate = "{PropertyName} = value?.RootElement.ToString();",
+                RequiredUsing = "System.Text.Json"
+            },
+            QuickRuleType.Xml => new PropertyTransformRule
+            {
+                RuleName = "XML to XElement",
+                ColumnNamePattern = "*Xml",
+                DataTypePattern = "xml",
+                ActionType = "NotMappedHelper",
+                HelperPropertyNameTemplate = "{PropertyName}Xml",
+                TargetType = "XElement?",
+                GetterTemplate = "string.IsNullOrWhiteSpace({PropertyName}) ? null : XElement.Parse({PropertyName})",
+                SetterTemplate = "{PropertyName} = value?.ToString();",
+                RequiredUsing = "System.Xml.Linq"
+            },
+            QuickRuleType.CsvList => new PropertyTransformRule
+            {
+                RuleName = "CSV to List<string>",
+                ColumnNamePattern = "*Tags",
+                DataTypePattern = "*",
+                ActionType = "NotMappedHelper",
+                HelperPropertyNameTemplate = "{PropertyName}List",
+                TargetType = "List<string>?",
+                GetterTemplate = "string.IsNullOrWhiteSpace({PropertyName}) ? null : {PropertyName}.Split(',').ToList()",
+                SetterTemplate = "{PropertyName} = value == null ? null : string.Join(\",\", value);",
+                RequiredUsing = "System.Linq"
+            },
+            QuickRuleType.Enum => new PropertyTransformRule
+            {
+                RuleName = "Int to Enum",
+                ColumnNamePattern = "*Status",
+                DataTypePattern = "int",
+                ActionType = "TypeOverride",
+                TargetType = "MyStatusEnum",
+                RequiredUsing = "MyProject.Enums"
+            },
+            _ => new PropertyTransformRule()
+        };
+
+        _editingProfile.Options.CSharp.TransformRules.Add(rule);
+    }
+
+    private void OpenNewRuleModal()
+    {
+        _editingRule = new PropertyTransformRule();
+        _isNewRule = true;
+        _showRuleModal = true;
+    }
+
+    private void EditRule(PropertyTransformRule rule)
+    {
+        _editingRule = rule;
+        _isNewRule = false;
+        _showRuleModal = true;
+    }
+
+    private void DeleteRule(PropertyTransformRule rule)
+    {
+        _editingProfile.Options.CSharp.TransformRules.Remove(rule);
+    }
+
+    private void SaveRule()
+    {
+        if (_isNewRule)
+        {
+            _editingProfile.Options.CSharp.TransformRules.Add(_editingRule);
+        }
+        _showRuleModal = false;
+    }
+
+    private void AppendNamespaceToken(string token)
+    {
+        _editingProfile.Options.CSharp.Namespace += (_editingProfile.Options.CSharp.Namespace.EndsWith(".") ? "" : ".") + token;
+    }
+
+    private void AppendFkToken(string token)
+    {
+        _editingProfile.Options.CSharp.CustomFkAttributeTemplate += token;
+    }
+
+    private void EnsureInitialConstants()
+    {
+        if (_editingProfile.Options.CSharp.IncludeConstants && _editingProfile.Options.CSharp.Constants.Count == 0)
+        {
+            _editingProfile.Options.CSharp.Constants.Add(new ClassConstantDefinition
+            {
+                AccessModifier = "public",
+                Type = "string",
+                Name = "TABLE_NAME",
+                ValueTemplate = "\"{TableName}\""
+            });
+            _editingProfile.Options.CSharp.Constants.Add(new ClassConstantDefinition
+            {
+                AccessModifier = "public",
+                Type = "string",
+                Name = "SCHEMA_NAME",
+                ValueTemplate = "\"{SchemaName}\""
+            });
+        }
+    }
+
+    private void AddConstant()
+    {
+        _editingProfile.Options.CSharp.Constants.Add(new ClassConstantDefinition
+        {
+            AccessModifier = "public",
+            Type = "string",
+            Name = "NEW_CONSTANT",
+            ValueTemplate = "\"{TableName}\""
+        });
+    }
+
+    private void RemoveConstant(ClassConstantDefinition item)
+    {
+        _editingProfile.Options.CSharp.Constants.Remove(item);
+    }
+
+    private void AppendSchemaNsToken(string token)
+    {
+        _editingProfile.Options.CSharp.SchemaNamespacePattern +=
+            (_editingProfile.Options.CSharp.SchemaNamespacePattern.EndsWith(".") ? "" : ".") + token;
+    }
+
+    private void AddSchemaNamespaceMapping()
+    {
+        var schema = _dbSchemas.FirstOrDefault() ?? "dbo";
+        var db = !string.IsNullOrWhiteSpace(_editingProfile.DatabaseName) ? _editingProfile.DatabaseName : "MyProject";
+        _editingProfile.Options.CSharp.SchemaNamespaceMappings.Add(new SchemaNamespaceMapping
+        {
+            SchemaName = schema,
+            Namespace = $"{db}.{schema}.DataModel"
+        });
+    }
+
+    private void RemoveSchemaNamespaceMapping(SchemaNamespaceMapping map)
+    {
+        _editingProfile.Options.CSharp.SchemaNamespaceMappings.Remove(map);
+    }
+
+    private void EnsureInitialOverrides()
+    {
+        if (_editingProfile.Options.CSharp.IncludeOverrides && _editingProfile.Options.CSharp.Overrides.Count == 0)
+        {
+            _editingProfile.Options.CSharp.Overrides.Add(new ClassOverrideDefinition
+            {
+                AccessModifier = "public",
+                MemberKind = "Property",
+                ReturnType = "string",
+                Name = "TableName",
+                IsExpressionBodied = true,
+                Body = "\"{TableName}\""
+            });
+            _editingProfile.Options.CSharp.Overrides.Add(new ClassOverrideDefinition
+            {
+                AccessModifier = "public",
+                MemberKind = "Property",
+                ReturnType = "string",
+                Name = "SchemaName",
+                IsExpressionBodied = true,
+                Body = "\"{SchemaName}\""
+            });
+        }
+    }
+
+    private void AddOverride()
+    {
+        _editingProfile.Options.CSharp.Overrides.Add(new ClassOverrideDefinition
+        {
+            AccessModifier = "public",
+            MemberKind = "Property",
+            ReturnType = "string",
+            Name = "NewOverride",
+            IsExpressionBodied = true,
+            Body = "\"{TableName}\""
+        });
+    }
+
+    private void RemoveOverride(ClassOverrideDefinition item)
+    {
+        _editingProfile.Options.CSharp.Overrides.Remove(item);
+    }
+}

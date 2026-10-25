@@ -1,4 +1,4 @@
-﻿using BprDevKit.Config;
+using BprDevKit.Config;
 
 namespace BprDevKit.Utility
 {
@@ -19,6 +19,12 @@ namespace BprDevKit.Utility
                 case BprDevConfig.ServerConfiguration:
                     {
                         folderName = Constants.EncryptedServerConfigFileName;
+                    }
+                    break;
+
+                case BprDevConfig.ModelGeneratorConfiguration:
+                    {
+                        folderName = Constants.EncryptedModelGeneratorConfigFileName;
                     }
                     break;
 

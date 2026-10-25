@@ -522,6 +522,7 @@ ORDER BY s.name, t.name;";
         WHERE i.is_primary_key = 1 AND ixc.object_id = c.object_id AND ixc.column_id = c.column_id) THEN 1 ELSE 0 END AS IsPrimaryKey,
     c.collation_name AS Collation,
     dc.definition AS DefaultValue,
+    dc.name AS DefaultConstraintName,
     cc.definition AS ComputedFormula,
     ISNULL(cc.is_persisted, 0) AS IsPersisted,
     CAST(ep.value AS nvarchar(4000)) AS Description
@@ -737,7 +738,8 @@ END");
 
                 if (newDefault is not null)
                 {
-                    builder.AppendLine($"ALTER TABLE {table} ADD DEFAULT ({newDefault}) FOR {QUOTENAME(currentColumnName)};");
+                    var dfName = $"DF_{config.SchemaName}_{config.TableName}_{currentColumnName}";
+                    builder.AppendLine($"ALTER TABLE {table} ADD CONSTRAINT {QUOTENAME(dfName)} DEFAULT ({newDefault}) FOR {QUOTENAME(currentColumnName)};");
                 }
                 else if (!config.ChangesDefault)
                 {
