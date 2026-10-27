@@ -21,7 +21,7 @@ mono_crash.*
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/*
-![Rr]elease/BprDevKit v*
+![Rr]elease/BprDevKit v*.zip
 [Rr]eleases/
 x64/
 x86/
