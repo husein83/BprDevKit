@@ -67,6 +67,19 @@ namespace BprDevKit.Config
             }
         }
 
+        /// <summary>
+        /// Saves a collection of server configurations directly to the encrypted file
+        /// </summary>
+        public static void SaveAll(List<ServerConfiguration> serverConfigurations)
+        {
+            if (serverConfigurations.TryDevSerialize(out var jsonContent))
+            {
+                string filePath = DevFunctions.GetConfigurationPath(BprDevConfig.ServerConfiguration, out bool isExistsFile);
+                string encryptedContent = jsonContent.EncryptContent();
+                File.WriteAllText(filePath, encryptedContent);
+            }
+        }
+
         public static bool TryDeleteServerById(Guid id)
         {
             bool result = false;

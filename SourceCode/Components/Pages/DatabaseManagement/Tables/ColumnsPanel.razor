@@ -1,0 +1,356 @@
+@using System.Globalization
+@using BprDevKit.Utility
+@using BprDevKit.Config
+@using BprDevKit.DatabaseManagement.Models.Metadata
+@using BprDevKit.DatabaseManagement.Models.Operations
+@using BprDevKit.DatabaseManagement
+@inject ITranslationFactory TranslationFactory
+
+@{
+    var t = TranslationFactory.Current;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h3 class="h6 mb-0"><i class="bi bi-columns-gap me-1 text-primary"></i>@t[TranslationKeys.Columns] (@Table.Columns.Count)</h3>
+    <button class="btn btn-sm btn-primary" type="button" @onclick="OpenAdd" disabled="@_isSaving"><i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.ColPanelAddColumn]</button>
+</div>
+
+<BprAlert Message="@_bprMessage" OnDismiss="ClearMessage" />
+
+@if (_mode == PanelMode.Add || _mode == PanelMode.Edit)
+{
+    <div class="card border-primary mb-3">
+        <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">@(_mode == PanelMode.Add ? t[TranslationKeys.ColPanelAddColumn] : t.Get(TranslationKeys.ColPanelEditColumn, _original!.ColumnName))</span>
+            <button class="btn-close btn-close-white" type="button" @onclick="Close"></button>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold" for="column-name">@t[TranslationKeys.ColumnName]</label>
+                    <input id="column-name" class="form-control form-control-sm font-monospace" maxlength="@(ServerConfig?.Database?.MaxColumnNameLength ?? Constants.MaxColumnNameLength)" @bind="_form.ColumnName" @bind:event="oninput" />
+                </div>
+                <div class="col-md-8">
+                    @if (CanEditType)
+                    {
+                        <ColumnTypeEditor Column="_form" />
+                    }
+                    else
+                    {
+                        <label class="form-label small fw-semibold">@t[TranslationKeys.DataType]</label>
+                        <div class="form-control-plaintext form-control-sm font-monospace">@(_original!.DataType) <span class="text-muted">@t[TranslationKeys.ColPanelCannotChangeType]</span></div>
+                    }
+                </div>
+
+                @if (CanEditType)
+                {
+                    <div class="col-12 d-flex flex-wrap gap-4">
+                        <div class="form-check">
+                            <input id="column-nullable" class="form-check-input" type="checkbox" checked="@_form.IsNullable"
+                                   disabled="@(_form.IsIdentity || (_original?.IsPrimaryKey ?? false))" @onchange="e => _form.IsNullable = (bool)e.Value!" />
+                            <label class="form-check-label small" for="column-nullable">@t[TranslationKeys.AllowNull]</label>
+                        </div>
+                        @if (_mode == PanelMode.Add)
+                        {
+                            <div class="form-check">
+                                <input id="column-identity" class="form-check-input" type="checkbox" checked="@_form.IsIdentity"
+                                       disabled="@(ColumnDataType.Find(_form.DataType)?.SupportsIdentity != true || (!_form.IsIdentity && HasIdentityColumn))"
+                                       @onchange="e => _form.SetIdentity((bool)e.Value!)" />
+                                <label class="form-check-label small" for="column-identity">@t[TranslationKeys.IsIdentity]</label>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (!_form.IsIdentity && !IsComputed)
+                {
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold" for="column-default">@t[TranslationKeys.ColPanelDefaultExpr]</label>
+                        <input id="column-default" class="form-control form-control-sm font-monospace" placeholder="0, 'N/A', SYSUTCDATETIME()" @bind="_formDefault" @bind:event="oninput" />
+                    </div>
+                }
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold" for="column-description">@t[TranslationKeys.Description]</label>
+                    <input id="column-description" class="form-control form-control-sm" maxlength="3000" @bind="_formDescription" @bind:event="oninput" />
+                </div>
+            </div>
+
+            @if (_mode == PanelMode.Add && !_form.IsNullable && !_form.IsIdentity && string.IsNullOrWhiteSpace(_formDefault))
+            {
+                <div class="alert alert-warning small mt-3 mb-0">@t[TranslationKeys.ColPanelNotNullWarning]</div>
+            }
+            @if (_mode == PanelMode.Edit && DefinitionChanged)
+            {
+                <div class="alert alert-warning small mt-3 mb-0">
+                    @t[TranslationKeys.ColPanelAlterWarning]
+                </div>
+            }
+
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <button class="btn btn-sm btn-light" type="button" @onclick="Close">@t[TranslationKeys.Cancel]</button>
+                <button class="btn btn-sm btn-success" type="button" @onclick="Save" disabled="@(_isSaving || !CanSave)">
+                    @if (_isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    @(_mode == PanelMode.Add ? t[TranslationKeys.ColPanelAddColumn] : t[TranslationKeys.SaveChanges])
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_mode == PanelMode.Drop && _original is not null)
+{
+    <div class="card border-danger mb-3">
+        <div class="card-header bg-danger text-white py-2 fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1"></i>@t.Get(TranslationKeys.ColPanelDropTitle, _original.ColumnName)</div>
+        <div class="card-body">
+            <p class="small mb-2">@t[TranslationKeys.ColPanelDropWarning]</p>
+            <label class="form-label small" for="drop-column-confirmation">@t.Get(TranslationKeys.ColPanelDropConfirmType, _original.ColumnName)</label>
+            <input id="drop-column-confirmation" class="form-control form-control-sm mb-3" autocomplete="off" @bind="_dropConfirmation" @bind:event="oninput" />
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-sm btn-light" type="button" @onclick="Close">@t[TranslationKeys.Cancel]</button>
+                <button class="btn btn-sm btn-danger" type="button" @onclick="Drop"
+                        disabled="@(_isSaving || !string.Equals(_dropConfirmation.Trim(), _original.ColumnName, StringComparison.Ordinal))">@t[TranslationKeys.ColPanelDropButton]</button>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="table-responsive">
+    <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+            <tr><th>#</th><th>@t[TranslationKeys.ColumnName]</th><th>@t[TranslationKeys.DataType]</th><th class="text-center">@t[TranslationKeys.AllowNull]</th><th>@t[TranslationKeys.ColPanelExtras]</th><th>@t[TranslationKeys.ColPanelDefaultFormula]</th><th>@t[TranslationKeys.Description]</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var column in Table.Columns)
+            {
+                <tr>
+                    <td class="text-muted small">@column.OrdinalPosition</td>
+                    <td class="font-monospace">
+                        @if (column.IsPrimaryKey)
+                        {
+                            <i class="bi bi-key-fill text-warning me-1" title="@t[TranslationKeys.PrimaryKey]"></i>
+                        }
+                        @column.ColumnName
+                    </td>
+                    <td class="font-monospace small">@FormatType(column)</td>
+                    <td class="text-center">@(column.IsNullable ? "✓" : "—")</td>
+                    <td>
+                        @if (column.IsIdentity)
+                        {
+                            <span class="badge text-bg-info">Identity(@column.IdentitySeed,@column.IdentityIncrement)</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(column.ComputedFormula))
+                        {
+                            <span class="badge text-bg-secondary">@t[TranslationKeys.ColPanelComputed]@(column.IsPersisted ? $" · {t[TranslationKeys.ColPanelPersisted]}" : string.Empty)</span>
+                        }
+                    </td>
+                    <td class="font-monospace small">@(column.ComputedFormula ?? column.DefaultValue ?? "—")</td>
+                    <td class="small text-muted">@(column.Description ?? "—")</td>
+                    <td class="text-end">
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-secondary" type="button" title="@t[TranslationKeys.Edit]" disabled="@_isSaving" @onclick="() => OpenEdit(column)"><i class="bi bi-pencil-square"></i></button>
+                            <button class="btn btn-outline-danger" type="button" title="@t[TranslationKeys.Delete]" disabled="@(_isSaving || Table.Columns.Count == 1)" @onclick="() => OpenDrop(column)"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private enum PanelMode { None, Add, Edit, Drop }
+
+    [Parameter, EditorRequired] public DatabaseManager Manager { get; set; } = null!;
+    [Parameter, EditorRequired] public TableOperation.Information Table { get; set; } = null!;
+    [Parameter] public ServerConfiguration? ServerConfig { get; set; }
+    [Parameter] public EventCallback<OperationResult> OnChanged { get; set; }
+
+    private PanelMode _mode = PanelMode.None;
+    private ColumnOperation.Information? _original;
+    private ColumnDefinition _form = new();
+    private string _formDefault = string.Empty;
+    private string _formDescription = string.Empty;
+    private string _dropConfirmation = string.Empty;
+    private bool _isSaving;
+    private BprMessage? _bprMessage;
+
+    private bool HasIdentityColumn => Table.Columns.Any(column => column.IsIdentity);
+    private bool IsComputed => _original is not null && !string.IsNullOrWhiteSpace(_original.ComputedFormula);
+
+    /// <summary>Identity, computed and unsupported-type columns can only be renamed or get a new default/description.</summary>
+    private bool CanEditType => _mode == PanelMode.Add
+        || (_original is not null && ColumnDataType.Find(_original.DataType) is not null && !_original.IsIdentity && !IsComputed);
+
+    private bool RenameRequested => _mode == PanelMode.Edit && _original is not null
+        && !string.IsNullOrWhiteSpace(_form.ColumnName) && !string.Equals(_form.ColumnName.Trim(), _original.ColumnName, StringComparison.Ordinal);
+
+    private bool DefinitionChanged => _mode == PanelMode.Edit && _original is not null && CanEditType
+        && (!string.Equals(_form.DataType, _original.DataType, StringComparison.OrdinalIgnoreCase)
+            || _form.Length != _original.Length || _form.Precision != _original.Precision || _form.Scale != _original.Scale
+            || _form.IsNullable != _original.IsNullable);
+
+    private bool DefaultChanged => _mode == PanelMode.Edit && _original is not null && !_original.IsIdentity && !IsComputed
+        && !string.Equals((_formDefault ?? string.Empty).Trim(), StripOuterParentheses(_original.DefaultValue), StringComparison.Ordinal);
+
+    private bool DescriptionChanged => _mode == PanelMode.Edit && _original is not null
+        && !string.Equals((_formDescription ?? string.Empty).Trim(), (_original.Description ?? string.Empty).Trim(), StringComparison.Ordinal);
+
+    private bool CanSave => _mode == PanelMode.Add
+        ? !string.IsNullOrWhiteSpace(_form.ColumnName)
+        : RenameRequested || DefinitionChanged || DefaultChanged || DescriptionChanged;
+
+    private void OpenAdd()
+    {
+        Close();
+        _original = null;
+        _form = new ColumnDefinition { DataType = "nvarchar", Length = 50 };
+        _formDefault = string.Empty;
+        _formDescription = string.Empty;
+        _mode = PanelMode.Add;
+    }
+
+    private void OpenEdit(ColumnOperation.Information column)
+    {
+        Close();
+        _original = column;
+        _form = new ColumnDefinition
+        {
+            ColumnName = column.ColumnName,
+            DataType = column.DataType,
+            Length = column.Length,
+            Precision = column.Precision,
+            Scale = column.Scale,
+            IsNullable = column.IsNullable,
+            Collation = column.Collation
+        };
+        _formDefault = StripOuterParentheses(column.DefaultValue);
+        _formDescription = column.Description ?? string.Empty;
+        _mode = PanelMode.Edit;
+    }
+
+    private void OpenDrop(ColumnOperation.Information column)
+    {
+        Close();
+        _original = column;
+        _dropConfirmation = string.Empty;
+        _mode = PanelMode.Drop;
+    }
+
+    private void Close()
+    {
+        _mode = PanelMode.None;
+        _dropConfirmation = string.Empty;
+    }
+
+    private async Task Save()
+    {
+        _isSaving = true;
+        try
+        {
+            var result = _mode == PanelMode.Add
+                ? await Manager.CreateColumn(BuildCreate())
+                : await Manager.AlterColumn(BuildAlter());
+            await Complete(result);
+        }
+        catch (Exception exception) { ShowResult(OperationResult.ErrorResult(TranslationFactory.Current.Get(TranslationKeys.ColErrSaveColumn, exception.Message), exception)); }
+        finally { _isSaving = false; }
+    }
+
+    private ColumnOperation.Create BuildCreate()
+    {
+        _form.ColumnName = (_form.ColumnName ?? string.Empty).Trim();
+        _form.DefaultValue = string.IsNullOrWhiteSpace(_formDefault) ? null : _formDefault.Trim();
+        _form.Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription.Trim();
+
+        return new ColumnOperation.Create
+        {
+            DatabaseName = Table.DatabaseName,
+            SchemaName = Table.SchemaName,
+            TableName = Table.TableName,
+            Column = _form
+        };
+    }
+
+    private ColumnOperation.Alter BuildAlter()
+    {
+        return new ColumnOperation.Alter
+        {
+            DatabaseName = Table.DatabaseName,
+            SchemaName = Table.SchemaName,
+            TableName = Table.TableName,
+            ColumnName = _original!.ColumnName,
+            NewColumnName = RenameRequested ? _form.ColumnName.Trim() : null,
+            Definition = DefinitionChanged ? _form : null,
+            DefaultValue = DefaultChanged ? (_formDefault ?? string.Empty).Trim() : null,
+            Description = DescriptionChanged ? (_formDescription ?? string.Empty).Trim() : null
+        };
+    }
+
+    private async Task Drop()
+    {
+        if (_original is null) return;
+
+        _isSaving = true;
+        try
+        {
+            var result = await Manager.DropColumn(new ColumnOperation.Drop
+            {
+                DatabaseName = Table.DatabaseName,
+                SchemaName = Table.SchemaName,
+                TableName = Table.TableName,
+                ColumnName = _original.ColumnName
+            });
+            await Complete(result);
+        }
+        catch (Exception exception) { ShowResult(OperationResult.ErrorResult(TranslationFactory.Current.Get(TranslationKeys.ColErrDropColumn, exception.Message), exception)); }
+        finally { _isSaving = false; }
+    }
+
+    private async Task Complete(OperationResult result)
+    {
+        ShowResult(result);
+        if (!result.Success) return;
+
+        Close();
+        await OnChanged.InvokeAsync(result);
+    }
+
+    private void ShowResult(OperationResult result) => _bprMessage = result;
+    private void ClearMessage() => _bprMessage = null;
+
+    /// <summary>SQL Server stores a default as "((0))" or "(getdate())"; the editor shows the expression without the outer pair.</summary>
+    private static string StripOuterParentheses(string? definition)
+    {
+        var text = (definition ?? string.Empty).Trim();
+        if (text.Length < 2 || text[0] != '(' || text[^1] != ')')
+            return text;
+
+        var depth = 0;
+        for (var index = 0; index < text.Length - 1; index++)
+        {
+            if (text[index] == '(') depth++;
+            else if (text[index] == ')') depth--;
+
+            // The first '(' closes before the end, so the outer pair does not wrap the whole expression.
+            if (depth == 0)
+                return text;
+        }
+
+        return text[1..^1].Trim();
+    }
+
+    private static string FormatType(ColumnOperation.Information column)
+    {
+        var type = ColumnDataType.Find(column.DataType);
+        return type?.Kind switch
+        {
+            ColumnDataTypeKind.Length => $"{column.DataType}({(column.Length == -1 ? "MAX" : column.Length?.ToString(CultureInfo.InvariantCulture))})",
+            ColumnDataTypeKind.PrecisionScale => $"{column.DataType}({column.Precision},{column.Scale})",
+            ColumnDataTypeKind.FractionalSeconds => $"{column.DataType}({column.Scale})",
+            _ => column.DataType
+        };
+    }
+}

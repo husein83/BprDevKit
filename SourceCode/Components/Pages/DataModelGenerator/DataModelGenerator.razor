@@ -1,0 +1,824 @@
+@page "/data-model-generator"
+@using System.Text
+@using System.Text.Json
+@using BprDevKit.Config
+@using BprDevKit.DatabaseManagement
+@using BprDevKit.DatabaseManagement.Connections
+@using BprDevKit.DatabaseManagement.Models.Operations
+@using BprDevKit.DataModelGenerator
+@using BprDevKit.DataModelGenerator.Models
+@using BprDevKit.DataModelGenerator.Services
+@using BprDevKit.Utility
+@using BprDevKit.Utility.Logging
+@using BprDevKit.Localization
+@inject DatabaseManagerFactory DatabaseManagerFactory
+@inject ITranslationFactory TranslationFactory
+@inject IBprLogger Logger
+@inject IJSRuntime JSRuntime
+@inject DataModelGeneratorService GeneratorService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+@{
+    var t = TranslationFactory.Current;
+    var isReady = _selectedServer != null && !string.IsNullOrWhiteSpace(_selectedDatabase) && _selectedProfile != null;
+}
+
+<div class="container-fluid py-4 px-lg-5 data-model-generator-page">
+    <!-- Hero Header -->
+    <header class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+        <div>
+            <p class="text-primary text-uppercase fw-semibold small mb-1">@t[TranslationKeys.AppName]</p>
+            <h1 class="h2 mb-1 fw-bold"><i class="bi bi-boxes me-2"></i>@t[TranslationKeys.DataModelTitle]</h1>
+            <p class="text-muted mb-0">@t[TranslationKeys.DataModelSubtitle]</p>
+        </div>
+        @if (isReady)
+        {
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span class="badge text-bg-light border px-3 py-2">
+                    <i class="bi bi-server text-primary me-1"></i>@_selectedServer!.Server.ServerName
+                </span>
+                <span class="badge text-bg-primary px-3 py-2">
+                    <i class="bi bi-database-check me-1"></i>@_selectedDatabase
+                </span>
+                <span class="badge text-bg-info text-white px-3 py-2">
+                    <i class="bi bi-bookmark-star-fill me-1"></i>@_selectedProfile!.ProfileName
+                </span>
+            </div>
+        }
+    </header>
+
+    <BprAlert Message="@_bprMessage" OnDismiss="() => _bprMessage = null" />
+
+    <!-- 3-Step Selection Workflow: 1. Server -> 2. Database -> 3. Profile -->
+    <section class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-3 p-lg-4">
+            <div class="row g-3 align-items-end">
+                <!-- Step 1: Server Selector -->
+                <div class="col-lg-4 col-md-6">
+                    <label class="form-label fw-semibold small mb-1" for="select-server">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">1</span>
+                        <i class="bi bi-hdd-network me-1 text-primary"></i>@t[TranslationKeys.DataModelStep1Server]
+                    </label>
+                    <div class="input-group">
+                        <select id="select-server" class="form-select" @bind="_selectedServerId" @bind:after="OnServerSelected">
+                            <option value="">-- @t[TranslationKeys.SelectServer] --</option>
+                            @foreach (var s in _serverConfigurations)
+                            {
+                                <option value="@s.Id">@GetServerDisplayName(s)</option>
+                            }
+                        </select>
+                        <button class="btn btn-outline-secondary" type="button" @onclick="LoadServers" disabled="@_isLoadingServers" title="@t[TranslationKeys.Refresh]">
+                            <i class="bi @(_isLoadingServers ? "bi-hourglass-split" : "bi-arrow-clockwise")"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Database Selector -->
+                <div class="col-lg-4 col-md-6">
+                    <label class="form-label fw-semibold small mb-1" for="select-database">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">2</span>
+                        <i class="bi bi-database me-1 text-primary"></i>@t[TranslationKeys.DataModelStep2Database]
+                    </label>
+                    <div class="input-group">
+                        <select id="select-database" class="form-select" @bind="_selectedDatabase" @bind:after="OnDatabaseSelected" disabled="@(_databaseManager is null || _isLoadingDatabases)">
+                            <option value="">-- @t[TranslationKeys.DataModelSelectDatabase] --</option>
+                            @foreach (var db in _databases)
+                            {
+                                <option value="@db">@db</option>
+                            }
+                        </select>
+                        <button class="btn btn-outline-secondary" type="button" @onclick="RefreshDatabases" disabled="@(_databaseManager is null || _isLoadingDatabases)" title="@t[TranslationKeys.Refresh]">
+                            <i class="bi @(_isLoadingDatabases ? "bi-hourglass-split" : "bi-arrow-clockwise")"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Profile / Configuration Selector -->
+                <div class="col-lg-4 col-md-12">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label fw-semibold small mb-0" for="select-profile">
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">3</span>
+                            <i class="bi bi-bookmark-star me-1 text-primary"></i>@t[TranslationKeys.DataModelStep3Profile]
+                        </label>
+                        <a href="/configuration-setting?tab=modelgenerator" class="small text-decoration-none text-primary fw-semibold" title="@t[TranslationKeys.DataModelManageProfilesInSettings]">
+                            <i class="bi bi-gear-fill me-1"></i>@t[TranslationKeys.DataModelManageProfilesInSettings]
+                        </a>
+                    </div>
+                    <div class="input-group">
+                        <select id="select-profile" class="form-select" value="@(_selectedProfileId?.ToString() ?? "")" @onchange="OnProfileSelectChanged" disabled="@(string.IsNullOrWhiteSpace(_selectedDatabase))">
+                            <option value="">-- @t[TranslationKeys.DataModelProfileSelect] --</option>
+                            @foreach (var prof in _profiles)
+                            {
+                                var isGlobal = !prof.ServerId.HasValue && string.IsNullOrWhiteSpace(prof.DatabaseName);
+                                <option value="@prof.Id.ToString()">
+                                    @prof.ProfileName @(isGlobal ? $" ({t[TranslationKeys.DataModelProfileGlobal]})" : "")
+                                </option>
+                            }
+                        </select>
+                        <button class="btn btn-outline-secondary" type="button" @onclick="RefreshProfiles" disabled="@(string.IsNullOrWhiteSpace(_selectedDatabase))" title="@t[TranslationKeys.Refresh]">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" type="button" @onclick="ClearAll" disabled="@(_selectedServerId is null && string.IsNullOrEmpty(_selectedDatabase))" title="@t[TranslationKeys.DataModelClear]">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @if (!isReady)
+    {
+        <!-- Step-by-Step Flow Guide -->
+        <div class="card shadow-sm border-0 py-5 px-3 text-center my-4">
+            <div class="mx-auto" style="max-width: 700px;">
+                <div class="d-flex justify-content-center align-items-center gap-3 gap-md-4 mb-4">
+                    <!-- Step 1 Indicator -->
+                    <div class="d-flex flex-column align-items-center">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center mb-2 shadow-sm @(_selectedServer != null ? "bg-success text-white" : "bg-primary text-white")" style="width: 48px; height: 48px;">
+                            @if (_selectedServer != null)
+                            {
+                                <i class="bi bi-check-lg fs-5"></i>
+                            }
+                            else
+                            {
+                                <span class="fw-bold fs-5">1</span>
+                            }
+                        </div>
+                        <span class="small fw-semibold @(_selectedServer != null ? "text-success" : "text-dark")">@t[TranslationKeys.Server]</span>
+                    </div>
+
+                    <div class="border-top flex-grow-1" style="border-width: 2px !important; margin-top: -24px;"></div>
+
+                    <!-- Step 2 Indicator -->
+                    <div class="d-flex flex-column align-items-center">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center mb-2 shadow-sm @(!string.IsNullOrWhiteSpace(_selectedDatabase) ? "bg-success text-white" : (_selectedServer != null ? "bg-primary text-white" : "bg-light text-muted border"))" style="width: 48px; height: 48px;">
+                            @if (!string.IsNullOrWhiteSpace(_selectedDatabase))
+                            {
+                                <i class="bi bi-check-lg fs-5"></i>
+                            }
+                            else
+                            {
+                                <span class="fw-bold fs-5">2</span>
+                            }
+                        </div>
+                        <span class="small fw-semibold @(!string.IsNullOrWhiteSpace(_selectedDatabase) ? "text-success" : (_selectedServer != null ? "text-dark" : "text-muted"))">@t[TranslationKeys.Database]</span>
+                    </div>
+
+                    <div class="border-top flex-grow-1" style="border-width: 2px !important; margin-top: -24px;"></div>
+
+                    <!-- Step 3 Indicator -->
+                    <div class="d-flex flex-column align-items-center">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center mb-2 shadow-sm @(_selectedProfile != null ? "bg-success text-white" : (!string.IsNullOrWhiteSpace(_selectedDatabase) ? "bg-primary text-white" : "bg-light text-muted border"))" style="width: 48px; height: 48px;">
+                            @if (_selectedProfile != null)
+                            {
+                                <i class="bi bi-check-lg fs-5"></i>
+                            }
+                            else
+                            {
+                                <span class="fw-bold fs-5">3</span>
+                            }
+                        </div>
+                        <span class="small fw-semibold @(_selectedProfile != null ? "text-success" : (!string.IsNullOrWhiteSpace(_selectedDatabase) ? "text-dark" : "text-muted"))">@t[TranslationKeys.DataModelProfile]</span>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    @if (_selectedServer == null)
+                    {
+                        <h3 class="h5 fw-bold mb-2">@t[TranslationKeys.DataModelSelectServer]</h3>
+                        <p class="text-muted small mb-0">@t[TranslationKeys.NoServerSelected]</p>
+                    }
+                    else if (string.IsNullOrWhiteSpace(_selectedDatabase))
+                    {
+                        <h3 class="h5 fw-bold mb-2">@t[TranslationKeys.DataModelSelectDatabase]</h3>
+                        <p class="text-muted small mb-0">@t[TranslationKeys.DataModelSelectDatabase]</p>
+                    }
+                    else if (_selectedProfile == null)
+                    {
+                        <h3 class="h5 fw-bold mb-2">@t[TranslationKeys.DataModelStep3Profile]</h3>
+                        <p class="text-muted small mb-3">@t[TranslationKeys.DataModelSelectProfileToProceed]</p>
+                        @if (_profiles.Count == 0)
+                        {
+                            <div class="alert alert-warning d-inline-block py-2 px-3 small mb-3">
+                                <i class="bi bi-exclamation-triangle me-1"></i> @t[TranslationKeys.DataModelCreateProfilePrompt]
+                            </div>
+                        }
+                        <div class="d-flex justify-content-center gap-2">
+                            <a href="/configuration-setting?tab=modelgenerator" class="btn btn-primary px-4">
+                                <i class="bi bi-gear-fill me-1"></i> @t[TranslationKeys.DataModelManageProfilesInSettings]
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Main Workspace (2 columns: Tables on Left, Roomy Code Viewer on Right) -->
+        <div class="row g-4">
+            <!-- Left: Tables Selection -->
+            <div class="col-lg-3 col-xl-3">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white py-3 border-bottom-0 d-flex justify-content-between align-items-center">
+                        <h2 class="h6 mb-0 fw-bold">
+                            <i class="bi bi-table me-2 text-primary"></i>@t[TranslationKeys.DataModelSelectTables]
+                        </h2>
+                        <span class="badge text-bg-primary rounded-pill">@_selectedTables.Count / @_allTables.Count</span>
+                    </div>
+                    <div class="card-body pt-0 d-flex flex-column" style="max-height: 720px;">
+                        <!-- Filter and Select/Deselect All -->
+                        <div class="mb-3">
+                            <div class="input-group input-group-sm mb-2">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                                <input type="text" class="form-control border-start-0" placeholder="@t[TranslationKeys.DataModelSearchPlaceholder]" @bind="_searchFilter" @bind:event="oninput" />
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-xs btn-outline-primary flex-fill" type="button" @onclick="SelectAllTables" disabled="@(_allTables.Count == 0)">
+                                    @t[TranslationKeys.DataModelSelectAll]
+                                </button>
+                                <button class="btn btn-xs btn-outline-secondary flex-fill" type="button" @onclick="DeselectAllTables" disabled="@(_selectedTables.Count == 0)">
+                                    @t[TranslationKeys.DataModelDeselectAll]
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Table Checkbox List -->
+                        @if (_isLoadingObjects)
+                        {
+                            <div class="d-flex flex-column align-items-center justify-content-center py-5 text-muted">
+                                <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+                                <span class="small">@t[TranslationKeys.Loading]</span>
+                            </div>
+                        }
+                        else if (_allTables.Count == 0)
+                        {
+                            <div class="text-center py-5 text-muted small">
+                                <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>
+                                @t[TranslationKeys.DataModelNoTablesSelected]
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="overflow-auto flex-fill pe-1" style="max-height: 520px;">
+                                @foreach (var tbl in FilteredTables)
+                                {
+                                    var key = $"{tbl.SchemaName}.{tbl.TableName}";
+                                    var isChecked = _selectedTables.Contains(key);
+                                    <div class="form-check py-1 border-bottom border-light">
+                                        <input class="form-check-input" type="checkbox" id="tbl-@key" checked="@isChecked" @onchange="(e) => ToggleTableSelection(key, e.Value)" />
+                                        <label class="form-check-label small text-truncate d-block" for="tbl-@key" title="@tbl.FullName">
+                                            <span class="text-muted">@tbl.SchemaName.</span><strong>@tbl.TableName</strong>
+                                        </label>
+                                    </div>
+                                }
+                                @if (!FilteredTables.Any())
+                                {
+                                    <div class="text-muted small py-3 text-center">@t[TranslationKeys.DataModelNoMatchFilter]</div>
+                                }
+                            </div>
+                        }
+
+                        <!-- Generate Button -->
+                        <div class="pt-3 border-top mt-auto">
+                            <button class="btn btn-primary w-100 py-2 fw-bold shadow-sm"
+                                    type="button" @onclick="GenerateModels"
+                                    disabled="@(_isGenerating || _selectedTables.Count == 0)">
+                                @if (_isGenerating)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                    @t[TranslationKeys.DataModelGenerating]
+                                }
+                                else
+                                {
+                                    <i class="bi bi-play-fill me-1 fs-5 align-middle"></i>
+                                    @t[TranslationKeys.DataModelGenerate]
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Roomy Generated Code Viewer (spanning col-lg-9 col-xl-9) -->
+            <div class="col-lg-9 col-xl-9">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white py-3 border-bottom-0 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <!-- Profile badge pill and Output title -->
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <h2 class="h6 mb-0 fw-bold">
+                                <i class="bi bi-file-earmark-code me-1 text-primary"></i>@t[TranslationKeys.DataModelOutputTitle]
+                            </h2>
+                            <span class="badge text-bg-light border px-2 py-1">
+                                <i class="bi bi-bookmark-star-fill text-warning me-1"></i>@_selectedProfile!.ProfileName
+                            </span>
+                            <span class="badge text-bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
+                                @_selectedProfile.Options.Language
+                            </span>
+                        </div>
+
+                        @if (_generatedFiles.Count > 0)
+                        {
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <button class="btn btn-sm @(_isCopied ? "btn-success" : "btn-outline-secondary")"
+                                        type="button" @onclick="CopyToClipboard">
+                                    <i class="bi @(_isCopied ? "bi-check2" : "bi-clipboard") me-1"></i>
+                                    @(_isCopied ? t[TranslationKeys.DataModelCopied] : t[TranslationKeys.DataModelCopyClipboard])
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary" type="button" @onclick="DownloadCurrentFile">
+                                    <i class="bi bi-file-earmark-arrow-down me-1"></i>@t[TranslationKeys.DataModelDownloadFile]
+                                </button>
+
+                                <div class="input-group input-group-sm w-auto">
+                                    <span class="input-group-text bg-light text-muted"><i class="bi bi-folder-fill me-1 text-warning"></i>@t[TranslationKeys.ZipPackagingStructure]:</span>
+                                    <select class="form-select form-select-sm" @bind="_zipPackaging">
+                                        <option value="@ZipPackagingStructure.Flat">@t[TranslationKeys.ZipPackagingFlat]</option>
+                                        <option value="@ZipPackagingStructure.BySchema">@t[TranslationKeys.ZipPackagingBySchema]</option>
+                                        <option value="@ZipPackagingStructure.ByNamespace">@t[TranslationKeys.ZipPackagingByNamespace]</option>
+                                    </select>
+                                </div>
+
+                                <button class="btn btn-sm btn-primary" type="button" @onclick="DownloadZipArchive" title="@t[TranslationKeys.DataModelDownloadZip]">
+                                    <i class="bi bi-file-earmark-zip me-1"></i>@t[TranslationKeys.DataModelDownloadZip]
+                                </button>
+
+                                @if (_generatedFiles.Select(f => f.SchemaName).Distinct().Count() > 1)
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="DownloadSeparateSchemaZips" title="@t[TranslationKeys.DataModelDownloadSeparateZips]">
+                                        <i class="bi bi-collection me-1"></i>@t[TranslationKeys.DataModelDownloadSeparateZips]
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="card-body pt-0 d-flex flex-column" style="min-height: 640px;">
+                        @if (_isGenerating)
+                        {
+                            <div class="flex-fill d-flex flex-column align-items-center justify-content-center text-center py-5">
+                                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                                <h3 class="h5 fw-bold mb-1">@t[TranslationKeys.DataModelGenerating]</h3>
+                                <p class="text-muted small mb-0">Generating entity models...</p>
+                            </div>
+                        }
+                        else if (_generatedFiles.Count > 0)
+                        {
+                            <!-- File Tabs -->
+                            <ul class="nav nav-tabs card-header-tabs mb-3 overflow-auto flex-nowrap pb-1">
+                                @for (int i = 0; i < _generatedFiles.Count; i++)
+                                {
+                                    var index = i;
+                                    var file = _generatedFiles[index];
+                                    <li class="nav-item">
+                                        <button class="nav-link py-1 px-3 text-nowrap @(_selectedFileIndex == index ? "active fw-bold" : "")"
+                                                type="button" @onclick="() => SelectFileTab(index)">
+                                            <i class="bi bi-file-code me-1 text-primary"></i>@file.FileName
+                                        </button>
+                                    </li>
+                                }
+                            </ul>
+
+                            <!-- Code Display Area (Very roomy) -->
+                            <div class="flex-fill d-flex flex-column">
+                                <textarea readonly spellcheck="false" class="form-control font-monospace flex-fill p-3 border-0 bg-light"
+                                          style="font-size: 0.875rem; resize: none; min-height: 520px; line-height: 1.6;">@ActiveCodeContent</textarea>
+                            </div>
+
+                            <!-- Metrics Footer -->
+                            <div class="d-flex flex-wrap justify-content-between align-items-center pt-2 mt-2 border-top small text-muted">
+                                <span>
+                                    <i class="bi bi-boxes me-1"></i>@_generatedFiles.Count @t[TranslationKeys.DataModelTotalModels]
+                                </span>
+                                <span>@CurrentCodeLines.ToString("N0") @t[TranslationKeys.DataModelLines]</span>
+                                <span>@CurrentCodeChars.ToString("N0") @t[TranslationKeys.DataModelCharacters]</span>
+                                <span>@((CurrentCodeChars * 2.0 / 1024.0).ToString("N1")) @t[TranslationKeys.DataModelSizeKb]</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="flex-fill d-flex flex-column align-items-center justify-content-center text-center text-muted py-5">
+                                <i class="bi bi-boxes display-1 opacity-25 mb-3"></i>
+                                <h3 class="h5 fw-normal mb-1">@t[TranslationKeys.DataModelTitle]</h3>
+                                <p class="small mb-3" style="max-width: 450px;">@t[TranslationKeys.DataModelSubtitle]</p>
+                                <button class="btn btn-primary btn-sm px-4 py-2" type="button"
+                                        @onclick="GenerateModels" disabled="@(_selectedTables.Count == 0)">
+                                    <i class="bi bi-play-fill me-1"></i>@t[TranslationKeys.DataModelGenerate]
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ServerConfiguration> _serverConfigurations = new();
+    private ServerConfiguration? _selectedServer;
+    private Guid? _selectedServerId;
+    private DatabaseManager? _databaseManager;
+    private List<string> _databases = new();
+    private string _selectedDatabase = string.Empty;
+
+    // Profiles
+    private List<DataModelProfile> _profiles = new();
+    private Guid? _selectedProfileId;
+    private DataModelProfile? _selectedProfile;
+    private DataModelOptions _options = new();
+    private ZipPackagingStructure _zipPackaging = ZipPackagingStructure.BySchema;
+
+    private List<TableOperation.Information> _allTables = new();
+    private HashSet<string> _selectedTables = new();
+    private string _searchFilter = string.Empty;
+
+    private List<GeneratedModelFile> _generatedFiles = new();
+    private int _selectedFileIndex = 0;
+
+    private bool _isLoadingServers;
+    private bool _isLoadingDatabases;
+    private bool _isLoadingObjects;
+    private bool _isGenerating;
+    private bool _isCopied;
+    private BprMessage? _bprMessage;
+
+    private IEnumerable<TableOperation.Information> FilteredTables =>
+        string.IsNullOrWhiteSpace(_searchFilter)
+            ? _allTables
+            : _allTables.Where(t =>
+                t.TableName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase) ||
+                t.SchemaName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase));
+
+    private string ActiveCodeContent =>
+        _selectedFileIndex >= 0 && _selectedFileIndex < _generatedFiles.Count
+            ? _generatedFiles[_selectedFileIndex].Content
+            : string.Empty;
+
+    private int CurrentCodeLines =>
+        string.IsNullOrEmpty(ActiveCodeContent)
+            ? 0
+            : ActiveCodeContent.Split('\n').Length;
+
+    private int CurrentCodeChars =>
+        ActiveCodeContent.Length;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadServers();
+    }
+
+    private async Task LoadServers()
+    {
+        _isLoadingServers = true;
+        try
+        {
+            _serverConfigurations = ServerConfiguration.LoadAllFromEncryptedFile(false)
+                .Where(c => c.Id.HasValue)
+                .OrderBy(GetServerDisplayName)
+                .ToList();
+
+            _selectedServerId = null;
+            _selectedServer = null;
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.ServerLoadError, ex.Message));
+        }
+        finally
+        {
+            _isLoadingServers = false;
+        }
+    }
+
+    private async Task OnServerSelected()
+    {
+        _selectedServer = _serverConfigurations.FirstOrDefault(s => s.Id == _selectedServerId);
+        _databaseManager = _selectedServer != null ? DatabaseManagerFactory.Create(_selectedServer) : null;
+        _databases.Clear();
+        _selectedDatabase = string.Empty;
+        _selectedProfileId = null;
+        _selectedProfile = null;
+        _profiles.Clear();
+        _allTables.Clear();
+        _selectedTables.Clear();
+        ClearOutput();
+
+        if (_databaseManager != null)
+        {
+            await RefreshDatabases();
+        }
+    }
+
+    private async Task RefreshDatabases()
+    {
+        if (_databaseManager == null) return;
+        _isLoadingDatabases = true;
+        try
+        {
+            var res = await _databaseManager.GetDatabases();
+            if (res.operationResult.Success)
+            {
+                _databases = res.databases.OrderBy(d => d).ToList();
+                _selectedDatabase = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.DbErrLoadDatabases, ex.Message));
+        }
+        finally
+        {
+            _isLoadingDatabases = false;
+        }
+    }
+
+    private async Task OnDatabaseSelected()
+    {
+        _selectedProfileId = null;
+        _selectedProfile = null;
+        _allTables.Clear();
+        _selectedTables.Clear();
+        ClearOutput();
+
+        if (_databaseManager == null || string.IsNullOrWhiteSpace(_selectedDatabase)) return;
+
+        RefreshProfiles();
+    }
+
+    private void RefreshProfiles()
+    {
+        _profiles = ModelGeneratorConfiguration.GetProfilesFor(_selectedServerId, _selectedDatabase);
+        if (_selectedProfileId.HasValue)
+        {
+            _selectedProfile = _profiles.FirstOrDefault(p => p.Id == _selectedProfileId);
+            if (_selectedProfile == null)
+            {
+                _selectedProfileId = null;
+            }
+        }
+    }
+
+    private async Task OnProfileSelectChanged(ChangeEventArgs e)
+    {
+        var val = e.Value?.ToString();
+        if (Guid.TryParse(val, out var profId))
+        {
+            _selectedProfileId = profId;
+            _selectedProfile = _profiles.FirstOrDefault(p => p.Id == profId);
+            if (_selectedProfile != null)
+            {
+                _options = _selectedProfile.Options;
+                _zipPackaging = _options.ZipPackaging;
+                ClearOutput();
+                if (_allTables.Count == 0 && _databaseManager != null && !string.IsNullOrWhiteSpace(_selectedDatabase))
+                {
+                    await LoadTables();
+                }
+            }
+        }
+        else
+        {
+            _selectedProfileId = null;
+            _selectedProfile = null;
+        }
+    }
+
+    private async Task LoadTables()
+    {
+        if (_databaseManager == null || string.IsNullOrWhiteSpace(_selectedDatabase)) return;
+
+        _isLoadingObjects = true;
+        try
+        {
+            var tableResult = await _databaseManager.GetTableList(_selectedDatabase);
+            if (tableResult.operationResult.Success)
+            {
+                _allTables = tableResult.tables.OrderBy(t => t.SchemaName).ThenBy(t => t.TableName).ToList();
+            }
+            else
+            {
+                _bprMessage = BprMessage.Error(tableResult.operationResult.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.CommonOperationFailed, ex.Message));
+        }
+        finally
+        {
+            _isLoadingObjects = false;
+        }
+    }
+
+    private void SelectAllTables()
+    {
+        foreach (var tbl in FilteredTables)
+        {
+            _selectedTables.Add($"{tbl.SchemaName}.{tbl.TableName}");
+        }
+    }
+
+    private void DeselectAllTables()
+    {
+        _selectedTables.Clear();
+    }
+
+    private void ToggleTableSelection(string key, object? value)
+    {
+        if (value is bool b && b)
+        {
+            _selectedTables.Add(key);
+        }
+        else
+        {
+            _selectedTables.Remove(key);
+        }
+    }
+
+    private async Task GenerateModels()
+    {
+        if (_databaseManager == null || string.IsNullOrWhiteSpace(_selectedDatabase)) return;
+
+        if (_selectedTables.Count == 0)
+        {
+            _bprMessage = BprMessage.Warning(TranslationFactory.Current[TranslationKeys.DataModelNoTablesSelected]);
+            return;
+        }
+
+        _isGenerating = true;
+        _bprMessage = null;
+        try
+        {
+            var tablesToProcess = new List<TableOperation.Information>();
+            foreach (var key in _selectedTables)
+            {
+                var parts = key.Split('.');
+                if (parts.Length != 2) continue;
+
+                var res = await _databaseManager.GetTableInformation(new TableOperation.Information
+                {
+                    DatabaseName = _selectedDatabase,
+                    SchemaName = parts[0],
+                    TableName = parts[1]
+                });
+
+                if (res.operationResult.Success && res.table != null)
+                {
+                    tablesToProcess.Add(res.table);
+                }
+            }
+
+            _generatedFiles = GeneratorService.GenerateModels(tablesToProcess, _options);
+            _selectedFileIndex = _generatedFiles.Count > 0 ? 0 : -1;
+
+            Logger.LogInformation(
+                "DataModelGenerator",
+                $"Generated {_generatedFiles.Count} models for language '{_options.Language}' using profile '{_selectedProfile?.ProfileName}' from database '{_selectedDatabase}'",
+                details: null,
+                serverName: _selectedServer?.Server.ServerName,
+                databaseName: _selectedDatabase);
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.CommonOperationFailed, ex.Message));
+            Logger.LogError("DataModelGenerator", $"Model generation failed: {ex.Message}", ex);
+        }
+        finally
+        {
+            _isGenerating = false;
+        }
+    }
+
+    private void SelectFileTab(int index)
+    {
+        _selectedFileIndex = index;
+    }
+
+    private async Task CopyToClipboard()
+    {
+        if (string.IsNullOrWhiteSpace(ActiveCodeContent)) return;
+
+        try
+        {
+            var res = await JSRuntime.InvokeAsync<bool>("window.copyTextToClipboard", ActiveCodeContent);
+            if (res)
+            {
+                _isCopied = true;
+                StateHasChanged();
+                _ = Task.Delay(2000).ContinueWith(_ =>
+                {
+                    _isCopied = false;
+                    InvokeAsync(StateHasChanged);
+                });
+            }
+        }
+        catch
+        {
+            // Ignore
+        }
+    }
+
+    private async Task DownloadCurrentFile()
+    {
+        if (string.IsNullOrWhiteSpace(ActiveCodeContent) || _selectedFileIndex < 0 || _selectedFileIndex >= _generatedFiles.Count) return;
+
+        var filename = _generatedFiles[_selectedFileIndex].FileName;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("window.downloadTextFile", filename, ActiveCodeContent);
+            Logger.LogInformation(
+                "DataModelGenerator",
+                $"Downloaded model file '{filename}'",
+                details: null,
+                serverName: _selectedServer?.Server.ServerName,
+                databaseName: _selectedDatabase);
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.CommonOperationFailed, ex.Message));
+        }
+    }
+
+    private async Task DownloadZipArchive()
+    {
+        if (_generatedFiles.Count == 0) return;
+
+        var zipFilename = $"{_selectedDatabase}_Models_{_options.Language}_{DevFunctions.GetReadableTimestamp()}.zip";
+        try
+        {
+            var bytes = GeneratorService.CreateZipArchive(_generatedFiles, _zipPackaging);
+            var base64 = Convert.ToBase64String(bytes);
+            await JSRuntime.InvokeVoidAsync("window.downloadBase64File", zipFilename, base64, "application/zip");
+            Logger.LogInformation(
+                "DataModelGenerator",
+                $"Downloaded model ZIP archive '{zipFilename}' containing {_generatedFiles.Count} files",
+                details: null,
+                serverName: _selectedServer?.Server.ServerName,
+                databaseName: _selectedDatabase);
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.CommonOperationFailed, ex.Message));
+            Logger.LogError("DataModelGenerator", $"Failed to download ZIP archive: {ex.Message}", ex);
+        }
+    }
+
+    private async Task DownloadSeparateSchemaZips()
+    {
+        if (_generatedFiles.Count == 0) return;
+
+        var schemas = _generatedFiles.Select(f => string.IsNullOrWhiteSpace(f.SchemaName) ? "dbo" : f.SchemaName).Distinct().ToList();
+        try
+        {
+            foreach (var schema in schemas)
+            {
+                var schemaFiles = _generatedFiles.Where(f => (string.IsNullOrWhiteSpace(f.SchemaName) ? "dbo" : f.SchemaName).Equals(schema, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (schemaFiles.Count == 0) continue;
+
+                var zipFilename = $"{_selectedDatabase}_{schema}_Models_{_options.Language}_{DevFunctions.GetReadableTimestamp()}.zip";
+                var bytes = GeneratorService.CreateZipArchive(schemaFiles, ZipPackagingStructure.Flat);
+                var base64 = Convert.ToBase64String(bytes);
+                await JSRuntime.InvokeVoidAsync("window.downloadBase64File", zipFilename, base64, "application/zip");
+            }
+            Logger.LogInformation(
+                "DataModelGenerator",
+                $"Downloaded separate model ZIP archives for {schemas.Count} schemas",
+                details: null,
+                serverName: _selectedServer?.Server.ServerName,
+                databaseName: _selectedDatabase);
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.CommonOperationFailed, ex.Message));
+            Logger.LogError("DataModelGenerator", $"Failed to download separate ZIP archives: {ex.Message}", ex);
+        }
+    }
+
+    private void ClearOutput()
+    {
+        _generatedFiles.Clear();
+        _selectedFileIndex = 0;
+    }
+
+    private void ClearAll()
+    {
+        _selectedServerId = null;
+        _selectedServer = null;
+        _databaseManager = null;
+        _databases.Clear();
+        _selectedDatabase = string.Empty;
+        _allTables.Clear();
+        _selectedTables.Clear();
+        _selectedProfileId = null;
+        _selectedProfile = null;
+        _profiles.Clear();
+        ClearOutput();
+    }
+
+    private static string GetServerDisplayName(ServerConfiguration config) =>
+        config.Server.Port.HasValue
+            ? $"{config.Server.ServerName}:{config.Server.Port}"
+            : config.Server.ServerName;
+}

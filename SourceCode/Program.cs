@@ -1,8 +1,12 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
-using BprDevKit.DatabaseManagement.Services;
 using BprDevKit.Components;
 using BprDevKit.Config;
+using BprDevKit.DatabaseManagement;
+using BprDevKit.DatabaseManagement.Connections;
+using BprDevKit.DatabaseManagement.Decryption;
+using BprDevKit.DatabaseManagement.SqlGenerators;
+using BprDevKit.DataModelGenerator.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,7 +25,7 @@ builder.Services.AddSingleton<ISqlObjectDecryptor, SqlObjectDecryptor>();
 builder.Services.AddSingleton<BprDevKit.Utility.Logging.IBprLogger>(BprDevKit.Utility.Logging.BprLogger.Instance);
 builder.Services.AddScoped<DatabaseManager>();
 builder.Services.AddSingleton<DatabaseManagerFactory>();
-builder.Services.AddSingleton<BprDevKit.DatabaseManagement.Services.DataModels.DataModelGeneratorService>();
+builder.Services.AddSingleton<DataModelGeneratorService>();
 
 var app = builder.Build();
 

@@ -654,6 +654,18 @@ namespace BprDevKit.Localization
         public const string DataModelCsStringEmpty = "DataModel.CsStringEmpty";
         public const string DataModelCsStringNone = "DataModel.CsStringNone";
         public const string DataModelCsCustomSnippet = "DataModel.CsCustomSnippet";
+        public const string DataModelCsBackingField = "DataModel.CsBackingField";
+        public const string DataModelCsOuterRegionName = "DataModel.CsOuterRegionName";
+        public const string DataModelCsOuterRegionHelp = "DataModel.CsOuterRegionHelp";
+        public const string DataModelCsIncludeTimestamp = "DataModel.CsIncludeTimestamp";
+        public const string DataModelCsCustomClassAttributes = "DataModel.CsCustomClassAttributes";
+        public const string DataModelCsDefaultPropertyAttributes = "DataModel.CsDefaultPropertyAttributes";
+        public const string DataModelCsDefaultPropertyAttributesHelp = "DataModel.CsDefaultPropertyAttributesHelp";
+        public const string DataModelCsCustomNavReferenceAttr = "DataModel.CsCustomNavReferenceAttr";
+        public const string DataModelCsCustomNavInverseAttr = "DataModel.CsCustomNavInverseAttr";
+        public const string DataModelCsNavigationPropertyAttributes = "DataModel.CsNavigationPropertyAttributes";
+        public const string DataModelCsNavigationPropertyAttributesHelp = "DataModel.CsNavigationPropertyAttributesHelp";
+        public const string DataModelCsIncludeSchemaInRelationName = "DataModel.CsIncludeSchemaInRelationName";
 
         // Transformation Engine
         public const string DataModelTransformAddRule = "DataModel.TransformAddRule";
@@ -738,5 +750,63 @@ namespace BprDevKit.Localization
 
         // Home Card
         public const string HomeDataModelCardDesc = "Home.DataModelCardDesc";
+
+        // Database Backup & Restore
+        public const string DbTabBackupDb = "Db.Tab.BackupDb";
+        public const string DbTabRestoreDb = "Db.Tab.RestoreDb";
+        public const string DbTabBackupPath = "Db.Tab.BackupPath";
+        public const string DbTabBackupPathHelp = "Db.Tab.BackupPathHelp";
+        public const string DbTabWithCompression = "Db.Tab.WithCompression";
+        public const string DbTabCopyOnly = "Db.Tab.CopyOnly";
+        public const string DbTabRestorePath = "Db.Tab.RestorePath";
+        public const string DbTabRestorePathHelp = "Db.Tab.RestorePathHelp";
+        public const string DbTabWithReplace = "Db.Tab.WithReplace";
+        public const string DbTabCloseConnections = "Db.Tab.CloseConnections";
+        public const string DbTabBackupSuccess = "Db.Tab.BackupSuccess";
+        public const string DbTabRestoreSuccess = "Db.Tab.RestoreSuccess";
+        public const string DbTabTakingBackup = "Db.Tab.TakingBackup";
+        public const string DbTabRestoring = "Db.Tab.Restoring";
+        public const string DbTabBrowse = "Db.Tab.Browse";
+        public const string DbTabSelectFolder = "Db.Tab.SelectFolder";
+        public const string DbTabSelectBakFile = "Db.Tab.SelectBakFile";
+        public const string DbTabBackupFolder = "Db.Tab.BackupFolder";
+        public const string DbTabBackupFileName = "Db.Tab.BackupFileName";
+        public const string DbTabSelectThisFolder = "Db.Tab.SelectThisFolder";
+        public const string DbTabParentFolder = "Db.Tab.ParentFolder";
+        public const string DbTabDrives = "Db.Tab.Drives";
+        public const string DbTabNoItems = "Db.Tab.NoItems";
+        public const string DbTabFullBackupPath = "Db.Tab.FullBackupPath";
+
+        // Configuration Backup & Restore
+        public const string BackupRestoreTab = "Config.BackupRestoreTab";
+        public const string BackupRestoreSettings = "Config.BackupRestoreSettings";
+        public const string ConfigBackupExportTitle = "Config.BackupExportTitle";
+        public const string ConfigBackupExportSubtitle = "Config.BackupExportSubtitle";
+        public const string ConfigBackupDownloadBtn = "Config.BackupDownloadBtn";
+        public const string ConfigBackupImportTitle = "Config.BackupImportTitle";
+        public const string ConfigBackupImportSubtitle = "Config.BackupImportSubtitle";
+        public const string ConfigBackupSelectFile = "Config.BackupSelectFile";
+        public const string ConfigBackupPreview = "Config.BackupPreview";
+        public const string ConfigBackupAppVersion = "Config.BackupAppVersion";
+        public const string ConfigBackupExportDate = "Config.BackupExportDate";
+        public const string ConfigBackupServersCount = "Config.BackupServersCount";
+        public const string ConfigBackupProfilesCount = "Config.BackupProfilesCount";
+        public const string ConfigBackupIncludeAppSettings = "Config.BackupIncludeAppSettings";
+        public const string ConfigBackupRestoreServers = "Config.BackupRestoreServers";
+        public const string ConfigBackupRestoreProfiles = "Config.BackupRestoreProfiles";
+        public const string ConfigBackupRestoreApp = "Config.BackupRestoreApp";
+        public const string ConfigBackupMergeOption = "Config.BackupMergeOption";
+        public const string ConfigBackupReplaceOption = "Config.BackupReplaceOption";
+        public const string ConfigBackupApplyBtn = "Config.BackupApplyBtn";
+        public const string ConfigBackupInvalidFile = "Config.BackupInvalidFile";
+        public const string ConfigBackupSuccess = "Config.BackupSuccess";
+
+        // Data Model ZIP Packaging
+        public const string ZipPackagingStructure = "DataModel.ZipPackagingStructure";
+        public const string ZipPackagingFlat = "DataModel.ZipPackagingFlat";
+        public const string ZipPackagingBySchema = "DataModel.ZipPackagingBySchema";
+        public const string ZipPackagingByNamespace = "DataModel.ZipPackagingByNamespace";
+        public const string ZipPackagingHelp = "DataModel.ZipPackagingHelp";
+        public const string DataModelDownloadSeparateZips = "DataModel.DownloadSeparateZips";
     }
 }

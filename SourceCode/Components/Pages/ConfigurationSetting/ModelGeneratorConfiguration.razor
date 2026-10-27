@@ -1,13 +1,16 @@
 @using System.Text.Json
 @using BprDevKit.Config
-@using BprDevKit.DatabaseManagement.Services.DataModels
+@using BprDevKit.DataModelGenerator.Models
+@using BprDevKit.DataModelGenerator.Services
+@using BprDevKit.DatabaseManagement
+@using BprDevKit.DatabaseManagement.Connections
 @using BprDevKit.Localization
 @using BprDevKit.Utility
-@using ModelGenConfig = BprDevKit.Config.ModelGeneratorConfiguration
+@using ModelGenConfig = BprDevKit.Config.DataModelProfile
 @using ServerConfig = BprDevKit.Config.ServerConfiguration
-@using BprDevKit.DatabaseManagement.Services
 @inject ITranslationFactory TranslationFactory
 @inject DatabaseManagerFactory DatabaseManagerFactory
+@inject IJSRuntime JSRuntime
 
 @{
     var t = TranslationFactory.Current;
@@ -133,11 +136,11 @@
         <div class="profile-editor card shadow-sm border-0 p-4 mb-4">
             <!-- Profile Metadata -->
             <div class="row g-3 mb-4 p-3 bg-light rounded border">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelProfileName] *</label>
                     <input type="text" class="form-control form-control-sm" placeholder="e.g. EF Core Domain Entities" @bind="_editingProfile.ProfileName" />
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.ServerName] (Optional)</label>
                     <select class="form-select form-select-sm" @bind="_editingProfile.ServerId" @bind:after="OnProfileServerChanged">
                         <option value="">-- @t[TranslationKeys.DataModelProfileGlobal] --</option>
@@ -147,7 +150,7 @@
                         }
                     </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.Database] (Optional)</label>
                     @if (!_editingProfile.ServerId.HasValue)
                     {
@@ -173,6 +176,14 @@
                             }
                         </select>
                     }
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.ZipPackagingStructure]</label>
+                    <select class="form-select form-select-sm" @bind="_editingProfile.Options.ZipPackaging">
+                        <option value="@ZipPackagingStructure.Flat">@t[TranslationKeys.ZipPackagingFlat]</option>
+                        <option value="@ZipPackagingStructure.BySchema">@t[TranslationKeys.ZipPackagingBySchema]</option>
+                        <option value="@ZipPackagingStructure.ByNamespace">@t[TranslationKeys.ZipPackagingByNamespace]</option>
+                    </select>
                 </div>
             </div>
 
@@ -264,6 +275,7 @@
                             <select class="form-select form-select-sm" @bind="_editingProfile.Options.CSharp.PropertyAccessor">
                                 <option value="get_set">@t[TranslationKeys.DataModelCsGetSet]</option>
                                 <option value="get_init">@t[TranslationKeys.DataModelCsGetInit]</option>
+                                <option value="backing_field">@t[TranslationKeys.DataModelCsBackingField]</option>
                             </select>
                         </div>
                         <div class="col-md-4">
@@ -307,9 +319,14 @@
                             @if (_editingProfile.Options.CSharp.UseRegions)
                             {
                                 <div class="ps-3 border-start mb-2">
-                                    <div class="form-check form-switch mb-1">
+                                    <div class="form-check form-switch mb-2">
                                         <input class="form-check-input" type="checkbox" id="cs-p-ctor" @bind="_editingProfile.Options.CSharp.IncludeConstructor" />
                                         <label class="form-check-label small" for="cs-p-ctor">@t[TranslationKeys.DataModelCsIncludeConstructor]</label>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1" for="cs-p-outer-region">@t[TranslationKeys.DataModelCsOuterRegionName]</label>
+                                        <input type="text" id="cs-p-outer-region" class="form-control form-control-sm font-monospace" placeholder="e.g. Generator" @bind="_editingProfile.Options.CSharp.OuterRegionName" />
+                                        <span class="text-muted" style="font-size: 0.72rem;">@t[TranslationKeys.DataModelCsOuterRegionHelp]</span>
                                     </div>
                                 </div>
                             }
@@ -348,7 +365,11 @@
                                 @if (_editingProfile.Options.CSharp.IncludeConstants)
                                 {
                                     <div class="small text-muted mb-2">
-                                        Available tokens: <code>{TableName}</code>, <code>{SchemaName}</code>, <code>{ClassName}</code>, <code>{Database}</code>
+                                        Available tokens:
+                                        <code class="user-select-all cursor-pointer me-1" title="Click to copy token" @onclick='() => CopyToken("{TableName}")'>{TableName}</code>
+                                        <code class="user-select-all cursor-pointer me-1" title="Click to copy token" @onclick='() => CopyToken("{SchemaName}")'>{SchemaName}</code>
+                                        <code class="user-select-all cursor-pointer me-1" title="Click to copy token" @onclick='() => CopyToken("{ClassName}")'>{ClassName}</code>
+                                        <code class="user-select-all cursor-pointer" title="Click to copy token" @onclick='() => CopyToken("{Database}")'>{Database}</code>
                                     </div>
                                     @if (_editingProfile.Options.CSharp.Constants.Count > 0)
                                     {
@@ -514,7 +535,7 @@
                                             @t[TranslationKeys.DataModelFetchSchemasFromDb]
                                         </button>
                                     }
-                                    <button class="btn btn-primary btn-sm" type="button" @onclick="OpenAddSchemaRuleModal" disabled="@(!_editingProfile.ServerId.HasValue || string.IsNullOrWhiteSpace(_editingProfile.DatabaseName) || _dbSchemas.Count == 0)">
+                                    <button class="btn btn-primary btn-sm" type="button" @onclick="OpenAddSchemaRuleModal" disabled="@(!_editingProfile.ServerId.HasValue || string.IsNullOrWhiteSpace(_editingProfile.DatabaseName) || _isLoadingSchemas)">
                                         <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.DataModelAddSchemaRule]
                                     </button>
                                 </div>
@@ -530,6 +551,13 @@
                                     <span>@t[TranslationKeys.DataModelSchemaAccessServerDbRequired]</span>
                                 </div>
                             }
+                            else if (_isLoadingSchemas && _dbSchemas.Count == 0)
+                            {
+                                <div class="d-flex align-items-center gap-2 text-muted small py-2 mb-3">
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                    <span>Loading database schemas...</span>
+                                </div>
+                            }
                             else if (_dbSchemas.Count == 0)
                             {
                                 <div class="alert alert-info py-2 px-3 small d-flex align-items-center justify-content-between gap-2 mb-3">
@@ -537,13 +565,13 @@
                                         <i class="bi bi-info-circle-fill fs-5 text-info"></i>
                                         <span>Click to fetch database schemas from <strong>@_editingProfile.DatabaseName</strong>.</span>
                                     </div>
-                                    <button class="btn btn-sm btn-info text-white" type="button" @onclick="DetectSchemasFromDb" disabled="@_isLoadingSchemas">
+                                    <button class="btn btn-sm btn-info text-white" type="button" @onclick="() => LoadSchemasForDatabase(silent: false)" disabled="@_isLoadingSchemas">
                                         <i class="bi bi-download me-1"></i>@t[TranslationKeys.DataModelFetchSchemasFromDb]
                                     </button>
                                 </div>
                             }
 
-                            @if (_showAddSchemaRuleModal && _dbSchemas.Count > 0)
+                            @if (_showAddSchemaRuleModal)
                             {
                                 <div class="card p-3 mb-3 border-primary shadow-sm bg-light-subtle">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -558,24 +586,38 @@
                                     <div class="row g-2 mb-3">
                                         <div class="col-md-5">
                                             <label class="form-label small mb-1 fw-semibold">@t[TranslationKeys.DataModelSourceSchema] *</label>
-                                            <select class="form-select form-select-sm font-monospace" @bind="_newSourceSchema">
-                                                <option value="">-- @t[TranslationKeys.DataModelSelectSchema] --</option>
-                                                @foreach (var s in _dbSchemas)
-                                                {
-                                                    <option value="@s">@s</option>
-                                                }
-                                            </select>
-                                        </div>
-                                        <div class="col-md-7">
-                                            <label class="form-label small mb-1 fw-semibold">@t[TranslationKeys.DataModelAllowedTargetSchemas]</label>
-                                            <div class="input-group input-group-sm">
-                                                <select class="form-select font-monospace" @bind="_modalSelectedTargetSchema">
-                                                    <option value="">-- @t[TranslationKeys.DataModelSelectTargetSchemaPrompt] --</option>
-                                                    @foreach (var s in _dbSchemas.Where(x => !string.Equals(x, _newSourceSchema, StringComparison.OrdinalIgnoreCase) && !_modalSelectedTargetSchemasList.Contains(x, StringComparer.OrdinalIgnoreCase)))
+                                            @if (_dbSchemas.Count > 0)
+                                            {
+                                                <select class="form-select form-select-sm font-monospace" @bind="_newSourceSchema">
+                                                    <option value="">-- @t[TranslationKeys.DataModelSelectSchema] --</option>
+                                                    @foreach (var s in _dbSchemas)
                                                     {
                                                         <option value="@s">@s</option>
                                                     }
                                                 </select>
+                                            }
+                                            else
+                                            {
+                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. dbo" @bind="_newSourceSchema" />
+                                            }
+                                        </div>
+                                        <div class="col-md-7">
+                                            <label class="form-label small mb-1 fw-semibold">@t[TranslationKeys.DataModelAllowedTargetSchemas]</label>
+                                            <div class="input-group input-group-sm">
+                                                @if (_dbSchemas.Count > 0)
+                                                {
+                                                    <select class="form-select font-monospace" @bind="_modalSelectedTargetSchema">
+                                                        <option value="">-- @t[TranslationKeys.DataModelSelectTargetSchemaPrompt] --</option>
+                                                        @foreach (var s in _dbSchemas.Where(x => !string.Equals(x, _newSourceSchema, StringComparison.OrdinalIgnoreCase) && !_modalSelectedTargetSchemasList.Contains(x, StringComparer.OrdinalIgnoreCase)))
+                                                        {
+                                                            <option value="@s">@s</option>
+                                                        }
+                                                    </select>
+                                                }
+                                                else
+                                                {
+                                                    <input type="text" class="form-control font-monospace" placeholder="e.g. Mat" @bind="_modalSelectedTargetSchema" />
+                                                }
                                                 <button class="btn btn-outline-primary" type="button" @onclick="AddModalTargetSchema" disabled="@string.IsNullOrWhiteSpace(_modalSelectedTargetSchema)">
                                                     <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.Add]
                                                 </button>
@@ -708,6 +750,12 @@
                                 <div class="card p-3 bg-light border-0">
                                     <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsNamespace]</label>
                                     <input type="text" class="form-control form-control-sm font-monospace" placeholder="MyProject.Models" @bind="_editingProfile.Options.CSharp.Namespace" />
+                                    <div class="small text-muted mt-1">
+                                        Available tokens:
+                                        <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendSingleNsToken("{Database}")'>{Database}</code>
+                                        <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendSingleNsToken("{Schema}")'>{Schema}</code>
+                                        <code class="user-select-all cursor-pointer" @onclick='() => AppendSingleNsToken("{Table}")'>{Table}</code>
+                                    </div>
                                     <div class="small text-muted mt-1">@t[TranslationKeys.DataModelNamespaceSingleHelp]</div>
                                 </div>
                             </div>
@@ -786,7 +834,7 @@
 
                         <div class="col-12">
                             <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsCustomUsings]</label>
-                            <textarea class="form-control form-control-sm font-monospace" rows="4" placeholder="MyCompany.Data;&#10;MyCompany.Core;" @bind="_editingProfile.Options.CSharp.CustomUsings"></textarea>
+                            <textarea class="form-control form-control-sm font-monospace" rows="4" placeholder="@("MyCompany.Data;\nMyCompany.Core;")" @bind="_editingProfile.Options.CSharp.CustomUsings"></textarea>
                         </div>
                     </div>
                 }
@@ -813,6 +861,10 @@
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" id="cs-p-json" @bind="_editingProfile.Options.CSharp.IncludeJsonAttributes" />
                                 <label class="form-check-label small" for="cs-p-json">@t[TranslationKeys.DataModelCsJsonAttributes]</label>
+                            </div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cs-p-timestamp" @bind="_editingProfile.Options.CSharp.IncludeTimestampAttribute" />
+                                <label class="form-check-label small" for="cs-p-timestamp">@t[TranslationKeys.DataModelCsIncludeTimestamp]</label>
                             </div>
                         </div>
 
@@ -851,7 +903,26 @@
 
                         <div class="col-12">
                             <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsCustomColumnRules]</label>
-                            <textarea class="form-control form-control-sm font-monospace" rows="3" placeholder="*Date:[Auditable]&#10;uniqueidentifier:[GuidColumn]" @bind="_editingProfile.Options.CSharp.CustomColumnAttributeRules"></textarea>
+                            <textarea class="form-control form-control-sm font-monospace" rows="2" placeholder="@("*Date:[Auditable]\nuniqueidentifier:[GuidColumn]")" @bind="_editingProfile.Options.CSharp.CustomColumnAttributeRules"></textarea>
+                            <div class="small text-muted" style="font-size: 0.72rem;">
+                                Tokens: <code>{ColumnName}</code> <code>{PropertyName}</code> <code>{DataType}</code> <code>{Length}</code> <code>{Precision}</code> <code>{Scale}</code>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsCustomClassAttributes]</label>
+                            <textarea class="form-control form-control-sm font-monospace" rows="3" placeholder="@("[DataContract]\n[Serializable]")" @bind="_editingProfile.Options.CSharp.CustomClassAttributes"></textarea>
+                            <div class="small text-muted" style="font-size: 0.72rem;">
+                                Tokens: <code>{ClassName}</code> <code>{TableName}</code> <code>{SchemaName}</code> <code>{Database}</code>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsDefaultPropertyAttributes]</label>
+                            <textarea class="form-control form-control-sm font-monospace" rows="3" placeholder="@("[DataMember]\n[Column]")" @bind="_editingProfile.Options.CSharp.DefaultPropertyAttributes"></textarea>
+                            <div class="small text-muted" style="font-size: 0.72rem;">
+                                @t[TranslationKeys.DataModelCsDefaultPropertyAttributesHelp] &bull; Tokens: <code>{ColumnName}</code> <code>{PropertyName}</code> <code>{DataType}</code> <code>{Length}</code>
+                            </div>
                         </div>
                     </div>
                 }
@@ -866,6 +937,30 @@
                             </select>
                         </div>
 
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsNavigationPropertyAttributes]</label>
+                            <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. [DataMember]" @bind="_editingProfile.Options.CSharp.NavigationPropertyAttributes" />
+                            <div class="small text-muted" style="font-size: 0.72rem;">@t[TranslationKeys.DataModelCsNavigationPropertyAttributesHelp]</div>
+                        </div>
+
+                        <div class="col-12"><hr class="my-1" /></div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsCustomNavReferenceAttr]</label>
+                            <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. [ForeignKey(nameof({FkProperty}))]" @bind="_editingProfile.Options.CSharp.CustomNavReferenceAttribute" />
+                            <div class="small text-muted" style="font-size: 0.72rem;">
+                                Tokens: <code>{FkProperty}</code> <code>{TargetType}</code> <code>{TargetClass}</code> <code>{OtherKey}</code>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsCustomNavInverseAttr]</label>
+                            <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. [InverseProperty(nameof({InverseType}.{InverseProperty}))]" @bind="_editingProfile.Options.CSharp.CustomNavInversePropertyAttribute" />
+                            <div class="small text-muted" style="font-size: 0.72rem;">
+                                Tokens: <code>{InverseType}</code> <code>{InverseProperty}</code> <code>{ChildClass}</code> <code>{ChildFk}</code> <code>{OtherKey}</code>
+                            </div>
+                        </div>
+
                         @if (_editingProfile.Options.CSharp.NavigationStyle == "Enterprise")
                         {
                             <div class="col-12">
@@ -876,6 +971,10 @@
                                 <div class="form-check form-switch mb-2">
                                     <input class="form-check-input" type="checkbox" id="cs-p-nav-null-colls" @bind="_editingProfile.Options.CSharp.MakeCollectionsNullable" />
                                     <label class="form-check-label small" for="cs-p-nav-null-colls">@t[TranslationKeys.DataModelCsMakeCollectionsNullable]</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="cs-p-nav-schema-prefix" @bind="_editingProfile.Options.CSharp.IncludeSchemaInRelationName" />
+                                    <label class="form-check-label small" for="cs-p-nav-schema-prefix">@t[TranslationKeys.DataModelCsIncludeSchemaInRelationName]</label>
                                 </div>
                             </div>
                         }
@@ -1017,7 +1116,7 @@
                     <div class="row g-3">
                         <div class="col-12">
                             <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsCustomSnippet]</label>
-                            <textarea class="form-control form-control-sm font-monospace" rows="8" placeholder="// Custom properties or methods&#10;public string FullTitle => $&quot;{Id} - {Title}&quot;;" @bind="_editingProfile.Options.CSharp.CustomClassBodySnippet"></textarea>
+                            <textarea class="form-control form-control-sm font-monospace" rows="8" placeholder="@("// Custom properties or methods\npublic string FullTitle => $\"{Id} - {Title}\";")" @bind="_editingProfile.Options.CSharp.CustomClassBodySnippet"></textarea>
                             <div class="small text-muted mt-1">
                                 Tokens: <code>{ClassName}</code>, <code>{TableName}</code>, <code>{SchemaName}</code>
                             </div>
@@ -1270,9 +1369,19 @@
     {
         try
         {
+            _panelMessage = null;
             var json = JsonSerializer.Serialize(profile);
             _editingProfile = JsonSerializer.Deserialize<DataModelProfile>(json) ?? new DataModelProfile();
             _isEditingProfile = true;
+
+            // Initialize known schemas from saved rules first as immediate fallback
+            _dbSchemas = _editingProfile.Options.SchemaAccessRules
+                .Select(r => r.SourceSchema)
+                .Concat(_editingProfile.Options.SchemaAccessRules.SelectMany(r => r.AllowedTargetSchemas))
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(s => s)
+                .ToList();
 
             if (_editingProfile.ServerId.HasValue)
             {
@@ -1282,7 +1391,7 @@
                     await LoadDatabasesForServer(s);
                     if (!string.IsNullOrWhiteSpace(_editingProfile.DatabaseName))
                     {
-                        await DetectSchemasFromDb();
+                        await LoadSchemasForDatabase(silent: true);
                     }
                 }
             }
@@ -1399,17 +1508,13 @@
         _dbSchemas.Clear();
         if (_editingProfile.ServerId.HasValue && !string.IsNullOrWhiteSpace(_editingProfile.DatabaseName))
         {
-            await DetectSchemasFromDb();
+            await LoadSchemasForDatabase(silent: true);
         }
     }
 
-    private async Task SetCsActiveTab(string tab)
+    private void SetCsActiveTab(string tab)
     {
         _csActiveTab = tab;
-        if (tab == "schemaAccess" && _dbSchemas.Count == 0 && _editingProfile.ServerId.HasValue && !string.IsNullOrWhiteSpace(_editingProfile.DatabaseName))
-        {
-            await DetectSchemasFromDb();
-        }
     }
 
     private async Task LoadDatabasesForServer(ServerConfig server)
@@ -1436,8 +1541,12 @@
         }
     }
 
-    private void OpenAddSchemaRuleModal()
+    private async Task OpenAddSchemaRuleModal()
     {
+        if (_dbSchemas.Count == 0 && _editingProfile.ServerId.HasValue && !string.IsNullOrWhiteSpace(_editingProfile.DatabaseName))
+        {
+            await LoadSchemasForDatabase(silent: true);
+        }
         _newSourceSchema = _dbSchemas.FirstOrDefault(s => !_editingProfile.Options.SchemaAccessRules.Any(r => string.Equals(r.SourceSchema, s, StringComparison.OrdinalIgnoreCase))) ?? _dbSchemas.FirstOrDefault() ?? string.Empty;
         _modalSelectedTargetSchema = string.Empty;
         _modalSelectedTargetSchemasList.Clear();
@@ -1518,6 +1627,56 @@
         }
     }
 
+    private async Task LoadSchemasForDatabase(bool silent = true)
+    {
+        if (!_editingProfile.ServerId.HasValue || string.IsNullOrWhiteSpace(_editingProfile.DatabaseName))
+            return;
+
+        var server = _servers.FirstOrDefault(x => x.Id == _editingProfile.ServerId.Value);
+        if (server == null) return;
+
+        _isLoadingSchemas = true;
+        try
+        {
+            var manager = DatabaseManagerFactory.Create(server);
+            var (res, schemas) = await manager.GetSchemas(_editingProfile.DatabaseName);
+            if (res.Success && schemas != null)
+            {
+                var ruleSchemas = _editingProfile.Options.SchemaAccessRules
+                    .Select(r => r.SourceSchema)
+                    .Concat(_editingProfile.Options.SchemaAccessRules.SelectMany(r => r.AllowedTargetSchemas))
+                    .Where(s => !string.IsNullOrWhiteSpace(s));
+
+                _dbSchemas = schemas
+                    .Concat(ruleSchemas)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(s => s)
+                    .ToList();
+
+                if (!silent)
+                {
+                    _panelMessage = BprMessage.Success($"Loaded {_dbSchemas.Count} schemas from database.");
+                }
+            }
+            else if (!silent)
+            {
+                _panelMessage = BprMessage.Warning(res.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!silent)
+            {
+                _panelMessage = BprMessage.Warning($"Failed to load schemas: {ex.Message}");
+            }
+        }
+        finally
+        {
+            _isLoadingSchemas = false;
+            StateHasChanged();
+        }
+    }
+
     private async Task DetectSchemasFromDb()
     {
         if (!_editingProfile.ServerId.HasValue || string.IsNullOrWhiteSpace(_editingProfile.DatabaseName))
@@ -1533,7 +1692,16 @@
             var (res, schemas) = await manager.GetSchemas(_editingProfile.DatabaseName);
             if (res.Success && schemas != null)
             {
-                _dbSchemas = schemas.OrderBy(s => s).ToList();
+                var ruleSchemas = _editingProfile.Options.SchemaAccessRules
+                    .Select(r => r.SourceSchema)
+                    .Concat(_editingProfile.Options.SchemaAccessRules.SelectMany(r => r.AllowedTargetSchemas))
+                    .Where(s => !string.IsNullOrWhiteSpace(s));
+
+                _dbSchemas = schemas
+                    .Concat(ruleSchemas)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(s => s)
+                    .ToList();
 
                 foreach (var s in _dbSchemas)
                 {
@@ -1710,6 +1878,32 @@
     {
         _editingProfile.Options.CSharp.SchemaNamespacePattern +=
             (_editingProfile.Options.CSharp.SchemaNamespacePattern.EndsWith(".") ? "" : ".") + token;
+    }
+
+    private void AppendSingleNsToken(string token)
+    {
+        if (string.IsNullOrWhiteSpace(_editingProfile.Options.CSharp.Namespace))
+        {
+            _editingProfile.Options.CSharp.Namespace = token;
+        }
+        else
+        {
+            _editingProfile.Options.CSharp.Namespace +=
+                (_editingProfile.Options.CSharp.Namespace.EndsWith(".") ? "" : ".") + token;
+        }
+    }
+
+    private async Task CopyToken(string token)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", token);
+            _panelMessage = BprMessage.Success($"Token {token} copied to clipboard.");
+        }
+        catch
+        {
+            // fallback if clipboard API is restricted
+        }
     }
 
     private void AddSchemaNamespaceMapping()

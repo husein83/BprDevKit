@@ -15,7 +15,14 @@
   <ItemGroup>
     <Folder Include="DatabaseManagement\Models\Metadata\" />
     <Folder Include="DatabaseManagement\Models\Operations\" />
-    <Folder Include="DatabaseManagement\Services\" />
+    <Folder Include="DatabaseManagement\Connections\" />
+    <Folder Include="DatabaseManagement\Decryption\" />
+    <Folder Include="DatabaseManagement\SqlGenerators\" />
+    <Folder Include="DataModelGenerator\Generators\" />
+    <Folder Include="DataModelGenerator\Models\" />
+    <Folder Include="DataModelGenerator\Services\" />
+    <Folder Include="ScriptGenerator\Models\" />
+    <Folder Include="ScriptGenerator\Services\" />
   </ItemGroup>
 
 </Project>

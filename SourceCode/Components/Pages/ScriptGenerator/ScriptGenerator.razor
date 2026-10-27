@@ -3,8 +3,10 @@
 @using BprDevKit.Config
 @using BprDevKit.DatabaseManagement.Models.Metadata
 @using BprDevKit.DatabaseManagement.Models.Operations
-@using BprDevKit.DatabaseManagement.Services
-@using BprDevKit.DatabaseManagement.Services.Scripting
+@using BprDevKit.DatabaseManagement
+@using BprDevKit.DatabaseManagement.Connections
+@using BprDevKit.ScriptGenerator.Models
+@using BprDevKit.ScriptGenerator.Services
 @using BprDevKit.Localization
 @using BprDevKit.Utility
 @inject DatabaseManagerFactory DatabaseManagerFactory
@@ -1040,7 +1042,7 @@
     {
         if (string.IsNullOrWhiteSpace(_generatedScript) || string.IsNullOrWhiteSpace(_selectedDatabase)) return;
 
-        var filename = $"{_selectedDatabase}_{_options.ScriptType}_{DateTime.Now:yyyyMMdd_HHmmss}.sql";
+        var filename = $"{_selectedDatabase}_{_options.ScriptType}_{DevFunctions.GetReadableTimestamp()}.sql";
         try
         {
             await JSRuntime.InvokeVoidAsync("window.downloadTextFile", filename, _generatedScript);

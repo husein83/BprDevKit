@@ -1,0 +1,361 @@
+@using BprDevKit.Utility
+@using BprDevKit.Config
+@using BprDevKit.DatabaseManagement.Models.Metadata
+@using BprDevKit.DatabaseManagement.Models.Operations
+@using BprDevKit.DatabaseManagement
+@inject ITranslationFactory TranslationFactory
+
+@{
+    var t = TranslationFactory.Current;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h3 class="h6 mb-0"><i class="bi bi-link-45deg me-1 text-primary"></i>@t[TranslationKeys.FkPanelForeignKeys] (@Table.ForeignKeys.Count)</h3>
+    <button class="btn btn-sm btn-primary" type="button" @onclick="OpenCreate" disabled="@_isSaving"><i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.FkPanelCreateFk]</button>
+</div>
+
+<BprAlert Message="@_bprMessage" OnDismiss="ClearMessage" />
+
+@if (_mode == PanelMode.Create)
+{
+    <div class="card border-primary mb-3">
+        <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">@t.Get(TranslationKeys.FkPanelCreateOn, $"{Table.SchemaName}.{Table.TableName}")</span>
+            <button class="btn-close btn-close-white" type="button" @onclick="Close"></button>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small fw-semibold mb-0" for="fk-name-input">@t[TranslationKeys.Name]</label>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" id="auto-name-fk" @bind="_autoGenerateName" />
+                            <label class="form-check-label small" for="auto-name-fk">@t[TranslationKeys.AutoName]</label>
+                        </div>
+                    </div>
+                    @if (_autoGenerateName)
+                    {
+                        <div class="form-control form-control-sm font-monospace bg-light text-primary fw-semibold text-truncate d-flex align-items-center justify-content-between" title="@ComputedFKName">
+                            <span class="text-truncate"><i class="bi bi-magic me-1"></i>@ComputedFKName</span>
+                            <span class="badge text-bg-secondary font-monospace small">AUTO</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <input id="fk-name-input" class="form-control form-control-sm font-monospace" 
+                               maxlength="@(ServerConfig?.Database?.MaxForeignKeyNameLength ?? Constants.MaxForeignKeyNameLength)" 
+                               placeholder="@ComputedFKName" 
+                               @bind="_customFkName" @bind:event="oninput" />
+                    }
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold" for="fk-reference">@t[TranslationKeys.FkPanelReferencedTable]</label>
+                    <select id="fk-reference" class="form-select form-select-sm" value="@_referenceKey" @onchange="OnReferenceChanged">
+                        <option value="">@t[TranslationKeys.FkPanelSelectTablePrompt]</option>
+                        @foreach (var table in Tables)
+                        {
+                            <option value="@table.FullName">@table.FullName</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label small fw-semibold">@t[TranslationKeys.FkPanelColumnPairs]</label>
+                    @foreach (var mapping in _form.Columns)
+                    {
+                        <div class="row g-2 mb-1 align-items-center">
+                            <div class="col-5">
+                                <select class="form-select form-select-sm" value="@mapping.ColumnName" @onchange="e => mapping.ColumnName = e.Value?.ToString() ?? string.Empty">
+                                    <option value="">@t[TranslationKeys.FkPanelSelectCol]</option>
+                                    @foreach (var column in Table.Columns)
+                                    {
+                                        <option value="@column.ColumnName">@column.ColumnName</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-auto"><i class="bi bi-arrow-right"></i></div>
+                            <div class="col-5">
+                                <select class="form-select form-select-sm" value="@mapping.RefColumnName" disabled="@(_referenceColumns.Count == 0)"
+                                        @onchange="e => mapping.RefColumnName = e.Value?.ToString() ?? string.Empty">
+                                    <option value="">@t[TranslationKeys.FkPanelSelectRefCol]</option>
+                                    @foreach (var column in _referenceColumns)
+                                    {
+                                        <option value="@column">@column</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-sm btn-outline-danger" type="button" title="@t[TranslationKeys.Remove]" disabled="@(_form.Columns.Count == 1)" @onclick="() => _form.Columns.Remove(mapping)"><i class="bi bi-x-lg"></i></button>
+                            </div>
+                        </div>
+                    }
+                    <button class="btn btn-sm btn-outline-primary mt-1" type="button" @onclick="AddPair"><i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.FkPanelAddPair]</button>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold" for="fk-delete">@t[TranslationKeys.FkPanelOnDelete]</label>
+                    <select id="fk-delete" class="form-select form-select-sm" @bind="_form.OnDelete">
+                        @foreach (var action in ForeignKeyOperation.ReferentialActions)
+                        {
+                            <option value="@action">@action</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold" for="fk-update">@t[TranslationKeys.FkPanelOnUpdate]</label>
+                    <select id="fk-update" class="form-select form-select-sm" @bind="_form.OnUpdate">
+                        @foreach (var action in ForeignKeyOperation.ReferentialActions)
+                        {
+                            <option value="@action">@action</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="form-check">
+                        <input id="fk-disabled" class="form-check-input" type="checkbox" checked="@(!_form.Enabled)" @onchange="e => _form.Enabled = !(bool)e.Value!" />
+                        <label class="form-check-label small" for="fk-disabled">@t[TranslationKeys.FkPanelCreateDisabled]</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-info small mt-3 mb-0">@t[TranslationKeys.FkPanelNote]</div>
+
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <button class="btn btn-sm btn-light" type="button" @onclick="Close">@t[TranslationKeys.Cancel]</button>
+                <button class="btn btn-sm btn-success" type="button" @onclick="CreateForeignKey" disabled="@(_isSaving || !CanCreate)">
+                    @if (_isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    @t[TranslationKeys.Create]
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_mode == PanelMode.Drop && _selected is not null)
+{
+    <div class="card border-danger mb-3">
+        <div class="card-header bg-danger text-white py-2 fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1"></i>@t.Get(TranslationKeys.FkPanelDropTitle, _selected.FKName)</div>
+        <div class="card-body">
+            <p class="small mb-3">
+                @t.Get(TranslationKeys.FkPanelDropWarning, $"{_selected.SchemaName}.{_selected.TableName}")
+            </p>
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-sm btn-light" type="button" @onclick="Close">@t[TranslationKeys.Cancel]</button>
+                <button class="btn btn-sm btn-danger" type="button" @onclick="DropForeignKey" disabled="@_isSaving">@t[TranslationKeys.Delete]</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (Table.ForeignKeys.Count == 0)
+{
+    <p class="text-muted small mb-0">@t[TranslationKeys.FkPanelNoFks]</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>@t[TranslationKeys.Name]</th><th>@t[TranslationKeys.FkPanelDirection]</th><th>@t[TranslationKeys.FkPanelRelation]</th><th>@t[TranslationKeys.FkPanelOnDelete]</th><th>@t[TranslationKeys.FkPanelOnUpdate]</th><th class="text-center">@t[TranslationKeys.FkPanelEnabled]</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var foreignKey in Table.ForeignKeys)
+                {
+                    <tr>
+                        <td class="font-monospace small">@foreignKey.FKName</td>
+                        <td>
+                            @if (IsOutgoing(foreignKey))
+                            {
+                                <span class="badge text-bg-primary">@t[TranslationKeys.FkPanelOutgoing]</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">@t[TranslationKeys.FkPanelIncoming]</span>
+                            }
+                        </td>
+                        <td class="font-monospace small">
+                            @($"{foreignKey.SchemaName}.{foreignKey.TableName}") (@foreignKey.ColumnName)
+                            <i class="bi bi-arrow-right mx-1"></i>
+                            @($"{foreignKey.RefSchemaName}.{foreignKey.RefTableName}") (@foreignKey.RefColumnName)
+                        </td>
+                        <td class="small">@foreignKey.OnDelete</td>
+                        <td class="small">@foreignKey.OnUpdate</td>
+                        <td class="text-center">@(foreignKey.Enabled ? t[TranslationKeys.Yes] : t[TranslationKeys.No])</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary" type="button" title="@(foreignKey.Enabled ? t[TranslationKeys.FkPanelDisable] : t[TranslationKeys.FkPanelEnable])" disabled="@_isSaving" @onclick="() => ToggleEnabled(foreignKey)">
+                                    <i class="bi @(foreignKey.Enabled ? "bi-toggle-on" : "bi-toggle-off")"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" type="button" title="@t[TranslationKeys.Delete]" disabled="@_isSaving" @onclick="() => OpenDrop(foreignKey)"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private enum PanelMode { None, Create, Drop }
+
+    [Parameter, EditorRequired] public DatabaseManager Manager { get; set; } = null!;
+    [Parameter, EditorRequired] public TableOperation.Information Table { get; set; } = null!;
+    [Parameter] public IReadOnlyList<TableOperation.Information> Tables { get; set; } = Array.Empty<TableOperation.Information>();
+    [Parameter] public ServerConfiguration? ServerConfig { get; set; }
+    [Parameter] public EventCallback<OperationResult> OnChanged { get; set; }
+
+    private PanelMode _mode = PanelMode.None;
+    private ForeignKeyOperation.Create _form = new();
+    private ForeignKeyOperation.Information? _selected;
+    private List<string> _referenceColumns = new();
+    private string _referenceKey = string.Empty;
+    private bool _autoGenerateName = true;
+    private string _customFkName = string.Empty;
+    private bool _isSaving;
+    private BprMessage? _bprMessage;
+
+    private bool CanCreate =>
+        !string.IsNullOrWhiteSpace(_referenceKey)
+        && _form.Columns.Count > 0
+        && _form.Columns.All(mapping => !string.IsNullOrWhiteSpace(mapping.ColumnName) && !string.IsNullOrWhiteSpace(mapping.RefColumnName));
+
+    private bool IsOutgoing(ForeignKeyOperation.Information foreignKey) =>
+        string.Equals(foreignKey.SchemaName, Table.SchemaName, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(foreignKey.TableName, Table.TableName, StringComparison.OrdinalIgnoreCase);
+
+    private void OpenCreate()
+    {
+        Close();
+        _autoGenerateName = true;
+        _customFkName = string.Empty;
+        _form = new ForeignKeyOperation.Create();
+        _form.Columns.Add(new ForeignKeyOperation.ColumnMapping());
+        _referenceKey = string.Empty;
+        _referenceColumns = new List<string>();
+        _mode = PanelMode.Create;
+    }
+
+    private void OpenDrop(ForeignKeyOperation.Information foreignKey)
+    {
+        Close();
+        _selected = foreignKey;
+        _mode = PanelMode.Drop;
+    }
+
+    private void Close() => _mode = PanelMode.None;
+
+    private void AddPair() => _form.Columns.Add(new ForeignKeyOperation.ColumnMapping());
+
+    private async Task OnReferenceChanged(ChangeEventArgs args)
+    {
+        _referenceKey = args.Value?.ToString() ?? string.Empty;
+        _referenceColumns = new List<string>();
+        foreach (var mapping in _form.Columns)
+            mapping.RefColumnName = string.Empty;
+
+        var reference = Tables.FirstOrDefault(table => table.FullName == _referenceKey);
+        if (reference is null) return;
+
+        try
+        {
+            var result = await Manager.GetColumns(Table.DatabaseName, reference.SchemaName, reference.TableName);
+            if (_referenceKey != reference.FullName) return;
+
+            if (result.operationResult.Success)
+                _referenceColumns = result.columns;
+            else
+                ShowResult(result.operationResult);
+        }
+        catch (Exception exception)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.FkPanelErrLoadRefColumns, reference.FullName, exception.Message));
+        }
+    }
+
+    private async Task CreateForeignKey()
+    {
+        var reference = Tables.FirstOrDefault(table => table.FullName == _referenceKey);
+        if (reference is null) return;
+
+        _form.DatabaseName = Table.DatabaseName;
+        _form.SchemaName = Table.SchemaName;
+        _form.TableName = Table.TableName;
+        _form.RefSchemaName = reference.SchemaName;
+        _form.RefTableName = reference.TableName;
+        _form.FKName = _autoGenerateName || string.IsNullOrWhiteSpace(_customFkName)
+            ? null
+            : _customFkName.Trim();
+
+        await Run(() => Manager.CreateForeignKey(_form));
+    }
+
+    private string ComputedFKName
+    {
+        get
+        {
+            var reference = Tables.FirstOrDefault(table => table.FullName == _referenceKey);
+            var destSchema = Table.SchemaName;
+            var destTable = Table.TableName;
+            var srcSchema = reference?.SchemaName ?? "SrcSchema";
+            var srcTable = reference?.TableName ?? "SrcTable";
+            var destCols = string.Join("_", _form.Columns.Select(c => c.ColumnName).Where(c => !string.IsNullOrWhiteSpace(c)));
+            var srcCols = string.Join("_", _form.Columns.Select(c => c.RefColumnName).Where(c => !string.IsNullOrWhiteSpace(c)));
+            if (string.IsNullOrWhiteSpace(destCols)) destCols = "Col";
+            if (string.IsNullOrWhiteSpace(srcCols)) srcCols = "RefCol";
+            return $"FK_{destSchema}_{destTable}_{destCols}_2_{srcSchema}_{srcTable}_{srcCols}";
+        }
+    }
+
+    private async Task ToggleEnabled(ForeignKeyOperation.Information foreignKey)
+    {
+        await Run(() => Manager.AlterForeignKey(new ForeignKeyOperation.Alter
+        {
+            DatabaseName = Table.DatabaseName,
+            SchemaName = foreignKey.SchemaName,
+            TableName = foreignKey.TableName,
+            FKName = foreignKey.FKName,
+            Enabled = !foreignKey.Enabled
+        }));
+    }
+
+    private async Task DropForeignKey()
+    {
+        if (_selected is null) return;
+
+        await Run(() => Manager.DropForeignKey(new ForeignKeyOperation.Drop
+        {
+            DatabaseName = Table.DatabaseName,
+            SchemaName = _selected.SchemaName,
+            TableName = _selected.TableName,
+            FKName = _selected.FKName
+        }));
+    }
+
+    private async Task Run(Func<Task<OperationResult>> operation)
+    {
+        _isSaving = true;
+        try
+        {
+            var result = await operation();
+            ShowResult(result);
+
+            if (result.Success)
+            {
+                Close();
+                await OnChanged.InvokeAsync(result);
+            }
+        }
+        catch (Exception exception)
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current.Get(TranslationKeys.CommonOperationFailed, exception.Message));
+        }
+        finally { _isSaving = false; }
+    }
+
+    private void ShowResult(OperationResult result) => _bprMessage = result;
+    private void ClearMessage() => _bprMessage = null;
+}

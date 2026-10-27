@@ -1,0 +1,811 @@
+@using System.Globalization
+@using BprDevKit.Utility
+@using BprDevKit.Config
+@using BprDevKit.DatabaseManagement.Models.Metadata
+@using BprDevKit.DatabaseManagement.Models.Operations
+@using BprDevKit.DatabaseManagement
+@using BprDevKit.DatabaseManagement.Connections
+@inject DatabaseManagerFactory DatabaseManagerFactory
+@inject ITranslationFactory TranslationFactory
+
+@{
+    var t = TranslationFactory.Current;
+}
+
+<div class="tables-management">
+    <div class="tables-toolbar d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h2 class="h4 mb-1"><i class="bi bi-table text-primary me-2"></i>@t[TranslationKeys.Tables]</h2>
+            <p class="text-muted mb-0">@t[TranslationKeys.TableTabSubtitle]</p>
+        </div>
+        <button class="create-table-button btn btn-primary" type="button" @onclick="OpenCreateTable" disabled="@(!HasDatabase || _isSaving)">
+            <i class="bi bi-plus-lg me-1"></i> @t[TranslationKeys.TableTabCreateTable]
+        </button>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-3">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label fw-semibold" for="table-database"><i class="bi bi-database me-1 text-primary"></i>@t[TranslationKeys.Database]</label>
+                    <select id="table-database" class="form-select" @bind="_selectedDatabase" @bind:after="OnDatabaseSelected" disabled="@(_isLoadingDatabases || _isSaving)">
+                        <option value="">@t[TranslationKeys.SchemaTabSelectDbPrompt]</option>
+                        @foreach (var databaseName in _databases)
+                        {
+                            <option value="@databaseName">@databaseName</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold" for="table-schema-filter">@t[TranslationKeys.SchemaName]</label>
+                    <select id="table-schema-filter" class="form-select" @bind="_schemaFilter" disabled="@(!HasDatabase)">
+                        <option value="">@t[TranslationKeys.TableTabAllSchemas]</option>
+                        @foreach (var schemaName in _tables.Select(table => table.SchemaName).Distinct().OrderBy(name => name))
+                        {
+                            <option value="@schemaName">@schemaName</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md">
+                    <label class="form-label fw-semibold" for="table-name-filter">@t[TranslationKeys.Search]</label>
+                    <input id="table-name-filter" class="form-control" placeholder="@t[TranslationKeys.TableName]" @bind="_nameFilter" @bind:event="oninput" disabled="@(!HasDatabase)" />
+                </div>
+                <div class="col-auto d-flex gap-2">
+                    <button class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center"
+                            style="width: 40px; height: 38px;"
+                            type="button"
+                            @onclick="RefreshAll"
+                            disabled="@(_isLoadingDatabases || _isLoadingTables || _isSaving)"
+                            title="@t[TranslationKeys.Refresh]">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+                        </svg>
+                    </button>
+                    <button class="btn btn-outline-danger d-inline-flex align-items-center justify-content-center"
+                            style="width: 40px; height: 38px;"
+                            type="button"
+                            @onclick="ClearSelection"
+                            disabled="@(!HasDatabase && string.IsNullOrEmpty(_nameFilter) && string.IsNullOrEmpty(_schemaFilter))"
+                            title="@t[TranslationKeys.Clear]">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                            <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <BprAlert Message="@_bprMessage" OnDismiss="ClearMessage" CssClass="tables-alert mb-4" />
+
+    @if (_showCreateForm)
+    {
+        <div class="tables-editor card border-primary shadow-sm mb-4">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-plus-square me-2"></i>@t.Get(TranslationKeys.TableTabCreateInDb, _selectedDatabase)</span>
+                <button class="btn-close btn-close-white" type="button" @onclick="CloseCreateTable"></button>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="new-table-schema">@t[TranslationKeys.SchemaName]</label>
+                        <select id="new-table-schema" class="form-select" @bind="_createConfiguration.SchemaName">
+                            @foreach (var schemaName in _schemas)
+                            {
+                                <option value="@schemaName">@schemaName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label fw-semibold" for="new-table-name">@t[TranslationKeys.TableName]</label>
+                        <input id="new-table-name" class="form-control" maxlength="@(ServerConfig?.Database?.MaxTableNameLength ?? Constants.MaxTableNameLength)" placeholder="Customers" @bind="_createConfiguration.TableName" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold" for="new-table-filegroup">@t[TranslationKeys.TableTabFileGroup]</label>
+                        <select id="new-table-filegroup" class="form-select" @bind="_createConfiguration.FileGroup">
+                            <option value="">@t[TranslationKeys.TableTabDbDefault]</option>
+                            @foreach (var fileGroup in _fileGroups)
+                            {
+                                <option value="@fileGroup">@fileGroup</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold" for="new-table-description">@t[TranslationKeys.Description] <span class="text-muted fw-normal">@t[TranslationKeys.DbTabOptional]</span></label>
+                        <input id="new-table-description" class="form-control" maxlength="3000" @bind="_createConfiguration.Description" />
+                    </div>
+                </div>
+
+                <h3 class="h6 fw-semibold mb-2"><i class="bi bi-columns-gap me-1 text-primary"></i>@t[TranslationKeys.Columns]</h3>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="min-width: 11rem;">@t[TranslationKeys.Name]</th>
+                                <th style="min-width: 9rem;">@t[TranslationKeys.Type]</th>
+                                <th style="min-width: 12rem;">@t[TranslationKeys.ColPanelSize]</th>
+                                <th class="text-center">@t[TranslationKeys.AllowNull]</th>
+                                <th class="text-center">@t[TranslationKeys.PrimaryKey]</th>
+                                <th class="text-center">@t[TranslationKeys.IsIdentity]</th>
+                                <th style="min-width: 11rem;">@t[TranslationKeys.DefaultValue]</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var column in _createConfiguration.Columns)
+                            {
+                                var type = ColumnDataType.Find(column.DataType);
+                                <tr>
+                                    <td><input class="form-control form-control-sm font-monospace" maxlength="@(ServerConfig?.Database?.MaxColumnNameLength ?? Constants.MaxColumnNameLength)" @bind="column.ColumnName" @bind:event="oninput" /></td>
+                                    <td>
+                                        <select class="form-select form-select-sm" value="@column.DataType" @onchange="e => column.ApplyDataType(e.Value?.ToString())">
+                                            @foreach (var option in ColumnDataType.All)
+                                            {
+                                                <option value="@option.Name">@option.Name</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        @if (type?.Kind == ColumnDataTypeKind.Length)
+                                        {
+                                            <div class="input-group input-group-sm flex-nowrap">
+                                                <input type="number" class="form-control font-monospace" min="1" max="@(type!.MaxLength)" disabled="@(column.Length == -1)"
+                                                       value="@(column.Length is > 0 ? column.Length.Value.ToString(CultureInfo.InvariantCulture) : string.Empty)"
+                                                       @onchange="e => column.Length = ParseInt(e.Value)" />
+                                                @if (type.SupportsMax)
+                                                {
+                                                    <span class="input-group-text d-inline-flex align-items-center gap-1">
+                                                        <input class="form-check-input m-0" type="checkbox" id="@($"max-{column.GetHashCode()}")" checked="@(column.Length == -1)" @onchange="e => ToggleMax(column, type, (bool)e.Value!)" />
+                                                        <label class="form-check-label small mb-0 user-select-none" for="@($"max-{column.GetHashCode()}")">MAX</label>
+                                                    </span>
+                                                }
+                                            </div>
+                                        }
+                                        else if (type?.Kind == ColumnDataTypeKind.PrecisionScale)
+                                        {
+                                            <div class="input-group input-group-sm">
+                                                <input type="number" class="form-control" min="1" max="38" title="@t[TranslationKeys.Precision]" placeholder="p"
+                                                       value="@(column.Precision?.ToString(CultureInfo.InvariantCulture))" @onchange="e => column.Precision = ParseInt(e.Value)" />
+                                                <input type="number" class="form-control" min="0" max="38" title="@t[TranslationKeys.Scale]" placeholder="s"
+                                                       value="@(column.Scale?.ToString(CultureInfo.InvariantCulture))" @onchange="e => column.Scale = ParseInt(e.Value)" />
+                                            </div>
+                                        }
+                                        else if (type?.Kind == ColumnDataTypeKind.FractionalSeconds)
+                                        {
+                                            <input type="number" class="form-control form-control-sm" min="0" max="7" title="@t[TranslationKeys.ColFractionalPrecision]" placeholder="@t[TranslationKeys.CommonDefault]"
+                                                   value="@(column.Scale?.ToString(CultureInfo.InvariantCulture))" @onchange="e => column.Scale = ParseInt(e.Value)" />
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">—</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        <input class="form-check-input" type="checkbox" checked="@(column.IsNullable && !column.IsPrimaryKey && !column.IsIdentity)"
+                                               disabled="@(column.IsPrimaryKey || column.IsIdentity)" @onchange="e => column.IsNullable = (bool)e.Value!" />
+                                    </td>
+                                    <td class="text-center">
+                                        <input class="form-check-input" type="checkbox" checked="@column.IsPrimaryKey" @onchange="e => column.SetPrimaryKey((bool)e.Value!)" />
+                                    </td>
+                                    <td class="text-center">
+                                        <input class="form-check-input" type="checkbox" checked="@column.IsIdentity"
+                                               disabled="@(type?.SupportsIdentity != true || (!column.IsIdentity && HasIdentityColumn))"
+                                               @onchange="e => column.SetIdentity((bool)e.Value!)" />
+                                    </td>
+                                    <td>
+                                        <input class="form-control form-control-sm font-monospace" placeholder="0, 'N/A', SYSUTCDATETIME()" disabled="@column.IsIdentity"
+                                               @bind="column.DefaultValue" />
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger" type="button" title="@t[TranslationKeys.Delete]" disabled="@(_createConfiguration.Columns.Count == 1)"
+                                                @onclick="() => RemoveColumn(column)"><i class="bi bi-x-lg"></i></button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <button class="btn btn-sm btn-outline-primary" type="button" @onclick="AddColumn"><i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.ColPanelAddColumn]</button>
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <button class="btn btn-light" type="button" @onclick="CloseCreateTable">@t[TranslationKeys.Cancel]</button>
+                    <button class="btn btn-success" type="button" @onclick="CreateTable" disabled="@_isSaving">
+                        @if (_isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        @t[TranslationKeys.TableTabCreateTable]
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            @if (!HasDatabase)
+            {
+                <div class="text-center text-muted py-5"><i class="bi bi-database display-6"></i><p class="mt-3 mb-0">@t[TranslationKeys.TableTabSelectDbToManage]</p></div>
+            }
+            else if (_isLoadingTables)
+            {
+                <div class="text-center py-5"><span class="spinner-border text-primary me-2"></span>@t[TranslationKeys.TableTabLoadingTables]</div>
+            }
+            else if (!VisibleTables.Any())
+            {
+                <div class="text-center text-muted py-5"><i class="bi bi-table display-6"></i><p class="mt-3 mb-0">@(_tables.Count == 0 ? t[TranslationKeys.TableTabNoTablesFound] : t[TranslationKeys.TableTabNoMatchFilter])</p></div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="tables-list-table table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr><th class="ps-4">@t[TranslationKeys.TableName]</th><th class="text-end">@t[TranslationKeys.TableTabRows]</th><th class="text-center">@t[TranslationKeys.Columns]</th><th>@t[TranslationKeys.LastModified]</th><th class="text-end pe-4">@t[TranslationKeys.Actions]</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var table in VisibleTables)
+                            {
+                                <tr>
+                                    <td class="ps-4">
+                                        <i class="bi bi-table me-2 text-primary"></i><span class="font-monospace">@table.FullName</span>
+                                        @if (!string.IsNullOrWhiteSpace(table.Description))
+                                        {
+                                            <div class="text-muted small">@table.Description</div>
+                                        }
+                                    </td>
+                                    <td class="text-end">@table.RowCount.ToString("N0", CultureInfo.InvariantCulture)</td>
+                                    <td class="text-center"><span class="badge text-bg-light border">@table.ColumnCount</span></td>
+                                    <td class="text-muted small">@table.ModifyDate.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</td>
+                                    <td class="text-end pe-4">
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" type="button" title="@t[TranslationKeys.DbTabViewDetails]" @onclick="() => OpenViewTable(table)"><i class="bi bi-eye"></i></button>
+                                            <button class="btn btn-outline-secondary" type="button" title="@t[TranslationKeys.TableTabRenameOrDesc]" @onclick="() => OpenEditTable(table)"><i class="bi bi-pencil-square"></i></button>
+                                            <button class="btn btn-outline-danger" type="button" title="@t[TranslationKeys.TableTabDropTable]" @onclick="() => OpenDeleteTable(table)"><i class="bi bi-trash"></i></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-4 py-2 border-top text-muted small">@t[TranslationKeys.TableTabRowCountNote]</div>
+            }
+        </div>
+    </div>
+
+    @if (_showViewDialog && _dialogTable is not null)
+    {
+        <div class="modal fade show d-block" tabindex="-1">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title fs-5"><i class="bi bi-table me-2"></i><span class="font-monospace">@_dialogTable.FullName</span></h2>
+                        <button class="btn-close" type="button" @onclick="CloseDialogs"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (_isLoadingDetails)
+                        {
+                            <div class="text-center py-4"><span class="spinner-border spinner-border-sm me-2"></span>@t[TranslationKeys.TableTabLoadingDetails]</div>
+                        }
+                        else if (_details is not null)
+                        {
+                            <TableDetailsView Manager="_databaseManager!" Table="_details" Tables="_tables" FileGroups="_fileGroups" ServerConfig="ServerConfig" OnChanged="OnTableStructureChanged" />
+                        }
+                    </div>
+                    <div class="modal-footer"><button class="btn btn-primary" type="button" @onclick="CloseDialogs">@t[TranslationKeys.Close]</button></div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+
+    @if (_showEditDialog && _dialogTable is not null)
+    {
+        <div class="modal fade show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title fs-5"><i class="bi bi-pencil-square me-2"></i>@t.Get(TranslationKeys.TableTabEditTitle, _dialogTable.FullName)</h2>
+                        <button class="btn-close" type="button" @onclick="CloseDialogs"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="edit-table-name">@t[TranslationKeys.TableName]</label>
+                            <input id="edit-table-name" class="form-control" maxlength="@(ServerConfig?.Database?.MaxTableNameLength ?? Constants.MaxTableNameLength)" @bind="_editNewName" @bind:event="oninput" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="edit-table-description">@t[TranslationKeys.Description]</label>
+                            <textarea id="edit-table-description" class="form-control" rows="3" maxlength="3000" @bind="_editDescription" @bind:event="oninput"></textarea>
+                            <div class="form-text">@t[TranslationKeys.TableTabClearDescHelp]</div>
+                        </div>
+                        @if (IsRenameRequested)
+                        {
+                            <div class="alert alert-warning small mb-0">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                @t[TranslationKeys.TableTabRenameWarning]
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-light" type="button" @onclick="CloseDialogs">@t[TranslationKeys.Cancel]</button>
+                        <button class="btn btn-primary" type="button" @onclick="SaveTableChanges" disabled="@(_isSaving || !HasEditChanges)">@t[TranslationKeys.SaveChanges]</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+
+    @if (_showDeleteDialog && _dialogTable is not null)
+    {
+        <div class="modal fade show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h2 class="modal-title fs-5"><i class="bi bi-exclamation-triangle-fill me-2"></i>@t[TranslationKeys.TableTabDropTable]</h2>
+                        <button class="btn-close btn-close-white" type="button" @onclick="CloseDialogs"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (_isLoadingDetails)
+                        {
+                            <div class="text-center py-3"><span class="spinner-border spinner-border-sm me-2"></span>@t[TranslationKeys.TableTabCheckingDependencies]</div>
+                        }
+                        else if (_details is not null)
+                        {
+                            <p>
+                                @t.Get(TranslationKeys.TableTabDeleteConfirm, _dialogTable.FullName, _dialogTable.RowCount.ToString("N0", CultureInfo.InvariantCulture))
+                            </p>
+                            <p class="text-danger small mb-0">@t[TranslationKeys.ServerActionUndoneWarning]</p>
+
+                            @if (IncomingForeignKeys.Count > 0)
+                            {
+                                <div class="alert alert-warning small mt-2">
+                                    @t[TranslationKeys.TableTabFkDependencyWarning]
+                                    <ul class="mb-2 mt-1">
+                                        @foreach (var foreignKey in IncomingForeignKeys)
+                                        {
+                                            <li class="font-monospace">@foreignKey.FKName <span class="text-muted">(@($"{foreignKey.SchemaName}.{foreignKey.TableName}"))</span></li>
+                                        }
+                                    </ul>
+                                    <div class="form-check">
+                                        <input id="drop-dependent-fks" class="form-check-input" type="checkbox" @bind="_dropDependentForeignKeys" />
+                                        <label class="form-check-label" for="drop-dependent-fks">@t[TranslationKeys.TableTabDropDependentFks]</label>
+                                    </div>
+                                </div>
+                            }
+
+                            <label class="form-label small mt-2" for="delete-confirmation">@t.Get(TranslationKeys.ColPanelDropConfirmType, _dialogTable.TableName)</label>
+                            <input id="delete-confirmation" class="form-control" @bind="_deleteConfirmation" @bind:event="oninput" autocomplete="off" />
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-light" type="button" @onclick="CloseDialogs">@t[TranslationKeys.Cancel]</button>
+                        <button class="btn btn-danger" type="button" @onclick="DeleteTable" disabled="@(_isSaving || !CanDelete)">@t[TranslationKeys.TableTabDropTable]</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+</div>
+
+@code {
+    [Parameter] public ServerConfiguration? ServerConfig { get; set; }
+    [Parameter] public EventCallback<string> OnOperationComplete { get; set; }
+
+    private DatabaseManager? _databaseManager;
+    private Guid? _loadedServerId;
+    private List<string> _databases = new();
+    private List<string> _schemas = new();
+    private List<string> _fileGroups = new();
+    private List<TableOperation.Information> _tables = new();
+    private TableOperation.Create _createConfiguration = NewCreateConfiguration();
+    private TableOperation.Information? _dialogTable;
+    private TableOperation.Information? _details;
+    private string _selectedDatabase = string.Empty;
+    private string _schemaFilter = string.Empty;
+    private string _nameFilter = string.Empty;
+    private string _editNewName = string.Empty;
+    private string _editDescription = string.Empty;
+    private string _deleteConfirmation = string.Empty;
+    private bool _dropDependentForeignKeys;
+    private bool _showCreateForm;
+    private bool _showViewDialog;
+    private bool _showEditDialog;
+    private bool _showDeleteDialog;
+    private bool _isLoadingDatabases;
+    private bool _isLoadingTables;
+    private bool _isLoadingDetails;
+    private bool _isSaving;
+    private BprMessage? _bprMessage;
+
+    private bool HasDatabase => !string.IsNullOrWhiteSpace(_selectedDatabase);
+    private bool HasIdentityColumn => _createConfiguration.Columns.Any(column => column.IsIdentity);
+
+    private IEnumerable<TableOperation.Information> VisibleTables => _tables.Where(table =>
+        (string.IsNullOrEmpty(_schemaFilter) || table.SchemaName == _schemaFilter)
+        && (string.IsNullOrWhiteSpace(_nameFilter) || table.TableName.Contains(_nameFilter.Trim(), StringComparison.OrdinalIgnoreCase)));
+
+    private bool IsRenameRequested =>
+        _dialogTable is not null && !string.IsNullOrWhiteSpace(_editNewName)
+        && !string.Equals(_editNewName.Trim(), _dialogTable.TableName, StringComparison.Ordinal);
+
+    private bool DescriptionChanged =>
+        !string.Equals((_editDescription ?? string.Empty).Trim(), (_dialogTable?.Description ?? string.Empty).Trim(), StringComparison.Ordinal);
+
+    private bool HasEditChanges => IsRenameRequested || DescriptionChanged;
+
+    /// <summary>Foreign keys of other tables that point to the table in the drop dialog.</summary>
+    private List<ForeignKeyOperation.Information> IncomingForeignKeys => _details is null || _dialogTable is null
+        ? new List<ForeignKeyOperation.Information>()
+        : _details.ForeignKeys.Where(foreignKey =>
+            string.Equals(foreignKey.RefSchemaName, _dialogTable.SchemaName, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(foreignKey.RefTableName, _dialogTable.TableName, StringComparison.OrdinalIgnoreCase)
+            && !(string.Equals(foreignKey.SchemaName, _dialogTable.SchemaName, StringComparison.OrdinalIgnoreCase)
+                 && string.Equals(foreignKey.TableName, _dialogTable.TableName, StringComparison.OrdinalIgnoreCase))).ToList();
+
+    private bool CanDelete =>
+        !_isLoadingDetails && _details is not null && _dialogTable is not null
+        && string.Equals(_deleteConfirmation.Trim(), _dialogTable.TableName, StringComparison.Ordinal)
+        && (IncomingForeignKeys.Count == 0 || _dropDependentForeignKeys);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ServerConfig?.Id == _loadedServerId)
+            return;
+
+        _loadedServerId = ServerConfig?.Id;
+        _databaseManager = ServerConfig is null ? null : DatabaseManagerFactory.Create(ServerConfig);
+        ResetState();
+
+        if (_databaseManager is not null)
+            await LoadDatabases();
+    }
+
+    private void ResetState()
+    {
+        _databases.Clear();
+        _schemas.Clear();
+        _fileGroups.Clear();
+        _tables.Clear();
+        _selectedDatabase = string.Empty;
+        _schemaFilter = string.Empty;
+        _nameFilter = string.Empty;
+        CloseCreateTable();
+        CloseDialogs();
+    }
+
+    private void ClearSelection()
+    {
+        _selectedDatabase = string.Empty;
+        _schemaFilter = string.Empty;
+        _nameFilter = string.Empty;
+        _tables.Clear();
+        _schemas.Clear();
+        _fileGroups.Clear();
+        CloseCreateTable();
+        CloseDialogs();
+    }
+
+    private async Task LoadDatabases()
+    {
+        if (_databaseManager is null) return;
+        _isLoadingDatabases = true;
+        try
+        {
+            var result = await _databaseManager.GetDatabases();
+            if (result.operationResult.Success)
+                _databases = result.databases;
+            else
+                ShowError(result.operationResult.Message);
+        }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.DbErrLoadDatabases, exception.Message)); }
+        finally { _isLoadingDatabases = false; }
+    }
+
+    private async Task LoadTables()
+    {
+        if (_databaseManager is null || !HasDatabase) return;
+
+        var databaseName = _selectedDatabase;
+        _isLoadingTables = true;
+        try
+        {
+            var tableResult = await _databaseManager.GetTableList(databaseName);
+            var schemaResult = await _databaseManager.GetSchemas(databaseName);
+            var fileGroupResult = await _databaseManager.GetFileGroups(databaseName);
+
+            // The user may have picked another database while the queries were running.
+            if (databaseName != _selectedDatabase) return;
+
+            if (tableResult.operationResult.Success)
+                _tables = tableResult.tables;
+            else
+                ShowError(tableResult.operationResult.Message);
+
+            if (schemaResult.operationResult.Success)
+                _schemas = schemaResult.schemas;
+
+            if (fileGroupResult.operationResult.Success)
+                _fileGroups = fileGroupResult.fileGroups;
+
+            if (!string.IsNullOrEmpty(_schemaFilter) && !_tables.Any(table => table.SchemaName == _schemaFilter))
+                _schemaFilter = string.Empty;
+        }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.TableErrLoadTables, exception.Message)); }
+        finally { _isLoadingTables = false; }
+    }
+
+    private async Task OnDatabaseSelected()
+    {
+        CloseCreateTable();
+        CloseDialogs();
+        _tables = new List<TableOperation.Information>();
+        _schemas = new List<string>();
+        _fileGroups = new List<string>();
+        _schemaFilter = string.Empty;
+        await LoadTables();
+    }
+
+    private async Task RefreshAll()
+    {
+        await LoadDatabases();
+        if (HasDatabase && !_databases.Contains(_selectedDatabase))
+        {
+            _selectedDatabase = string.Empty;
+            _tables = new List<TableOperation.Information>();
+        }
+
+        await LoadTables();
+    }
+
+    // ---- Create ----
+
+    private static TableOperation.Create NewCreateConfiguration() => new()
+    {
+        Columns = new List<ColumnDefinition>
+        {
+            new() { ColumnName = "Id", DataType = "int", IsPrimaryKey = true, IsIdentity = true, IsNullable = false }
+        }
+    };
+
+    private void OpenCreateTable()
+    {
+        _createConfiguration = NewCreateConfiguration();
+        _createConfiguration.SchemaName = _schemas.Contains("dbo") ? "dbo" : _schemas.FirstOrDefault() ?? string.Empty;
+        _createConfiguration.FileGroup = string.Empty;
+        _showCreateForm = true;
+    }
+
+    private void CloseCreateTable()
+    {
+        _showCreateForm = false;
+        _createConfiguration = NewCreateConfiguration();
+    }
+
+    private void AddColumn()
+    {
+        _createConfiguration.Columns.Add(new ColumnDefinition { DataType = "nvarchar", Length = 50 });
+    }
+
+    private void RemoveColumn(ColumnDefinition column)
+    {
+        if (_createConfiguration.Columns.Count > 1)
+            _createConfiguration.Columns.Remove(column);
+    }
+
+    private static int? ParseInt(object? value) =>
+        int.TryParse(value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) ? number : null;
+
+    private static void ToggleMax(ColumnDefinition column, ColumnDataType type, bool useMax)
+    {
+        column.Length = useMax ? -1 : Math.Min(50, type.MaxLength);
+    }
+
+    private async Task CreateTable()
+    {
+        if (_databaseManager is null || !HasDatabase) return;
+
+        _createConfiguration.DatabaseName = _selectedDatabase;
+        _createConfiguration.TableName = (_createConfiguration.TableName ?? string.Empty).Trim();
+        _createConfiguration.Description = string.IsNullOrWhiteSpace(_createConfiguration.Description) ? null : _createConfiguration.Description.Trim();
+        foreach (var column in _createConfiguration.Columns)
+        {
+            column.ColumnName = (column.ColumnName ?? string.Empty).Trim();
+            column.DefaultValue = string.IsNullOrWhiteSpace(column.DefaultValue) ? null : column.DefaultValue.Trim();
+        }
+
+        _isSaving = true;
+        try
+        {
+            var result = await _databaseManager.CreateTable(_createConfiguration);
+            ShowResult(result);
+            if (result.Success)
+            {
+                CloseCreateTable();
+                await LoadTables();
+            }
+
+            await OnOperationComplete.InvokeAsync(result.Message);
+        }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.TableErrCreateTable, exception.Message)); }
+        finally { _isSaving = false; }
+    }
+
+    // ---- View ----
+
+    private async Task OpenViewTable(TableOperation.Information table)
+    {
+        CloseDialogs();
+        _dialogTable = table;
+        _showViewDialog = true;
+        await LoadDetails(table);
+    }
+
+    private async Task LoadDetails(TableOperation.Information table)
+    {
+        if (_databaseManager is null || !HasDatabase) return;
+
+        _isLoadingDetails = true;
+        try
+        {
+            var result = await _databaseManager.GetTableInformation(new TableOperation.Information
+            {
+                DatabaseName = _selectedDatabase,
+                SchemaName = table.SchemaName,
+                TableName = table.TableName
+            });
+
+            if (!ReferenceEquals(table, _dialogTable)) return;
+
+            if (result.operationResult.Success)
+                _details = result.table;
+            else
+            {
+                CloseDialogs();
+                ShowError(result.operationResult.Message);
+            }
+        }
+        catch (Exception exception)
+        {
+            CloseDialogs();
+            ShowError(TranslationFactory.Current.Get(TranslationKeys.TableErrLoadDetails, exception.Message));
+        }
+        finally { _isLoadingDetails = false; }
+    }
+
+    /// <summary>A column, index or foreign key was changed in the details dialog: reload it and the table list.</summary>
+    private async Task OnTableStructureChanged(OperationResult result)
+    {
+        await OnOperationComplete.InvokeAsync(result.Message);
+        await RefreshDetails();
+        await LoadTables();
+    }
+
+    /// <summary>Reloads the open table without showing the loading spinner, so the dialog keeps its state.</summary>
+    private async Task RefreshDetails()
+    {
+        if (_databaseManager is null || !HasDatabase || _dialogTable is null) return;
+
+        var table = _dialogTable;
+        try
+        {
+            var result = await _databaseManager.GetTableInformation(new TableOperation.Information
+            {
+                DatabaseName = _selectedDatabase,
+                SchemaName = table.SchemaName,
+                TableName = table.TableName
+            });
+
+            if (!ReferenceEquals(table, _dialogTable)) return;
+
+            if (result.operationResult.Success)
+                _details = result.table;
+            else
+            {
+                CloseDialogs();
+                ShowError(result.operationResult.Message);
+            }
+        }
+        catch (Exception exception)
+        {
+            CloseDialogs();
+            ShowError(TranslationFactory.Current.Get(TranslationKeys.TableErrReloadTable, exception.Message));
+        }
+    }
+
+    // ---- Edit ----
+
+    private void OpenEditTable(TableOperation.Information table)
+    {
+        CloseDialogs();
+        _dialogTable = table;
+        _editNewName = table.TableName;
+        _editDescription = table.Description ?? string.Empty;
+        _showEditDialog = true;
+    }
+
+    private async Task SaveTableChanges()
+    {
+        if (_databaseManager is null || !HasDatabase || _dialogTable is null) return;
+
+        var request = new TableOperation.Alter
+        {
+            DatabaseName = _selectedDatabase,
+            SchemaName = _dialogTable.SchemaName,
+            TableName = _dialogTable.TableName,
+            NewTableName = IsRenameRequested ? _editNewName.Trim() : null,
+            Description = DescriptionChanged ? (_editDescription ?? string.Empty).Trim() : null
+        };
+
+        _isSaving = true;
+        try
+        {
+            var result = await _databaseManager.AlterTable(request);
+            ShowResult(result);
+            if (result.Success)
+            {
+                CloseDialogs();
+                await LoadTables();
+            }
+
+            await OnOperationComplete.InvokeAsync(result.Message);
+        }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.TableErrUpdateTable, exception.Message)); }
+        finally { _isSaving = false; }
+    }
+
+    // ---- Delete ----
+
+    private async Task OpenDeleteTable(TableOperation.Information table)
+    {
+        CloseDialogs();
+        _dialogTable = table;
+        _showDeleteDialog = true;
+        await LoadDetails(table);
+    }
+
+    private async Task DeleteTable()
+    {
+        if (_databaseManager is null || !HasDatabase || _dialogTable is null) return;
+
+        var request = new TableOperation.Drop
+        {
+            DatabaseName = _selectedDatabase,
+            SchemaName = _dialogTable.SchemaName,
+            TableName = _dialogTable.TableName,
+            IgnoreIfNotExists = false,
+            ForceDropDependent = _dropDependentForeignKeys
+        };
+
+        _isSaving = true;
+        try
+        {
+            var result = await _databaseManager.DropTable(request);
+            ShowResult(result);
+            if (result.Success)
+            {
+                CloseDialogs();
+                await LoadTables();
+            }
+
+            await OnOperationComplete.InvokeAsync(result.Message);
+        }
+        catch (Exception exception) { ShowError(TranslationFactory.Current.Get(TranslationKeys.TableErrDropTable, exception.Message)); }
+        finally { _isSaving = false; }
+    }
+
+    private void CloseDialogs()
+    {
+        _showViewDialog = _showEditDialog = _showDeleteDialog = false;
+        _dialogTable = null;
+        _details = null;
+        _deleteConfirmation = string.Empty;
+        _dropDependentForeignKeys = false;
+    }
+
+    private void ShowResult(OperationResult result) => _bprMessage = result;
+    private void ShowError(string message) => _bprMessage = BprMessage.Error(message);
+    private void ShowMessage(BprMessage message) => _bprMessage = message;
+    private void ClearMessage() => _bprMessage = null;
+}

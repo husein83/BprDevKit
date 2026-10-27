@@ -664,6 +664,18 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelCsStringEmpty] = "= string.Empty;",
             [TranslationKeys.DataModelCsStringNone] = "بدون مقدار پیش‌فرض",
             [TranslationKeys.DataModelCsCustomSnippet] = "تکه کد سفارشی بدنه کلاس",
+            [TranslationKeys.DataModelCsBackingField] = "فیلد پشتیبان خصوصی (Backing Field + get/set چندخطی)",
+            [TranslationKeys.DataModelCsOuterRegionName] = "نام ریجن سراسری بدنه کلاس (اختیاری)",
+            [TranslationKeys.DataModelCsOuterRegionHelp] = "تمام اعضای کلاس را درون یک ریجن بیرونی (مانند Generator) قرار می‌دهد.",
+            [TranslationKeys.DataModelCsIncludeTimestamp] = "تولید ویژگی [Timestamp] برای ستون‌های RowVersion و Concurrency",
+            [TranslationKeys.DataModelCsCustomClassAttributes] = "اتریبیوت‌های سفارشی بالای کلاس (هر کدام در یک سطر)",
+            [TranslationKeys.DataModelCsDefaultPropertyAttributes] = "اتریبیوت‌های پیش‌فرض تمام پراپرتی‌های ستون‌ها",
+            [TranslationKeys.DataModelCsDefaultPropertyAttributesHelp] = "روی تمامی پراپرتی‌های ستون‌ها اعمال می‌شود (مانند [DataMember] یا [Column]).",
+            [TranslationKeys.DataModelCsCustomNavReferenceAttr] = "قالب اتریبیوت رفرنس کلید خارجی (References)",
+            [TranslationKeys.DataModelCsCustomNavInverseAttr] = "قالب اتریبیوت اینورس پراپرتی (Relations)",
+            [TranslationKeys.DataModelCsNavigationPropertyAttributes] = "اتریبیوت‌های اختصاصی پراپرتی‌های ناوبری",
+            [TranslationKeys.DataModelCsNavigationPropertyAttributesHelp] = "روی تمام پراپرتی‌های ناوبری رفرنس و کالکشن درج می‌شود (مانند [DataMember]).",
+            [TranslationKeys.DataModelCsIncludeSchemaInRelationName] = "درج پیشوند اسکیما در نام کالکشن‌های رابطه ({Schema}_{Class}Set{Fk})",
 
             // Transformation Engine
             [TranslationKeys.DataModelTransformAddRule] = "افزودن قانون تبدیل",
@@ -747,7 +759,65 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelSchemaAccessServerDbRequired] = "لطفاً ابتدا سرور و پایگاه داده را برای این پروفایل مشخص کنید تا اسکیماها بارگذاری شوند.",
 
             // Home Card
-            [TranslationKeys.HomeDataModelCardDesc] = "تولید کلاس‌ها و دیتامدل‌های سی‌شارپ، پایتون، دارت و جاوا از روی جداول پایگاه داده."
+            [TranslationKeys.HomeDataModelCardDesc] = "تولید کلاس‌ها و دیتامدل‌های سی‌شارپ، پایتون، دارت و جاوا از روی جداول پایگاه داده.",
+
+            // Database Backup & Restore
+            [TranslationKeys.DbTabBackupDb] = "پشتیبان‌گیری از دیتابیس",
+            [TranslationKeys.DbTabRestoreDb] = "بازگردانی دیتابیس",
+            [TranslationKeys.DbTabBackupPath] = "مسیر فایل پشتیبان (.bak)",
+            [TranslationKeys.DbTabBackupPathHelp] = "مسیر فایل روی سرور که فایل .bak در آن ذخیره می‌شود",
+            [TranslationKeys.DbTabWithCompression] = "فشرده‌سازی بکاپ (WITH COMPRESSION)",
+            [TranslationKeys.DbTabCopyOnly] = "پشتیبان‌گیری مستقل (Copy-Only)",
+            [TranslationKeys.DbTabRestorePath] = "مسیر فایل بکاپ جهت بازگردانی (.bak)",
+            [TranslationKeys.DbTabRestorePathHelp] = "مسیر فایل .bak روی سرور که باید بازگردانی شود",
+            [TranslationKeys.DbTabWithReplace] = "بازنویسی روی دیتابیس موجود (WITH REPLACE)",
+            [TranslationKeys.DbTabCloseConnections] = "قطع اتصالات فعال دیتابیس (ROLLBACK IMMEDIATE)",
+            [TranslationKeys.DbTabBackupSuccess] = "پشتیبان‌گیری دیتابیس '{0}' با موفقیت در '{1}' ذخیره شد.",
+            [TranslationKeys.DbTabRestoreSuccess] = "بازگردانی دیتابیس '{0}' با موفقیت از '{1}' انجام شد.",
+            [TranslationKeys.DbTabTakingBackup] = "در حال ایجاد فایل پشتیبان...",
+            [TranslationKeys.DbTabRestoring] = "در حال بازگردانی دیتابیس...",
+            [TranslationKeys.DbTabBrowse] = "مرور...",
+            [TranslationKeys.DbTabSelectFolder] = "انتخاب پوشه",
+            [TranslationKeys.DbTabSelectBakFile] = "انتخاب فایل پشتیبان (.bak)",
+            [TranslationKeys.DbTabBackupFolder] = "مسیر پوشه ذخیره",
+            [TranslationKeys.DbTabBackupFileName] = "نام فایل پشتیبان",
+            [TranslationKeys.DbTabSelectThisFolder] = "انتخاب این پوشه",
+            [TranslationKeys.DbTabParentFolder] = "پوشه بالاتر (..)",
+            [TranslationKeys.DbTabDrives] = "درایوها",
+            [TranslationKeys.DbTabNoItems] = "موردی در این مسیر یافت نشد.",
+            [TranslationKeys.DbTabFullBackupPath] = "مسیر کامل فایل پشتیبان",
+
+            // Configuration Backup & Restore
+            [TranslationKeys.BackupRestoreTab] = "پشتیبان‌گیری و بازگردانی",
+            [TranslationKeys.BackupRestoreSettings] = "پشتیبان‌گیری تنظیمات",
+            [TranslationKeys.ConfigBackupExportTitle] = "پشتیبان‌گیری از تمام تنظیمات برنامه",
+            [TranslationKeys.ConfigBackupExportSubtitle] = "خروجی گرفتن از تمام سرورهای تعریف‌شده، پروفایل‌های مدل‌ساز و تنظیمات برنامه در یک فایل پشتیبان.",
+            [TranslationKeys.ConfigBackupDownloadBtn] = "دانلود فایل پشتیبان تنظیمات",
+            [TranslationKeys.ConfigBackupImportTitle] = "بازگردانی تنظیمات از فایل پشتیبان",
+            [TranslationKeys.ConfigBackupImportSubtitle] = "بارگذاری فایل بکاپ برای بازگردانی سرورها، پروفایل‌های دیتامدل و تنظیمات سیستم.",
+            [TranslationKeys.ConfigBackupSelectFile] = "انتخاب فایل پشتیبان (.json)",
+            [TranslationKeys.ConfigBackupPreview] = "پیش‌نمایش محتوای فایل پشتیبان",
+            [TranslationKeys.ConfigBackupAppVersion] = "نسخه برنامه",
+            [TranslationKeys.ConfigBackupExportDate] = "تاریخ ایجاد پشتیبان",
+            [TranslationKeys.ConfigBackupServersCount] = "سرورهای پایگاه داده",
+            [TranslationKeys.ConfigBackupProfilesCount] = "پروفایل‌های دیتامدل",
+            [TranslationKeys.ConfigBackupIncludeAppSettings] = "شامل تنظیمات عمومی برنامه",
+            [TranslationKeys.ConfigBackupRestoreServers] = "بازگردانی سرورها",
+            [TranslationKeys.ConfigBackupRestoreProfiles] = "بازگردانی پروفایل‌های دیتامدل",
+            [TranslationKeys.ConfigBackupRestoreApp] = "بازگردانی تنظیمات عمومی",
+            [TranslationKeys.ConfigBackupMergeOption] = "ادغام با داده‌های فعلی (عدم حذف سرورها و پروفایل‌های موجود)",
+            [TranslationKeys.ConfigBackupReplaceOption] = "جایگزینی کامل تنظیمات فعلی",
+            [TranslationKeys.ConfigBackupApplyBtn] = "اجرای بازگردانی تنظیمات",
+            [TranslationKeys.ConfigBackupInvalidFile] = "فرمت یا محتوای فایل پشتیبان نامعتبر است",
+            [TranslationKeys.ConfigBackupSuccess] = "تنظیمات با موفقیت بازگردانی شد!",
+
+            // Data Model ZIP Packaging
+            [TranslationKeys.ZipPackagingStructure] = "نحوه بسته‌بندی فایل زیپ (ZIP)",
+            [TranslationKeys.ZipPackagingFlat] = "همه در یک پوشه (تخت)",
+            [TranslationKeys.ZipPackagingBySchema] = "پوشه‌بندی بر اساس اسکیما (مانند dbo/User.cs)",
+            [TranslationKeys.ZipPackagingByNamespace] = "پوشه‌بندی بر اساس فضای نام (Namespace)",
+            [TranslationKeys.ZipPackagingHelp] = "نحوه سازماندهی فایل‌های مدل در ساختار فایل فشرده ZIP",
+            [TranslationKeys.DataModelDownloadSeparateZips] = "دانلود زیپ جداگانه برای هر اسکیما"
         };
 
         public string this[string key]

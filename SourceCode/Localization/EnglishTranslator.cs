@@ -663,6 +663,18 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelCsStringEmpty] = "= string.Empty;",
             [TranslationKeys.DataModelCsStringNone] = "None",
             [TranslationKeys.DataModelCsCustomSnippet] = "Custom Class Body Snippet",
+            [TranslationKeys.DataModelCsBackingField] = "Backing Field (private _field + get/set)",
+            [TranslationKeys.DataModelCsOuterRegionName] = "Outer Region Name (Optional)",
+            [TranslationKeys.DataModelCsOuterRegionHelp] = "Wraps all class members inside an enclosing #region (e.g. Generator).",
+            [TranslationKeys.DataModelCsIncludeTimestamp] = "Generate [Timestamp] for RowVersion / Timestamp Columns",
+            [TranslationKeys.DataModelCsCustomClassAttributes] = "Custom Class Attributes (One per line)",
+            [TranslationKeys.DataModelCsDefaultPropertyAttributes] = "Default Attributes for All Column Properties",
+            [TranslationKeys.DataModelCsDefaultPropertyAttributesHelp] = "Applied to all column properties (e.g. [DataMember] or [Column]).",
+            [TranslationKeys.DataModelCsCustomNavReferenceAttr] = "Custom Foreign Key Reference Attribute Template",
+            [TranslationKeys.DataModelCsCustomNavInverseAttr] = "Custom Inverse Property Attribute Template",
+            [TranslationKeys.DataModelCsNavigationPropertyAttributes] = "Navigation Properties Custom Attributes",
+            [TranslationKeys.DataModelCsNavigationPropertyAttributesHelp] = "Applied to all reference and collection navigation properties (e.g. [DataMember]).",
+            [TranslationKeys.DataModelCsIncludeSchemaInRelationName] = "Include Schema Prefix in Relation Collection Names ({Schema}_{Class}Set{Fk})",
 
             // Transformation Engine
             [TranslationKeys.DataModelTransformAddRule] = "Add Transformation Rule",
@@ -746,7 +758,65 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelSchemaAccessServerDbRequired] = "Please select a Server and Database for this profile to configure schema access.",
 
             // Home Card
-            [TranslationKeys.HomeDataModelCardDesc] = "Generate C#, Python, Dart, and Java data models and entities from tables."
+            [TranslationKeys.HomeDataModelCardDesc] = "Generate C#, Python, Dart, and Java data models and entities from tables.",
+
+            // Database Backup & Restore
+            [TranslationKeys.DbTabBackupDb] = "Backup Database",
+            [TranslationKeys.DbTabRestoreDb] = "Restore Database",
+            [TranslationKeys.DbTabBackupPath] = "Backup File Path (.bak)",
+            [TranslationKeys.DbTabBackupPathHelp] = "Server file path where the .bak file will be created",
+            [TranslationKeys.DbTabWithCompression] = "Compress Backup (WITH COMPRESSION)",
+            [TranslationKeys.DbTabCopyOnly] = "Copy-Only Backup",
+            [TranslationKeys.DbTabRestorePath] = "Restore From File Path (.bak)",
+            [TranslationKeys.DbTabRestorePathHelp] = "Server path to the .bak backup file to restore from",
+            [TranslationKeys.DbTabWithReplace] = "Overwrite Existing Database (WITH REPLACE)",
+            [TranslationKeys.DbTabCloseConnections] = "Disconnect Active Connections (ROLLBACK IMMEDIATE)",
+            [TranslationKeys.DbTabBackupSuccess] = "Database '{0}' backed up successfully to '{1}'",
+            [TranslationKeys.DbTabRestoreSuccess] = "Database '{0}' restored successfully from '{1}'",
+            [TranslationKeys.DbTabTakingBackup] = "Taking backup...",
+            [TranslationKeys.DbTabRestoring] = "Restoring database...",
+            [TranslationKeys.DbTabBrowse] = "Browse...",
+            [TranslationKeys.DbTabSelectFolder] = "Select Folder",
+            [TranslationKeys.DbTabSelectBakFile] = "Select Backup File (.bak)",
+            [TranslationKeys.DbTabBackupFolder] = "Destination Folder",
+            [TranslationKeys.DbTabBackupFileName] = "Backup File Name",
+            [TranslationKeys.DbTabSelectThisFolder] = "Select This Folder",
+            [TranslationKeys.DbTabParentFolder] = "Parent Folder (..)",
+            [TranslationKeys.DbTabDrives] = "Drives",
+            [TranslationKeys.DbTabNoItems] = "No items found in this directory.",
+            [TranslationKeys.DbTabFullBackupPath] = "Full Backup Path",
+
+            // Configuration Backup & Restore
+            [TranslationKeys.BackupRestoreTab] = "Backup & Restore",
+            [TranslationKeys.BackupRestoreSettings] = "Config Backup",
+            [TranslationKeys.ConfigBackupExportTitle] = "Backup All Configurations",
+            [TranslationKeys.ConfigBackupExportSubtitle] = "Export all configured servers, data model profiles, and application settings to a single backup file.",
+            [TranslationKeys.ConfigBackupDownloadBtn] = "Download Configurations Backup",
+            [TranslationKeys.ConfigBackupImportTitle] = "Restore Configurations",
+            [TranslationKeys.ConfigBackupImportSubtitle] = "Upload a previously exported backup file to restore your servers, model profiles, and settings.",
+            [TranslationKeys.ConfigBackupSelectFile] = "Select Backup File (.json)",
+            [TranslationKeys.ConfigBackupPreview] = "Backup File Preview",
+            [TranslationKeys.ConfigBackupAppVersion] = "Application Version",
+            [TranslationKeys.ConfigBackupExportDate] = "Export Date",
+            [TranslationKeys.ConfigBackupServersCount] = "Servers",
+            [TranslationKeys.ConfigBackupProfilesCount] = "Model Profiles",
+            [TranslationKeys.ConfigBackupIncludeAppSettings] = "General Settings Included",
+            [TranslationKeys.ConfigBackupRestoreServers] = "Restore Servers",
+            [TranslationKeys.ConfigBackupRestoreProfiles] = "Restore Model Profiles",
+            [TranslationKeys.ConfigBackupRestoreApp] = "Restore General Settings",
+            [TranslationKeys.ConfigBackupMergeOption] = "Merge with existing configurations (keep existing)",
+            [TranslationKeys.ConfigBackupReplaceOption] = "Replace all current configurations",
+            [TranslationKeys.ConfigBackupApplyBtn] = "Restore Selected Configurations",
+            [TranslationKeys.ConfigBackupInvalidFile] = "Invalid configuration backup file format",
+            [TranslationKeys.ConfigBackupSuccess] = "Configurations restored successfully!",
+
+            // Data Model ZIP Packaging
+            [TranslationKeys.ZipPackagingStructure] = "ZIP Packaging Structure",
+            [TranslationKeys.ZipPackagingFlat] = "All in root folder (Flat)",
+            [TranslationKeys.ZipPackagingBySchema] = "Folders by Schema (e.g. dbo/User.cs)",
+            [TranslationKeys.ZipPackagingByNamespace] = "Folders by Namespace",
+            [TranslationKeys.ZipPackagingHelp] = "How model files are organized into directories inside the ZIP file",
+            [TranslationKeys.DataModelDownloadSeparateZips] = "Download Separate ZIP per Schema"
         };
 
         public string this[string key]

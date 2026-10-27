@@ -43,5 +43,15 @@ namespace BprDevKit.Utility
             return filePath;
         }
         #endregion
+
+        #region Helpers
+        /// <summary>
+        /// Returns a clean, human-readable date and time string suitable for file naming: yyyy-MM-dd_HH-mm-ss
+        /// </summary>
+        public static string GetReadableTimestamp(DateTime? dateTime = null)
+        {
+            return (dateTime ?? DateTime.Now).ToString("yyyy-MM-dd_HH-mm-ss");
+        }
+        #endregion
     }
 }

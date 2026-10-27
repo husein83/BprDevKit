@@ -1,0 +1,258 @@
+@using BprDevKit.Config
+@using BprDevKit.Utility
+@using BprDevKit.Localization
+@using Microsoft.AspNetCore.Components.Forms
+@using ServerConfig = BprDevKit.Config.ServerConfiguration
+@using ModelGenConfig = BprDevKit.Config.ModelGeneratorConfiguration
+@inject ITranslationFactory TranslationFactory
+@inject IJSRuntime JSRuntime
+
+@{
+    var t = TranslationFactory.Current;
+}
+
+<div class="configuration-backup-tab">
+    <BprAlert Message="@_bprMessage" OnDismiss="() => _bprMessage = null" CssClass="mb-4" />
+
+    <div class="row g-4">
+        <!-- 1. Export / Backup Column -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-primary text-white py-3">
+                    <h2 class="h5 mb-0"><i class="bi bi-shield-check me-2"></i>@t[TranslationKeys.ConfigBackupExportTitle]</h2>
+                </div>
+                <div class="card-body p-4 d-flex flex-column justify-content-between">
+                    <div>
+                        <p class="text-muted">@t[TranslationKeys.ConfigBackupExportSubtitle]</p>
+
+                        <div class="list-group list-group-flush mb-4 rounded-3 border">
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div><i class="bi bi-server text-primary me-2"></i>@t[TranslationKeys.ConfigBackupServersCount]</div>
+                                <span class="badge bg-primary rounded-pill">@_currentServersCount</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div><i class="bi bi-boxes text-success me-2"></i>@t[TranslationKeys.ConfigBackupProfilesCount]</div>
+                                <span class="badge bg-success rounded-pill">@_currentProfilesCount</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div><i class="bi bi-gear-fill text-info me-2"></i>@t[TranslationKeys.ConfigBackupIncludeAppSettings]</div>
+                                <span class="badge bg-info rounded-pill">@t[TranslationKeys.Yes]</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-top">
+                        <button class="btn btn-primary w-100 py-2 fw-semibold" type="button" @onclick="DownloadBackup">
+                            <i class="bi bi-download me-2"></i>@t[TranslationKeys.ConfigBackupDownloadBtn]
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Import / Restore Column -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-dark text-white py-3">
+                    <h2 class="h5 mb-0"><i class="bi bi-arrow-repeat me-2"></i>@t[TranslationKeys.ConfigBackupImportTitle]</h2>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-muted">@t[TranslationKeys.ConfigBackupImportSubtitle]</p>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold" for="backup-file-input">@t[TranslationKeys.ConfigBackupSelectFile]</label>
+                        <InputFile id="backup-file-input" class="form-control" OnChange="HandleFileSelected" accept=".json" />
+                    </div>
+
+                    @if (_isReadingFile)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary spinner-border-sm me-2" role="status"></div>
+                            <span>@t[TranslationKeys.Loading]</span>
+                        </div>
+                    }
+                    else if (_importedPackage != null)
+                    {
+                        <div class="border rounded-3 p-3 bg-light mb-4">
+                            <h3 class="h6 fw-bold mb-3 text-dark"><i class="bi bi-info-circle text-primary me-2"></i>@t[TranslationKeys.ConfigBackupPreview]</h3>
+                            <div class="row g-2 small text-muted">
+                                <div class="col-sm-6">
+                                    <span class="fw-semibold text-dark">@t[TranslationKeys.ConfigBackupAppVersion]:</span> @_importedPackage.AppVersion
+                                </div>
+                                <div class="col-sm-6">
+                                    <span class="fw-semibold text-dark">@t[TranslationKeys.ConfigBackupExportDate]:</span> @_importedPackage.ExportedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                                </div>
+                                <div class="col-sm-6">
+                                    <span class="fw-semibold text-dark">@t[TranslationKeys.ConfigBackupServersCount]:</span> @(_importedPackage.ServerConfigs?.Count ?? 0)
+                                    @if (_importedPackage.ServerConfigs?.Count > 0)
+                                    {
+                                        <span class="text-muted ms-1">(@string.Join(", ", _importedPackage.ServerConfigs.Take(3).Select(s => s.Server.ServerName)))</span>
+                                    }
+                                </div>
+                                <div class="col-sm-6">
+                                    <span class="fw-semibold text-dark">@t[TranslationKeys.ConfigBackupProfilesCount]:</span> @(_importedPackage.ModelGeneratorProfiles?.Count ?? 0)
+                                    @if (_importedPackage.ModelGeneratorProfiles?.Count > 0)
+                                    {
+                                        <span class="text-muted ms-1">(@string.Join(", ", _importedPackage.ModelGeneratorProfiles.Take(3).Select(p => p.ProfileName)))</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Restore Checkbox Options -->
+                        <div class="mb-3">
+                            <h4 class="h6 fw-semibold text-dark mb-2">@t[TranslationKeys.Actions]</h4>
+                            <div class="form-check mb-2">
+                                <input id="restore-servers" class="form-check-input" type="checkbox" @bind="_restoreServers" disabled="@(_importedPackage.ServerConfigs == null || _importedPackage.ServerConfigs.Count == 0)" />
+                                <label class="form-check-label" for="restore-servers">@t[TranslationKeys.ConfigBackupRestoreServers] (@(_importedPackage.ServerConfigs?.Count ?? 0))</label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input id="restore-profiles" class="form-check-input" type="checkbox" @bind="_restoreProfiles" disabled="@(_importedPackage.ModelGeneratorProfiles == null || _importedPackage.ModelGeneratorProfiles.Count == 0)" />
+                                <label class="form-check-label" for="restore-profiles">@t[TranslationKeys.ConfigBackupRestoreProfiles] (@(_importedPackage.ModelGeneratorProfiles?.Count ?? 0))</label>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input id="restore-app" class="form-check-input" type="checkbox" @bind="_restoreAppSettings" disabled="@(_importedPackage.ApplicationConfig == null)" />
+                                <label class="form-check-label" for="restore-app">@t[TranslationKeys.ConfigBackupRestoreApp]</label>
+                            </div>
+                        </div>
+
+                        <!-- Merge vs Replace Mode -->
+                        <div class="mb-4 p-3 bg-white border rounded-3">
+                            <div class="form-check mb-2">
+                                <input id="merge-mode-merge" class="form-check-input" type="radio" name="mergeMode" checked="@_mergeWithExisting" @onchange="() => _mergeWithExisting = true" />
+                                <label class="form-check-label fw-semibold" for="merge-mode-merge">@t[TranslationKeys.ConfigBackupMergeOption]</label>
+                            </div>
+                            <div class="form-check">
+                                <input id="merge-mode-replace" class="form-check-input" type="radio" name="mergeMode" checked="@(!_mergeWithExisting)" @onchange="() => _mergeWithExisting = false" />
+                                <label class="form-check-label text-danger" for="merge-mode-replace">@t[TranslationKeys.ConfigBackupReplaceOption]</label>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-success w-100 py-2 fw-semibold" type="button" @onclick="ApplyRestore" disabled="@_isRestoring">
+                            @if (_isRestoring)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            <i class="bi bi-check-circle me-1"></i> @t[TranslationKeys.ConfigBackupApplyBtn]
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnConfigurationChanged { get; set; }
+
+    private BprMessage? _bprMessage;
+    private int _currentServersCount = 0;
+    private int _currentProfilesCount = 0;
+
+    private bool _isReadingFile;
+    private bool _isRestoring;
+    private ConfigurationBackupPackage? _importedPackage;
+
+    private bool _restoreServers = true;
+    private bool _restoreProfiles = true;
+    private bool _restoreAppSettings = true;
+    private bool _mergeWithExisting = true;
+
+    protected override void OnInitialized()
+    {
+        RefreshCurrentStats();
+    }
+
+    private void RefreshCurrentStats()
+    {
+        _currentServersCount = ServerConfig.LoadAllFromEncryptedFile(false).Count;
+        _currentProfilesCount = ModelGenConfig.LoadAllProfiles().Count;
+    }
+
+    private async Task DownloadBackup()
+    {
+        try
+        {
+            var json = ConfigurationBackupService.ExportToJson();
+            var filename = $"BprDevKit_ConfigBackup_{DevFunctions.GetReadableTimestamp()}.json";
+            await JSRuntime.InvokeVoidAsync("window.downloadTextFile", filename, json);
+            _bprMessage = BprMessage.Success($"Backup exported successfully: {filename}");
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error($"Error exporting backup: {ex.Message}");
+        }
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _bprMessage = null;
+        _importedPackage = null;
+        var file = e.File;
+        if (file == null) return;
+
+        _isReadingFile = true;
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            var content = await reader.ReadToEndAsync();
+
+            var result = ConfigurationBackupService.ImportFromJson(content);
+            if (result.Success && result.Package != null)
+            {
+                _importedPackage = result.Package;
+                _restoreServers = _importedPackage.ServerConfigs?.Count > 0;
+                _restoreProfiles = _importedPackage.ModelGeneratorProfiles?.Count > 0;
+                _restoreAppSettings = _importedPackage.ApplicationConfig != null;
+            }
+            else
+            {
+                _bprMessage = BprMessage.Error(TranslationFactory.Current[TranslationKeys.ConfigBackupInvalidFile] + ": " + result.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error($"Error reading backup file: {ex.Message}");
+        }
+        finally
+        {
+            _isReadingFile = false;
+        }
+    }
+
+    private async Task ApplyRestore()
+    {
+        if (_importedPackage == null) return;
+        _isRestoring = true;
+        try
+        {
+            var result = ConfigurationBackupService.RestorePackage(
+                _importedPackage,
+                restoreServers: _restoreServers,
+                restoreModelProfiles: _restoreProfiles,
+                restoreAppSettings: _restoreAppSettings,
+                mergeWithExisting: _mergeWithExisting);
+
+            if (result.Success)
+            {
+                _bprMessage = BprMessage.Success(TranslationFactory.Current[TranslationKeys.ConfigBackupSuccess] + " (" + result.Message + ")");
+                RefreshCurrentStats();
+                _importedPackage = null;
+                await OnConfigurationChanged.InvokeAsync();
+            }
+            else
+            {
+                _bprMessage = BprMessage.Error(result.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            _bprMessage = BprMessage.Error($"Error restoring configuration: {ex.Message}");
+        }
+        finally
+        {
+            _isRestoring = false;
+        }
+    }
+}
