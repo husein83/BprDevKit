@@ -54,6 +54,7 @@ namespace BprDevKit.DatabaseManagement.Models.Operations
             public string DatabaseName { get; set; } = null!;
             public string SchemaName { get; set; } = null!;
             public string TableName { get; set; } = null!;
+            public string ObjectType { get; set; } = Constants.ObjectTypes.Table;
 
             // ---- Loaded data (a table list fills only the first block, a single table fills everything) ----
             public long RowCount { get; set; }

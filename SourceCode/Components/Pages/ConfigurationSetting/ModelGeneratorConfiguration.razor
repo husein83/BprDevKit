@@ -841,66 +841,255 @@
                 else if (_csActiveTab == "attributes")
                 {
                     <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="cs-p-ann" @bind="_editingProfile.Options.CSharp.IncludeDataAnnotations" />
-                                <label class="form-check-label small" for="cs-p-ann">@t[TranslationKeys.DataModelCsDataAnnotations]</label>
-                            </div>
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="cs-p-ef" @bind="_editingProfile.Options.CSharp.IncludeEfCoreTableAttributes" />
-                                <label class="form-check-label small" for="cs-p-ef">@t[TranslationKeys.DataModelCsEfTableAttributes]</label>
-                            </div>
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="cs-p-nameof" @bind="_editingProfile.Options.CSharp.UseNameofInAttributes" />
-                                <label class="form-check-label small" for="cs-p-nameof">@t[TranslationKeys.DataModelCsUseNameof]</label>
-                            </div>
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="cs-p-idx" @bind="_editingProfile.Options.CSharp.IncludeIndexesAsAttributes" />
-                                <label class="form-check-label small" for="cs-p-idx">@t[TranslationKeys.DataModelCsIncludeIndexes]</label>
-                            </div>
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="cs-p-json" @bind="_editingProfile.Options.CSharp.IncludeJsonAttributes" />
-                                <label class="form-check-label small" for="cs-p-json">@t[TranslationKeys.DataModelCsJsonAttributes]</label>
-                            </div>
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="cs-p-timestamp" @bind="_editingProfile.Options.CSharp.IncludeTimestampAttribute" />
-                                <label class="form-check-label small" for="cs-p-timestamp">@t[TranslationKeys.DataModelCsIncludeTimestamp]</label>
+                        <!-- Master Switch Header -->
+                        <div class="col-12">
+                            <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded-3 border">
+                                <div>
+                                    <div class="form-check form-switch mb-1">
+                                        <input class="form-check-input" type="checkbox" id="cs-p-ann" @bind="_editingProfile.Options.CSharp.IncludeDataAnnotations" />
+                                        <label class="form-check-label fw-bold" for="cs-p-ann">
+                                            <i class="bi bi-shield-check text-primary me-1"></i>@t[TranslationKeys.DataModelCsAnnotationsManagement]
+                                        </label>
+                                    </div>
+                                    <div class="text-muted small">@t[TranslationKeys.DataModelCsAnnotationsManagementDesc]</div>
+                                </div>
+                                <span class="badge @(_editingProfile.Options.CSharp.IncludeDataAnnotations ? "text-bg-success" : "text-bg-secondary")">
+                                    @(_editingProfile.Options.CSharp.IncludeDataAnnotations ? "Active" : "Disabled")
+                                </span>
                             </div>
                         </div>
 
-                        <div class="col-md-6">
-                            <!-- Custom FK Attribute -->
-                            <div class="form-check form-switch mb-1">
-                                <input class="form-check-input" type="checkbox" id="cs-p-fk-attr" @bind="_editingProfile.Options.CSharp.EnableCustomFkAttribute" />
-                                <label class="form-check-label small fw-semibold" for="cs-p-fk-attr">@t[TranslationKeys.DataModelCsEnableCustomFk]</label>
-                            </div>
-                            @if (_editingProfile.Options.CSharp.EnableCustomFkAttribute)
-                            {
-                                <div class="ps-3 border-start mb-3">
-                                    <input type="text" class="form-control form-control-sm font-monospace mb-1" placeholder='[FkProperty(Name = "{FullFieldName}")]' @bind="_editingProfile.Options.CSharp.CustomFkAttributeTemplate" />
-                                    <div class="small text-muted">
-                                        Tokens:
-                                        <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendFkToken("{FullFieldName}")'>{FullFieldName}</code>
-                                        <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendFkToken("{PropertyName}")'>{PropertyName}</code>
-                                        <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendFkToken("{ColumnName}")'>{ColumnName}</code>
-                                        <code class="user-select-all cursor-pointer" @onclick='() => AppendFkToken("{TargetTable}")'>{TargetTable}</code>
+                        <!-- Data Annotations Cards -->
+                        @if (_editingProfile.Options.CSharp.IncludeDataAnnotations)
+                        {
+                            <!-- Required Attribute Card -->
+                            <div class="col-md-6">
+                                <div class="card h-100 border shadow-sm">
+                                    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                                        <div class="form-check form-switch mb-0">
+                                            <input class="form-check-input" type="checkbox" id="cs-p-req" @bind="_editingProfile.Options.CSharp.IncludeRequiredAttribute" />
+                                            <label class="form-check-label fw-semibold small" for="cs-p-req">
+                                                <code class="text-danger fw-bold me-1">[Required]</code>@t[TranslationKeys.DataModelCsRequiredAttribute]
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="card-body p-3 @(!_editingProfile.Options.CSharp.IncludeRequiredAttribute ? "opacity-50 pointer-events-none" : "")">
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsRequiredScope]</label>
+                                            <select class="form-select form-select-sm" @bind="_editingProfile.Options.CSharp.RequiredAttributeScope" disabled="@(!_editingProfile.Options.CSharp.IncludeRequiredAttribute)">
+                                                <option value="AllNonNullable">@t[TranslationKeys.DataModelCsRequiredScopeAll]</option>
+                                                <option value="StringsAndByteArrays">@t[TranslationKeys.DataModelCsRequiredScopeStrings]</option>
+                                                <option value="NonIdentity">@t[TranslationKeys.DataModelCsRequiredScopeNonIdentity]</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" id="cs-p-req-pk" @bind="_editingProfile.Options.CSharp.RequiredIncludePrimaryKeys" disabled="@(!_editingProfile.Options.CSharp.IncludeRequiredAttribute)" />
+                                            <label class="form-check-label small" for="cs-p-req-pk">@t[TranslationKeys.DataModelCsRequiredIncludePk]</label>
+                                        </div>
+
+                                        <div>
+                                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsRequiredErrorMsg]</label>
+                                            <input type="text" class="form-control form-control-sm font-monospace mb-1" placeholder='e.g. {PropertyName} is required.' @bind="_editingProfile.Options.CSharp.RequiredErrorMessageTemplate" disabled="@(!_editingProfile.Options.CSharp.IncludeRequiredAttribute)" />
+                                            <div class="small text-muted" style="font-size: 0.72rem;">
+                                                @t[TranslationKeys.DataModelCsRequiredErrorMsgHint]
+                                                <span class="ms-1">
+                                                    <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendRequiredErrorToken("{PropertyName}")'>{PropertyName}</code>
+                                                    <code class="user-select-all cursor-pointer" @onclick='() => AppendRequiredErrorToken("{ColumnName}")'>{ColumnName}</code>
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            }
-
-                            <!-- Custom PK Attribute -->
-                            <div class="form-check form-switch mb-1">
-                                <input class="form-check-input" type="checkbox" id="cs-p-pk-attr" @bind="_editingProfile.Options.CSharp.EnableCustomPkAttribute" />
-                                <label class="form-check-label small fw-semibold" for="cs-p-pk-attr">@t[TranslationKeys.DataModelCsEnableCustomPk]</label>
                             </div>
-                            @if (_editingProfile.Options.CSharp.EnableCustomPkAttribute)
-                            {
-                                <div class="ps-3 border-start mb-3">
-                                    <input type="text" class="form-control form-control-sm font-monospace" placeholder="[Key]" @bind="_editingProfile.Options.CSharp.CustomPkAttributeTemplate" />
+
+                            <!-- Column & String Length Card -->
+                            <div class="col-md-6">
+                                <div class="card h-100 border shadow-sm">
+                                    <div class="card-header bg-white py-2">
+                                        <span class="small fw-semibold">
+                                            <code class="text-primary fw-bold me-1">[Column]</code> &amp; <code class="text-primary fw-bold me-1">[StringLength]</code>
+                                        </span>
+                                    </div>
+                                    <div class="card-body p-3">
+                                        <!-- Column Placement Mode -->
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsColumnMode]</label>
+                                            <select class="form-select form-select-sm" @bind="_editingProfile.Options.CSharp.ColumnAttributeMode">
+                                                <option value="WhenNameDiffers">@t[TranslationKeys.DataModelCsColumnModeDiffers]</option>
+                                                <option value="Always">@t[TranslationKeys.DataModelCsColumnModeAlways]</option>
+                                                <option value="Never">@t[TranslationKeys.DataModelCsColumnModeNever]</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" id="cs-p-col-type" @bind="_editingProfile.Options.CSharp.IncludeColumnTypeName" disabled='@(_editingProfile.Options.CSharp.ColumnAttributeMode == "Never")' />
+                                            <label class="form-check-label small" for="cs-p-col-type">@t[TranslationKeys.DataModelCsColumnTypeName]</label>
+                                        </div>
+
+                                        <hr class="my-2" />
+
+                                        <!-- StringLength / MaxLength -->
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="cs-p-strlen" @bind="_editingProfile.Options.CSharp.IncludeStringLengthAttribute" />
+                                            <label class="form-check-label small fw-semibold" for="cs-p-strlen">@t[TranslationKeys.DataModelCsStringLengthAttribute]</label>
+                                        </div>
+
+                                        @if (_editingProfile.Options.CSharp.IncludeStringLengthAttribute)
+                                        {
+                                            <div class="ps-3 border-start">
+                                                <label class="form-label small mb-1">@t[TranslationKeys.DataModelCsStringLengthKind]</label>
+                                                <select class="form-select form-select-sm" @bind="_editingProfile.Options.CSharp.StringLengthAttributeKind">
+                                                    <option value="StringLength">[StringLength(n)]</option>
+                                                    <option value="MaxLength">[MaxLength(n)]</option>
+                                                </select>
+                                            </div>
+                                        }
+                                    </div>
                                 </div>
-                            }
+                            </div>
+
+                            <!-- Primary Key & Database Generated Card -->
+                            <div class="col-md-6">
+                                <div class="card h-100 border shadow-sm">
+                                    <div class="card-header bg-white py-2">
+                                        <span class="small fw-semibold">
+                                            <code class="text-success fw-bold me-1">[Key]</code> &amp; Identity
+                                        </span>
+                                    </div>
+                                    <div class="card-body p-3">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="cs-p-key" @bind="_editingProfile.Options.CSharp.IncludeKeyAttribute" />
+                                            <label class="form-check-label small" for="cs-p-key">@t[TranslationKeys.DataModelCsKeyAttribute]</label>
+                                        </div>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="cs-p-dbgen" @bind="_editingProfile.Options.CSharp.IncludeDatabaseGeneratedAttribute" />
+                                            <label class="form-check-label small" for="cs-p-dbgen">@t[TranslationKeys.DataModelCsDatabaseGeneratedAttribute]</label>
+                                        </div>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="cs-p-timestamp" @bind="_editingProfile.Options.CSharp.IncludeTimestampAttribute" />
+                                            <label class="form-check-label small" for="cs-p-timestamp">@t[TranslationKeys.DataModelCsIncludeTimestamp]</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Display & Documentation Card -->
+                            <div class="col-md-6">
+                                <div class="card h-100 border shadow-sm">
+                                    <div class="card-header bg-white py-2">
+                                        <span class="small fw-semibold">
+                                            <code class="text-info-emphasis fw-bold me-1">[Display]</code> &amp; Metadata
+                                        </span>
+                                    </div>
+                                    <div class="card-body p-3">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="cs-p-display" @bind="_editingProfile.Options.CSharp.IncludeDisplayAttribute" />
+                                            <label class="form-check-label small" for="cs-p-display">@t[TranslationKeys.DataModelCsDisplayAttribute]</label>
+                                        </div>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="cs-p-desc" @bind="_editingProfile.Options.CSharp.IncludeDescriptionAttribute" />
+                                            <label class="form-check-label small" for="cs-p-desc">@t[TranslationKeys.DataModelCsDescriptionAttribute]</label>
+                                        </div>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="cs-p-json" @bind="_editingProfile.Options.CSharp.IncludeJsonAttributes" />
+                                            <label class="form-check-label small" for="cs-p-json">@t[TranslationKeys.DataModelCsJsonAttributes]</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Entity Framework Core & Class Attributes Card -->
+                        <div class="col-12">
+                            <div class="card border shadow-sm">
+                                <div class="card-header bg-white py-2">
+                                    <span class="small fw-semibold">
+                                        <i class="bi bi-database me-1 text-primary"></i>Entity Framework Core &amp; Architecture
+                                    </span>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div class="row g-2">
+                                        <div class="col-md-3">
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" id="cs-p-ef" @bind="_editingProfile.Options.CSharp.IncludeEfCoreTableAttributes" />
+                                                <label class="form-check-label small" for="cs-p-ef">@t[TranslationKeys.DataModelCsEfTableAttributes]</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" id="cs-p-keyless" @bind="_editingProfile.Options.CSharp.IncludeKeylessAttributeForViews" />
+                                                <label class="form-check-label small" for="cs-p-keyless">@t[TranslationKeys.DataModelCsKeylessAttribute]</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" id="cs-p-idx" @bind="_editingProfile.Options.CSharp.IncludeIndexesAsAttributes" />
+                                                <label class="form-check-label small" for="cs-p-idx">@t[TranslationKeys.DataModelCsIncludeIndexes]</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" id="cs-p-nameof" @bind="_editingProfile.Options.CSharp.UseNameofInAttributes" />
+                                                <label class="form-check-label small" for="cs-p-nameof">@t[TranslationKeys.DataModelCsUseNameof]</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
+                        <!-- Custom FK and PK Attributes -->
+                        <div class="col-md-6">
+                            <div class="card h-100 border shadow-sm">
+                                <div class="card-header bg-white py-2">
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" type="checkbox" id="cs-p-fk-attr" @bind="_editingProfile.Options.CSharp.EnableCustomFkAttribute" />
+                                        <label class="form-check-label small fw-semibold" for="cs-p-fk-attr">@t[TranslationKeys.DataModelCsEnableCustomFk]</label>
+                                    </div>
+                                </div>
+                                <div class="card-body p-3">
+                                    @if (_editingProfile.Options.CSharp.EnableCustomFkAttribute)
+                                    {
+                                        <input type="text" class="form-control form-control-sm font-monospace mb-1" placeholder='[FkProperty(Name = "{FullFieldName}")]' @bind="_editingProfile.Options.CSharp.CustomFkAttributeTemplate" />
+                                        <div class="small text-muted" style="font-size: 0.72rem;">
+                                            Tokens:
+                                            <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendFkToken("{FullFieldName}")'>{FullFieldName}</code>
+                                            <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendFkToken("{PropertyName}")'>{PropertyName}</code>
+                                            <code class="user-select-all cursor-pointer me-1" @onclick='() => AppendFkToken("{ColumnName}")'>{ColumnName}</code>
+                                            <code class="user-select-all cursor-pointer" @onclick='() => AppendFkToken("{TargetTable}")'>{TargetTable}</code>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-muted small">Disabled</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card h-100 border shadow-sm">
+                                <div class="card-header bg-white py-2">
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" type="checkbox" id="cs-p-pk-attr" @bind="_editingProfile.Options.CSharp.EnableCustomPkAttribute" />
+                                        <label class="form-check-label small fw-semibold" for="cs-p-pk-attr">@t[TranslationKeys.DataModelCsEnableCustomPk]</label>
+                                    </div>
+                                </div>
+                                <div class="card-body p-3">
+                                    @if (_editingProfile.Options.CSharp.EnableCustomPkAttribute)
+                                    {
+                                        <input type="text" class="form-control form-control-sm font-monospace" placeholder="[Key]" @bind="_editingProfile.Options.CSharp.CustomPkAttributeTemplate" />
+                                    }
+                                    else
+                                    {
+                                        <div class="text-muted small">Disabled</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Custom Rules & Templates -->
                         <div class="col-12">
                             <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsCustomColumnRules]</label>
                             <textarea class="form-control form-control-sm font-monospace" rows="2" placeholder="@("*Date:[Auditable]\nuniqueidentifier:[GuidColumn]")" @bind="_editingProfile.Options.CSharp.CustomColumnAttributeRules"></textarea>
@@ -1835,6 +2024,12 @@
     private void AppendFkToken(string token)
     {
         _editingProfile.Options.CSharp.CustomFkAttributeTemplate += token;
+    }
+
+    private void AppendRequiredErrorToken(string token)
+    {
+        _editingProfile.Options.CSharp.RequiredErrorMessageTemplate =
+            (_editingProfile.Options.CSharp.RequiredErrorMessageTemplate ?? string.Empty) + token;
     }
 
     private void EnsureInitialConstants()

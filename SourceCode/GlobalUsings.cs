@@ -1,5 +1,7 @@
 // Global using directives for BprDevKit
 
+global using BprDevKit.Utility;
+
 global using BprDevKit.DataModelGenerator.Models;
 global using BprDevKit.DataModelGenerator.Services;
 global using BprDevKit.DataModelGenerator.Generators;

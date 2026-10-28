@@ -62,4 +62,44 @@ namespace BprDevKit.Utility
         Added,
         Deleted
     }
+
+    /// <summary>
+    /// Database object types
+    /// </summary>
+    public enum DatabaseObjectType
+    {
+        Table,
+        View,
+        StoredProcedure,
+        Function,
+        Trigger,
+        UserDefinedType,
+        Index,
+        CheckConstraint,
+        ForeignKey
+    }
+
+    /// <summary>
+    /// Data model object types (including result sets and parameters)
+    /// </summary>
+    public enum DataModelObjectType
+    {
+        Table,
+        View,
+        Procedure,
+        ProcedureParameters,
+        Function,
+        FunctionParameters
+    }
+
+    /// <summary>
+    /// Selection tabs in DataModelGenerator page
+    /// </summary>
+    public enum DataModelTab
+    {
+        Tables,
+        Views,
+        Procedures,
+        Functions
+    }
 }

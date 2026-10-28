@@ -18,7 +18,9 @@ namespace BprDevKit.DataModelGenerator.Generators
                 table.TableName,
                 globalOptions.RemoveTablePrefixes,
                 globalOptions.TablePrefixes,
-                globalOptions.SingularizeClassNames);
+                globalOptions.SingularizeClassNames,
+                globalOptions.PropertyNaming,
+                table.ObjectType);
 
             var sb = new StringBuilder();
 
@@ -83,7 +85,8 @@ namespace BprDevKit.DataModelGenerator.Generators
                 ClassName = className,
                 FileName = $"{className}.java",
                 Content = sb.ToString().TrimEnd() + Environment.NewLine,
-                Language = DataModelLanguage.Java
+                Language = DataModelLanguage.Java,
+                ObjectType = table.ObjectType
             };
         }
 
@@ -107,7 +110,7 @@ namespace BprDevKit.DataModelGenerator.Generators
             for (int i = 0; i < table.Columns.Count; i++)
             {
                 var col = table.Columns[i];
-                var fieldName = DataModelNamingHelper.ToCamelCase(col.ColumnName);
+                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
                 var javaType = SqlTypeMapper.MapToJava(col.DataType, col.IsNullable);
                 var comma = (i < table.Columns.Count - 1) ? "," : "";
 
@@ -172,7 +175,7 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
-                var fieldName = DataModelNamingHelper.ToCamelCase(col.ColumnName);
+                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
                 var javaType = SqlTypeMapper.MapToJava(col.DataType, col.IsNullable);
                 fields.Add((fieldName, javaType, col.ColumnName, col));
 
@@ -230,7 +233,9 @@ namespace BprDevKit.DataModelGenerator.Generators
                         fk.RefTableName,
                         globalOptions.RemoveTablePrefixes,
                         globalOptions.TablePrefixes,
-                        globalOptions.SingularizeClassNames);
+                        globalOptions.SingularizeClassNames,
+                        globalOptions.PropertyNaming,
+                        Constants.ObjectTypes.Table);
 
                     var fieldName = DataModelNamingHelper.ToCamelCase(parentClassName);
                     sb.AppendLine("    @ManyToOne(fetch = FetchType.LAZY)");

@@ -18,7 +18,9 @@ namespace BprDevKit.DataModelGenerator.Generators
                 table.TableName,
                 globalOptions.RemoveTablePrefixes,
                 globalOptions.TablePrefixes,
-                globalOptions.SingularizeClassNames);
+                globalOptions.SingularizeClassNames,
+                globalOptions.PropertyNaming,
+                table.ObjectType);
 
             var resolvedNamespace = ResolveNamespace(
                 options,
@@ -37,6 +39,10 @@ namespace BprDevKit.DataModelGenerator.Generators
             {
                 usings.Add("System.ComponentModel.DataAnnotations");
                 usings.Add("System.ComponentModel.DataAnnotations.Schema");
+                if (options.IncludeDescriptionAttribute)
+                {
+                    usings.Add("System.ComponentModel");
+                }
             }
 
             if (options.IncludeJsonAttributes)
@@ -44,7 +50,7 @@ namespace BprDevKit.DataModelGenerator.Generators
                 usings.Add("System.Text.Json.Serialization");
             }
 
-            if (options.IncludeEfCoreTableAttributes || options.IncludeIndexesAsAttributes || options.NavigationStyle == "Enterprise")
+            if (options.IncludeEfCoreTableAttributes || options.IncludeIndexesAsAttributes || options.NavigationStyle == "Enterprise" || options.IncludeKeylessAttributeForViews)
             {
                 usings.Add("Microsoft.EntityFrameworkCore");
             }
@@ -114,7 +120,7 @@ namespace BprDevKit.DataModelGenerator.Generators
             }
 
             // Table attribute
-            if (options.IncludeEfCoreTableAttributes)
+            if (options.IncludeEfCoreTableAttributes && table.IsEntityTableOrView())
             {
                 if (options.UseNameofInAttributes)
                 {
@@ -137,6 +143,16 @@ namespace BprDevKit.DataModelGenerator.Generators
                     {
                         sb.AppendLine($"{indent}[Table(\"{table.TableName}\")]");
                     }
+                }
+            }
+
+            // Keyless attribute for Views or Procedure results without Primary Key
+            if (options.IncludeKeylessAttributeForViews && options.IncludeEfCoreTableAttributes)
+            {
+                if ((table.ObjectType == Constants.ObjectTypes.View || table.ObjectType == Constants.ObjectTypes.Procedure) &&
+                    table.Columns.All(c => !c.IsPrimaryKey))
+                {
+                    sb.AppendLine($"{indent}[Keyless]");
                 }
             }
 
@@ -290,12 +306,12 @@ namespace BprDevKit.DataModelGenerator.Generators
                 // Data Annotations
                 if (options.IncludeDataAnnotations)
                 {
-                    if (col.IsPrimaryKey)
+                    if (options.IncludeKeyAttribute && col.IsPrimaryKey)
                     {
                         sb.AppendLine($"{indent}    [Key]");
                     }
 
-                    if (col.IsIdentity)
+                    if (options.IncludeDatabaseGeneratedAttribute && col.IsIdentity)
                     {
                         sb.AppendLine($"{indent}    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
                     }
@@ -305,19 +321,77 @@ namespace BprDevKit.DataModelGenerator.Generators
                         sb.AppendLine($"{indent}    [Timestamp]");
                     }
 
-                    if (!col.IsNullable && (csharpType == "string" || csharpType.StartsWith("byte[]")) && !string.Equals(col.DataType, "rowversion", StringComparison.OrdinalIgnoreCase) && !string.Equals(col.DataType, "timestamp", StringComparison.OrdinalIgnoreCase))
+                    // Flexible [Required] Attribute
+                    if (options.IncludeRequiredAttribute && ShouldIncludeRequired(col, csharpType, options))
                     {
-                        sb.AppendLine($"{indent}    [Required]");
+                        if (!string.IsNullOrWhiteSpace(options.RequiredErrorMessageTemplate))
+                        {
+                            var msg = options.RequiredErrorMessageTemplate
+                                .Replace("{PropertyName}", propName)
+                                .Replace("{ColumnName}", col.ColumnName)
+                                .Replace("\"", "\\\"");
+                            sb.AppendLine($"{indent}    [Required(ErrorMessage = \"{msg}\")]");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"{indent}    [Required]");
+                        }
                     }
 
-                    if (col.Length.HasValue && col.Length.Value > 0 && col.Length.Value < 8000 && (col.DataType.Contains("char") || col.DataType.Contains("varchar")))
+                    // [StringLength] or [MaxLength]
+                    if (options.IncludeStringLengthAttribute && col.Length.HasValue && col.Length.Value > 0 && col.Length.Value < 8000 && (col.DataType.Contains("char") || col.DataType.Contains("varchar")))
                     {
-                        sb.AppendLine($"{indent}    [StringLength({col.Length.Value})]");
+                        if (string.Equals(options.StringLengthAttributeKind, "MaxLength", StringComparison.OrdinalIgnoreCase))
+                        {
+                            sb.AppendLine($"{indent}    [MaxLength({col.Length.Value})]");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"{indent}    [StringLength({col.Length.Value})]");
+                        }
                     }
 
-                    if (propName != col.ColumnName)
+                    // [Column] Attribute
+                    var shouldIncludeColumn = options.ColumnAttributeMode switch
                     {
-                        sb.AppendLine($"{indent}    [Column(\"{col.ColumnName}\")]");
+                        "Always" => true,
+                        "Never" => false,
+                        _ => propName != col.ColumnName
+                    };
+
+                    if (shouldIncludeColumn)
+                    {
+                        if (options.IncludeColumnTypeName && !string.IsNullOrWhiteSpace(col.DataType))
+                        {
+                            var typeName = col.DataType;
+                            if (col.Precision.HasValue && col.Scale.HasValue && col.Precision.Value > 0)
+                            {
+                                typeName += $"({col.Precision.Value},{col.Scale.Value})";
+                            }
+                            else if (col.Length.HasValue && col.Length.Value > 0)
+                            {
+                                typeName += $"({col.Length.Value})";
+                            }
+                            sb.AppendLine($"{indent}    [Column(\"{col.ColumnName}\", TypeName = \"{typeName}\")]");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"{indent}    [Column(\"{col.ColumnName}\")]");
+                        }
+                    }
+
+                    // [Display] Attribute
+                    if (options.IncludeDisplayAttribute)
+                    {
+                        var displayName = DataModelNamingHelper.ToHumanReadableTitle(propName);
+                        sb.AppendLine($"{indent}    [Display(Name = \"{displayName}\")]");
+                    }
+
+                    // [Description] Attribute
+                    if (options.IncludeDescriptionAttribute && !string.IsNullOrWhiteSpace(col.Description))
+                    {
+                        var cleanDesc = col.Description.Replace("\"", "\\\"").Replace("\r", "").Replace("\n", " ");
+                        sb.AppendLine($"{indent}    [Description(\"{cleanDesc}\")]");
                     }
                 }
 
@@ -563,7 +637,9 @@ namespace BprDevKit.DataModelGenerator.Generators
                         fk.RefTableName,
                         globalOptions.RemoveTablePrefixes,
                         globalOptions.TablePrefixes,
-                        globalOptions.SingularizeClassNames);
+                        globalOptions.SingularizeClassNames,
+                        globalOptions.PropertyNaming,
+                        Constants.ObjectTypes.Table);
 
                     var localPropName = DataModelNamingHelper.FormatPropertyName(fk.ColumnName, globalOptions.PropertyNaming);
                     var refSchema = string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName;
@@ -689,7 +765,9 @@ namespace BprDevKit.DataModelGenerator.Generators
                             child.ChildTable.TableName,
                             globalOptions.RemoveTablePrefixes,
                             globalOptions.TablePrefixes,
-                            globalOptions.SingularizeClassNames);
+                            globalOptions.SingularizeClassNames,
+                            globalOptions.PropertyNaming,
+                            Constants.ObjectTypes.Table);
 
                         var childFkPropName = DataModelNamingHelper.FormatPropertyName(child.Fk.ColumnName, globalOptions.PropertyNaming);
                         var childNamespace = ResolveNamespace(options, child.ChildTable.SchemaName, table.DatabaseName ?? string.Empty, child.ChildTable.TableName);
@@ -973,7 +1051,8 @@ namespace BprDevKit.DataModelGenerator.Generators
                 FileName = $"{className}.cs",
                 Content = sb.ToString().TrimEnd() + Environment.NewLine,
                 Namespace = resolvedNamespace,
-                Language = DataModelLanguage.CSharp
+                Language = DataModelLanguage.CSharp,
+                ObjectType = table.ObjectType
             };
         }
 
@@ -1146,15 +1225,20 @@ namespace BprDevKit.DataModelGenerator.Generators
             sb.AppendLine($"{indent}    }}");
             sb.AppendLine();
 
-            foreach (var table in tables)
+            foreach (var table in tables.Where(t => t.IsEntityTableOrView()))
             {
                 var className = DataModelNamingHelper.FormatClassName(
                     table.TableName,
                     globalOptions.RemoveTablePrefixes,
                     globalOptions.TablePrefixes,
-                    globalOptions.SingularizeClassNames);
+                    globalOptions.SingularizeClassNames,
+                    globalOptions.PropertyNaming,
+                    table.ObjectType);
 
-                var dbSetName = className + "s";
+                var dbSetName = globalOptions.PropertyNaming == NamingConvention.Original
+                    ? table.TableName
+                    : (className.EndsWith("s") ? className : className + "s");
+
                 sb.AppendLine($"{indent}    public DbSet<{className}> {dbSetName} {{ get; set; }}");
             }
 
@@ -1170,13 +1254,19 @@ namespace BprDevKit.DataModelGenerator.Generators
                     table.TableName,
                     globalOptions.RemoveTablePrefixes,
                     globalOptions.TablePrefixes,
-                    globalOptions.SingularizeClassNames);
+                    globalOptions.SingularizeClassNames,
+                    globalOptions.PropertyNaming,
+                    table.ObjectType);
 
                 var pks = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pks.Count > 1)
                 {
                     var keys = string.Join(", ", pks.Select(k => $"e.{DataModelNamingHelper.FormatPropertyName(k.ColumnName, globalOptions.PropertyNaming)}"));
                     sb.AppendLine($"{indent}        modelBuilder.Entity<{className}>().HasKey(e => new {{ {keys} }});");
+                }
+                else if (table.ObjectType == Constants.ObjectTypes.View && pks.Count == 0)
+                {
+                    sb.AppendLine($"{indent}        modelBuilder.Entity<{className}>().HasNoKey().ToView(\"{table.TableName}\", \"{table.SchemaName}\");");
                 }
             }
 
@@ -1197,6 +1287,23 @@ namespace BprDevKit.DataModelGenerator.Generators
                 Content = sb.ToString().TrimEnd() + Environment.NewLine,
                 Namespace = ns ?? string.Empty,
                 Language = DataModelLanguage.CSharp
+            };
+        }
+
+        private static bool ShouldIncludeRequired(ColumnOperation.Information col, string csharpType, CSharpOptions options)
+        {
+            if (col.IsNullable) return false;
+            if (string.Equals(col.DataType, "rowversion", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(col.DataType, "timestamp", StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (col.IsPrimaryKey && !options.RequiredIncludePrimaryKeys)
+                return false;
+
+            return options.RequiredAttributeScope switch
+            {
+                "StringsAndByteArrays" => csharpType == "string" || csharpType.StartsWith("byte[]"),
+                "NonIdentity" => !col.IsIdentity,
+                _ => true // "AllNonNullable"
             };
         }
     }

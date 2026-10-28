@@ -328,5 +328,53 @@ namespace BprDevKit.Utility
             return string.Format(template, logLevel.ToString(), dateTime.ToString("yyyyMMdd"));
         }
         #endregion
+
+        #region Database & Model Object Helpers
+        /// <summary>
+        /// Combines schema and object name into standard "schema.object" format
+        /// </summary>
+        public static string ToQualifiedName(string schemaName, string objectName)
+        {
+            var s = string.IsNullOrWhiteSpace(schemaName) ? Constants.ModelGeneratorDefaults.DefaultSchema : schemaName;
+            return $"{s}.{objectName}";
+        }
+
+        /// <summary>
+        /// Parses a "schema.object" string into schema and object name
+        /// </summary>
+        public static bool TryParseQualifiedName(string qualifiedName, out string schemaName, out string objectName)
+        {
+            schemaName = string.Empty;
+            objectName = string.Empty;
+            if (string.IsNullOrWhiteSpace(qualifiedName)) return false;
+
+            var parts = qualifiedName.Split('.');
+            if (parts.Length != 2) return false;
+
+            schemaName = parts[0].Trim();
+            objectName = parts[1].Trim();
+            return !string.IsNullOrWhiteSpace(schemaName) && !string.IsNullOrWhiteSpace(objectName);
+        }
+
+        /// <summary>
+        /// Checks whether a model represents an entity table or view (used for EF Core attributes and DbContext DbSets)
+        /// </summary>
+        public static bool IsEntityTableOrView(this TableOperation.Information table)
+        {
+            return string.Equals(table.ObjectType, Constants.ObjectTypes.Table, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(table.ObjectType, Constants.ObjectTypes.View, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Returns the standard Bootstrap icon CSS class for a given data model object type
+        /// </summary>
+        public static string GetModelObjectIcon(string objectType) => objectType switch
+        {
+            Constants.ObjectTypes.View => "bi-eye text-success",
+            Constants.ObjectTypes.Procedure or Constants.ObjectTypes.ProcedureParameters => "bi-lightning text-warning",
+            Constants.ObjectTypes.Function or Constants.ObjectTypes.FunctionParameters => "bi-gear text-info",
+            _ => "bi-table text-primary"
+        };
+        #endregion
     }
 }

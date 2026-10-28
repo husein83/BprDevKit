@@ -32,7 +32,7 @@ namespace BprDevKit.DataModelGenerator.Models
         public NamingConvention PropertyNaming { get; set; } = NamingConvention.PascalCase;
         public ZipPackagingStructure ZipPackaging { get; set; } = ZipPackagingStructure.BySchema;
         public bool RemoveTablePrefixes { get; set; } = true;
-        public string TablePrefixes { get; set; } = "tbl_,tbl,vw_,view_";
+        public string TablePrefixes { get; set; } = "tbl_,tbl,vw_,view_,sp_,usp_,fn_,ufn_";
         public bool SingularizeClassNames { get; set; } = true;
         public bool IncludeNavigationProperties { get; set; } = true;
         public bool IncludeDocumentationComments { get; set; } = true;
@@ -170,6 +170,22 @@ namespace BprDevKit.DataModelGenerator.Models
 
         public bool NullableReferenceTypes { get; set; } = true;
         public bool IncludeDataAnnotations { get; set; } = true;
+
+        // Fine-grained Data Annotations Control
+        public bool IncludeKeyAttribute { get; set; } = true;
+        public bool IncludeRequiredAttribute { get; set; } = true;
+        public string RequiredAttributeScope { get; set; } = "AllNonNullable"; // AllNonNullable, StringsAndByteArrays, NonIdentity
+        public bool RequiredIncludePrimaryKeys { get; set; } = false;
+        public string RequiredErrorMessageTemplate { get; set; } = string.Empty;
+        public bool IncludeStringLengthAttribute { get; set; } = true;
+        public string StringLengthAttributeKind { get; set; } = "StringLength"; // StringLength, MaxLength
+        public string ColumnAttributeMode { get; set; } = "WhenNameDiffers"; // WhenNameDiffers, Always, Never
+        public bool IncludeColumnTypeName { get; set; } = false;
+        public bool IncludeDatabaseGeneratedAttribute { get; set; } = true;
+        public bool IncludeDisplayAttribute { get; set; } = false;
+        public bool IncludeDescriptionAttribute { get; set; } = false;
+        public bool IncludeKeylessAttributeForViews { get; set; } = true;
+
         public bool IncludeJsonAttributes { get; set; } = false;
         public bool IncludeEfCoreTableAttributes { get; set; } = true;
         public bool UseNameofInAttributes { get; set; } = false;
@@ -270,5 +286,6 @@ namespace BprDevKit.DataModelGenerator.Models
         public string Content { get; set; } = string.Empty;
         public string Namespace { get; set; } = string.Empty;
         public DataModelLanguage Language { get; set; }
+        public string ObjectType { get; set; } = Constants.ObjectTypes.Table;
     }
 }

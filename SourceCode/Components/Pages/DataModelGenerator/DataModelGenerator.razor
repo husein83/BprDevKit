@@ -219,16 +219,51 @@
     {
         <!-- Main Workspace (2 columns: Tables on Left, Roomy Code Viewer on Right) -->
         <div class="row g-4">
-            <!-- Left: Tables Selection -->
-            <div class="col-lg-3 col-xl-3">
+            <!-- Left: Objects Selection (Tables, Views, Procedures, Functions) -->
+            <div class="col-lg-4 col-xl-3">
                 <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-white py-3 border-bottom-0 d-flex justify-content-between align-items-center">
+                    <div class="card-header bg-white py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
                         <h2 class="h6 mb-0 fw-bold">
-                            <i class="bi bi-table me-2 text-primary"></i>@t[TranslationKeys.DataModelSelectTables]
+                            <i class="bi bi-stack me-2 text-primary"></i>@t[TranslationKeys.DataModelSelectObjects]
                         </h2>
-                        <span class="badge text-bg-primary rounded-pill">@_selectedTables.Count / @_allTables.Count</span>
+                        <span class="badge text-bg-primary rounded-pill">@TotalSelectedCount</span>
                     </div>
-                    <div class="card-body pt-0 d-flex flex-column" style="max-height: 720px;">
+
+                    <!-- Object Type Tabs -->
+                    <div class="p-2 bg-light border-bottom">
+                        <div class="btn-group w-100 btn-group-sm" role="group">
+                            <button type="button" class="btn @(_activeObjectTab == DataModelTab.Tables ? "btn-primary" : "btn-outline-secondary") position-relative" @onclick='() => _activeObjectTab = DataModelTab.Tables'>
+                                <i class="bi bi-table me-1"></i>@t[TranslationKeys.Tables]
+                                @if (_selectedTables.Count > 0)
+                                {
+                                    <span class="badge bg-white text-primary rounded-pill ms-1">@_selectedTables.Count</span>
+                                }
+                            </button>
+                            <button type="button" class="btn @(_activeObjectTab == DataModelTab.Views ? "btn-primary" : "btn-outline-secondary") position-relative" @onclick='() => _activeObjectTab = DataModelTab.Views'>
+                                <i class="bi bi-eye me-1"></i>@t[TranslationKeys.Views]
+                                @if (_selectedViews.Count > 0)
+                                {
+                                    <span class="badge bg-white text-primary rounded-pill ms-1">@_selectedViews.Count</span>
+                                }
+                            </button>
+                            <button type="button" class="btn @(_activeObjectTab == DataModelTab.Procedures ? "btn-primary" : "btn-outline-secondary") position-relative" @onclick='() => _activeObjectTab = DataModelTab.Procedures'>
+                                <i class="bi bi-lightning me-1"></i>@t[TranslationKeys.StoredProcedures]
+                                @if (_selectedProcedures.Count > 0)
+                                {
+                                    <span class="badge bg-white text-primary rounded-pill ms-1">@_selectedProcedures.Count</span>
+                                }
+                            </button>
+                            <button type="button" class="btn @(_activeObjectTab == DataModelTab.Functions ? "btn-primary" : "btn-outline-secondary") position-relative" @onclick='() => _activeObjectTab = DataModelTab.Functions'>
+                                <i class="bi bi-gear me-1"></i>@t[TranslationKeys.Functions]
+                                @if (_selectedFunctions.Count > 0)
+                                {
+                                    <span class="badge bg-white text-primary rounded-pill ms-1">@_selectedFunctions.Count</span>
+                                }
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card-body pt-2 d-flex flex-column" style="max-height: 720px;">
                         <!-- Filter and Select/Deselect All -->
                         <div class="mb-3">
                             <div class="input-group input-group-sm mb-2">
@@ -236,16 +271,16 @@
                                 <input type="text" class="form-control border-start-0" placeholder="@t[TranslationKeys.DataModelSearchPlaceholder]" @bind="_searchFilter" @bind:event="oninput" />
                             </div>
                             <div class="d-flex gap-2">
-                                <button class="btn btn-xs btn-outline-primary flex-fill" type="button" @onclick="SelectAllTables" disabled="@(_allTables.Count == 0)">
+                                <button class="btn btn-xs btn-outline-primary flex-fill" type="button" @onclick="SelectAllCurrent">
                                     @t[TranslationKeys.DataModelSelectAll]
                                 </button>
-                                <button class="btn btn-xs btn-outline-secondary flex-fill" type="button" @onclick="DeselectAllTables" disabled="@(_selectedTables.Count == 0)">
+                                <button class="btn btn-xs btn-outline-secondary flex-fill" type="button" @onclick="DeselectAllCurrent">
                                     @t[TranslationKeys.DataModelDeselectAll]
                                 </button>
                             </div>
                         </div>
 
-                        <!-- Table Checkbox List -->
+                        <!-- Checkbox List based on active tab -->
                         @if (_isLoadingObjects)
                         {
                             <div class="d-flex flex-column align-items-center justify-content-center py-5 text-muted">
@@ -253,30 +288,121 @@
                                 <span class="small">@t[TranslationKeys.Loading]</span>
                             </div>
                         }
-                        else if (_allTables.Count == 0)
-                        {
-                            <div class="text-center py-5 text-muted small">
-                                <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>
-                                @t[TranslationKeys.DataModelNoTablesSelected]
-                            </div>
-                        }
                         else
                         {
-                            <div class="overflow-auto flex-fill pe-1" style="max-height: 520px;">
-                                @foreach (var tbl in FilteredTables)
+                            <div class="overflow-auto flex-fill pe-1" style="max-height: 500px;">
+                                @if (_activeObjectTab == DataModelTab.Tables)
                                 {
-                                    var key = $"{tbl.SchemaName}.{tbl.TableName}";
-                                    var isChecked = _selectedTables.Contains(key);
-                                    <div class="form-check py-1 border-bottom border-light">
-                                        <input class="form-check-input" type="checkbox" id="tbl-@key" checked="@isChecked" @onchange="(e) => ToggleTableSelection(key, e.Value)" />
-                                        <label class="form-check-label small text-truncate d-block" for="tbl-@key" title="@tbl.FullName">
-                                            <span class="text-muted">@tbl.SchemaName.</span><strong>@tbl.TableName</strong>
-                                        </label>
-                                    </div>
+                                    @if (_allTables.Count == 0)
+                                    {
+                                        <div class="text-center py-5 text-muted small">
+                                            <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>
+                                            @t[TranslationKeys.DataModelNoTablesSelected]
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var tbl in FilteredTables)
+                                        {
+                                            var key = DevExtensions.ToQualifiedName(tbl.SchemaName, tbl.TableName);
+                                            var isChecked = _selectedTables.Contains(key);
+                                            <div class="form-check py-1 border-bottom border-light">
+                                                <input class="form-check-input" type="checkbox" id="tbl-@key" checked="@isChecked" @onchange="(e) => ToggleSelection(_selectedTables, key, e.Value)" />
+                                                <label class="form-check-label small text-truncate d-block" for="tbl-@key" title="@tbl.FullName">
+                                                    <span class="text-muted">@tbl.SchemaName.</span><strong>@tbl.TableName</strong>
+                                                </label>
+                                            </div>
+                                        }
+                                        @if (!FilteredTables.Any())
+                                        {
+                                            <div class="text-muted small py-3 text-center">@t[TranslationKeys.DataModelNoMatchFilter]</div>
+                                        }
+                                    }
                                 }
-                                @if (!FilteredTables.Any())
+                                else if (_activeObjectTab == DataModelTab.Views)
                                 {
-                                    <div class="text-muted small py-3 text-center">@t[TranslationKeys.DataModelNoMatchFilter]</div>
+                                    @if (_allViews.Count == 0)
+                                    {
+                                        <div class="text-center py-5 text-muted small">
+                                            <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>
+                                            @t[TranslationKeys.DataModelNoViewsFound]
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var vw in FilteredViews)
+                                        {
+                                            var key = DevExtensions.ToQualifiedName(vw.SchemaName, vw.ViewName);
+                                            var isChecked = _selectedViews.Contains(key);
+                                            <div class="form-check py-1 border-bottom border-light">
+                                                <input class="form-check-input" type="checkbox" id="vw-@key" checked="@isChecked" @onchange="(e) => ToggleSelection(_selectedViews, key, e.Value)" />
+                                                <label class="form-check-label small text-truncate d-block" for="vw-@key" title="@key">
+                                                    <span class="text-muted">@vw.SchemaName.</span><strong class="text-success">@vw.ViewName</strong>
+                                                </label>
+                                            </div>
+                                        }
+                                        @if (!FilteredViews.Any())
+                                        {
+                                            <div class="text-muted small py-3 text-center">@t[TranslationKeys.DataModelNoMatchFilter]</div>
+                                        }
+                                    }
+                                }
+                                else if (_activeObjectTab == DataModelTab.Procedures)
+                                {
+                                    @if (_allProcedures.Count == 0)
+                                    {
+                                        <div class="text-center py-5 text-muted small">
+                                            <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>
+                                            @t[TranslationKeys.DataModelNoProceduresFound]
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var proc in FilteredProcedures)
+                                        {
+                                            var key = DevExtensions.ToQualifiedName(proc.SchemaName, proc.ProcedureName);
+                                            var isChecked = _selectedProcedures.Contains(key);
+                                            <div class="form-check py-1 border-bottom border-light">
+                                                <input class="form-check-input" type="checkbox" id="pr-@key" checked="@isChecked" @onchange="(e) => ToggleSelection(_selectedProcedures, key, e.Value)" />
+                                                <label class="form-check-label small text-truncate d-block" for="pr-@key" title="@key">
+                                                    <span class="text-muted">@proc.SchemaName.</span><strong class="text-warning-emphasis">@proc.ProcedureName</strong>
+                                                </label>
+                                            </div>
+                                        }
+                                        @if (!FilteredProcedures.Any())
+                                        {
+                                            <div class="text-muted small py-3 text-center">@t[TranslationKeys.DataModelNoMatchFilter]</div>
+                                        }
+                                    }
+                                }
+                                else if (_activeObjectTab == DataModelTab.Functions)
+                                {
+                                    @if (_allFunctions.Count == 0)
+                                    {
+                                        <div class="text-center py-5 text-muted small">
+                                            <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>
+                                            @t[TranslationKeys.DataModelNoFunctionsFound]
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var func in FilteredFunctions)
+                                        {
+                                            var key = DevExtensions.ToQualifiedName(func.SchemaName, func.FunctionName);
+                                            var isChecked = _selectedFunctions.Contains(key);
+                                            <div class="form-check py-1 border-bottom border-light">
+                                                <input class="form-check-input" type="checkbox" id="fn-@key" checked="@isChecked" @onchange="(e) => ToggleSelection(_selectedFunctions, key, e.Value)" />
+                                                <label class="form-check-label small text-truncate d-block" for="fn-@key" title="@key">
+                                                    <span class="text-muted">@func.SchemaName.</span><strong class="text-info-emphasis">@func.FunctionName</strong>
+                                                    <span class="badge bg-secondary-subtle text-secondary ms-1 font-monospace" style="font-size: 0.65rem;">@func.FunctionType</span>
+                                                </label>
+                                            </div>
+                                        }
+                                        @if (!FilteredFunctions.Any())
+                                        {
+                                            <div class="text-muted small py-3 text-center">@t[TranslationKeys.DataModelNoMatchFilter]</div>
+                                        }
+                                    }
                                 }
                             </div>
                         }
@@ -285,7 +411,7 @@
                         <div class="pt-3 border-top mt-auto">
                             <button class="btn btn-primary w-100 py-2 fw-bold shadow-sm"
                                     type="button" @onclick="GenerateModels"
-                                    disabled="@(_isGenerating || _selectedTables.Count == 0)">
+                                    disabled="@(_isGenerating || TotalSelectedCount == 0)">
                                 @if (_isGenerating)
                                 {
                                     <span class="spinner-border spinner-border-sm me-2"></span>
@@ -295,6 +421,10 @@
                                 {
                                     <i class="bi bi-play-fill me-1 fs-5 align-middle"></i>
                                     @t[TranslationKeys.DataModelGenerate]
+                                    @if (TotalSelectedCount > 0)
+                                    {
+                                        <span class="badge bg-white text-primary rounded-pill ms-1">@TotalSelectedCount</span>
+                                    }
                                 }
                             </button>
                         </div>
@@ -374,7 +504,7 @@
                                     <li class="nav-item">
                                         <button class="nav-link py-1 px-3 text-nowrap @(_selectedFileIndex == index ? "active fw-bold" : "")"
                                                 type="button" @onclick="() => SelectFileTab(index)">
-                                            <i class="bi bi-file-code me-1 text-primary"></i>@file.FileName
+                                            <i class="bi @GetFileIcon(file.ObjectType) me-1"></i>@file.FileName
                                         </button>
                                     </li>
                                 }
@@ -403,7 +533,7 @@
                                 <h3 class="h5 fw-normal mb-1">@t[TranslationKeys.DataModelTitle]</h3>
                                 <p class="small mb-3" style="max-width: 450px;">@t[TranslationKeys.DataModelSubtitle]</p>
                                 <button class="btn btn-primary btn-sm px-4 py-2" type="button"
-                                        @onclick="GenerateModels" disabled="@(_selectedTables.Count == 0)">
+                                        @onclick="GenerateModels" disabled="@(TotalSelectedCount == 0)">
                                     <i class="bi bi-play-fill me-1"></i>@t[TranslationKeys.DataModelGenerate]
                                 </button>
                             </div>
@@ -432,7 +562,20 @@
 
     private List<TableOperation.Information> _allTables = new();
     private HashSet<string> _selectedTables = new();
+
+    private List<ViewOperation.Information> _allViews = new();
+    private HashSet<string> _selectedViews = new();
+
+    private List<StoredProcedureOperation.Information> _allProcedures = new();
+    private HashSet<string> _selectedProcedures = new();
+
+    private List<FunctionOperation.Information> _allFunctions = new();
+    private HashSet<string> _selectedFunctions = new();
+
+    private DataModelTab _activeObjectTab = DataModelTab.Tables;
     private string _searchFilter = string.Empty;
+
+    private int TotalSelectedCount => _selectedTables.Count + _selectedViews.Count + _selectedProcedures.Count + _selectedFunctions.Count;
 
     private List<GeneratedModelFile> _generatedFiles = new();
     private int _selectedFileIndex = 0;
@@ -450,6 +593,27 @@
             : _allTables.Where(t =>
                 t.TableName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase) ||
                 t.SchemaName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<ViewOperation.Information> FilteredViews =>
+        string.IsNullOrWhiteSpace(_searchFilter)
+            ? _allViews
+            : _allViews.Where(v =>
+                v.ViewName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase) ||
+                v.SchemaName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<StoredProcedureOperation.Information> FilteredProcedures =>
+        string.IsNullOrWhiteSpace(_searchFilter)
+            ? _allProcedures
+            : _allProcedures.Where(p =>
+                p.ProcedureName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase) ||
+                p.SchemaName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<FunctionOperation.Information> FilteredFunctions =>
+        string.IsNullOrWhiteSpace(_searchFilter)
+            ? _allFunctions
+            : _allFunctions.Where(f =>
+                f.FunctionName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase) ||
+                f.SchemaName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase));
 
     private string ActiveCodeContent =>
         _selectedFileIndex >= 0 && _selectedFileIndex < _generatedFiles.Count
@@ -503,6 +667,12 @@
         _profiles.Clear();
         _allTables.Clear();
         _selectedTables.Clear();
+        _allViews.Clear();
+        _selectedViews.Clear();
+        _allProcedures.Clear();
+        _selectedProcedures.Clear();
+        _allFunctions.Clear();
+        _selectedFunctions.Clear();
         ClearOutput();
 
         if (_databaseManager != null)
@@ -540,6 +710,12 @@
         _selectedProfile = null;
         _allTables.Clear();
         _selectedTables.Clear();
+        _allViews.Clear();
+        _selectedViews.Clear();
+        _allProcedures.Clear();
+        _selectedProcedures.Clear();
+        _allFunctions.Clear();
+        _selectedFunctions.Clear();
         ClearOutput();
 
         if (_databaseManager == null || string.IsNullOrWhiteSpace(_selectedDatabase)) return;
@@ -572,9 +748,9 @@
                 _options = _selectedProfile.Options;
                 _zipPackaging = _options.ZipPackaging;
                 ClearOutput();
-                if (_allTables.Count == 0 && _databaseManager != null && !string.IsNullOrWhiteSpace(_selectedDatabase))
+                if ((_allTables.Count == 0 && _allViews.Count == 0 && _allProcedures.Count == 0 && _allFunctions.Count == 0) && _databaseManager != null && !string.IsNullOrWhiteSpace(_selectedDatabase))
                 {
-                    await LoadTables();
+                    await LoadAllObjects();
                 }
             }
         }
@@ -585,21 +761,42 @@
         }
     }
 
-    private async Task LoadTables()
+    private async Task LoadAllObjects()
     {
         if (_databaseManager == null || string.IsNullOrWhiteSpace(_selectedDatabase)) return;
 
         _isLoadingObjects = true;
         try
         {
-            var tableResult = await _databaseManager.GetTableList(_selectedDatabase);
+            var tablesTask = _databaseManager.GetTableList(_selectedDatabase);
+            var viewsTask = _databaseManager.GetViews(_selectedDatabase);
+            var proceduresTask = _databaseManager.GetProcedures(_selectedDatabase);
+            var functionsTask = _databaseManager.GetFunctions(_selectedDatabase);
+
+            await Task.WhenAll(tablesTask, viewsTask, proceduresTask, functionsTask);
+
+            var tableResult = await tablesTask;
             if (tableResult.operationResult.Success)
             {
                 _allTables = tableResult.tables.OrderBy(t => t.SchemaName).ThenBy(t => t.TableName).ToList();
             }
-            else
+
+            var viewResult = await viewsTask;
+            if (viewResult.operationResult.Success)
             {
-                _bprMessage = BprMessage.Error(tableResult.operationResult.Message);
+                _allViews = viewResult.views.OrderBy(v => v.SchemaName).ThenBy(v => v.ViewName).ToList();
+            }
+
+            var procResult = await proceduresTask;
+            if (procResult.operationResult.Success)
+            {
+                _allProcedures = procResult.procedures.OrderBy(p => p.SchemaName).ThenBy(p => p.ProcedureName).ToList();
+            }
+
+            var funcResult = await functionsTask;
+            if (funcResult.operationResult.Success)
+            {
+                _allFunctions = funcResult.functions.OrderBy(f => f.SchemaName).ThenBy(f => f.FunctionName).ToList();
             }
         }
         catch (Exception ex)
@@ -612,38 +809,65 @@
         }
     }
 
-    private void SelectAllTables()
+    private void SelectAllCurrent()
     {
-        foreach (var tbl in FilteredTables)
+        switch (_activeObjectTab)
         {
-            _selectedTables.Add($"{tbl.SchemaName}.{tbl.TableName}");
+            case DataModelTab.Tables:
+                foreach (var tbl in FilteredTables) _selectedTables.Add(DevExtensions.ToQualifiedName(tbl.SchemaName, tbl.TableName));
+                break;
+            case DataModelTab.Views:
+                foreach (var vw in FilteredViews) _selectedViews.Add(DevExtensions.ToQualifiedName(vw.SchemaName, vw.ViewName));
+                break;
+            case DataModelTab.Procedures:
+                foreach (var p in FilteredProcedures) _selectedProcedures.Add(DevExtensions.ToQualifiedName(p.SchemaName, p.ProcedureName));
+                break;
+            case DataModelTab.Functions:
+                foreach (var f in FilteredFunctions) _selectedFunctions.Add(DevExtensions.ToQualifiedName(f.SchemaName, f.FunctionName));
+                break;
         }
     }
 
-    private void DeselectAllTables()
+    private void DeselectAllCurrent()
     {
-        _selectedTables.Clear();
+        switch (_activeObjectTab)
+        {
+            case DataModelTab.Tables:
+                _selectedTables.Clear();
+                break;
+            case DataModelTab.Views:
+                _selectedViews.Clear();
+                break;
+            case DataModelTab.Procedures:
+                _selectedProcedures.Clear();
+                break;
+            case DataModelTab.Functions:
+                _selectedFunctions.Clear();
+                break;
+        }
     }
 
-    private void ToggleTableSelection(string key, object? value)
+    private void ToggleSelection(HashSet<string> set, string key, object? value)
     {
         if (value is bool b && b)
         {
-            _selectedTables.Add(key);
+            set.Add(key);
         }
         else
         {
-            _selectedTables.Remove(key);
+            set.Remove(key);
         }
     }
+
+    private static string GetFileIcon(string objectType) => DevExtensions.GetModelObjectIcon(objectType);
 
     private async Task GenerateModels()
     {
         if (_databaseManager == null || string.IsNullOrWhiteSpace(_selectedDatabase)) return;
 
-        if (_selectedTables.Count == 0)
+        if (TotalSelectedCount == 0)
         {
-            _bprMessage = BprMessage.Warning(TranslationFactory.Current[TranslationKeys.DataModelNoTablesSelected]);
+            _bprMessage = BprMessage.Warning(TranslationFactory.Current[TranslationKeys.DataModelNoObjectsSelected]);
             return;
         }
 
@@ -651,26 +875,132 @@
         _bprMessage = null;
         try
         {
-            var tablesToProcess = new List<TableOperation.Information>();
+            var objectsToProcess = new List<TableOperation.Information>();
+
+            // 1. Tables
             foreach (var key in _selectedTables)
             {
-                var parts = key.Split('.');
-                if (parts.Length != 2) continue;
+                if (!DevExtensions.TryParseQualifiedName(key, out var schema, out var name)) continue;
 
                 var res = await _databaseManager.GetTableInformation(new TableOperation.Information
                 {
                     DatabaseName = _selectedDatabase,
-                    SchemaName = parts[0],
-                    TableName = parts[1]
+                    SchemaName = schema,
+                    TableName = name
                 });
 
                 if (res.operationResult.Success && res.table != null)
                 {
-                    tablesToProcess.Add(res.table);
+                    res.table.ObjectType = Constants.ObjectTypes.Table;
+                    objectsToProcess.Add(res.table);
                 }
             }
 
-            _generatedFiles = GeneratorService.GenerateModels(tablesToProcess, _options);
+            // 2. Views
+            foreach (var key in _selectedViews)
+            {
+                if (!DevExtensions.TryParseQualifiedName(key, out var schema, out var name)) continue;
+
+                var (opRes, cols) = await _databaseManager.GetViewColumns(_selectedDatabase, schema, name);
+                if (opRes.Success && cols != null && cols.Count > 0)
+                {
+                    objectsToProcess.Add(new TableOperation.Information
+                    {
+                        DatabaseName = _selectedDatabase,
+                        SchemaName = schema,
+                        TableName = name,
+                        ObjectType = Constants.ObjectTypes.View,
+                        Columns = cols
+                    });
+                }
+            }
+
+            // 3. Stored Procedures
+            foreach (var key in _selectedProcedures)
+            {
+                if (!DevExtensions.TryParseQualifiedName(key, out var schema, out var name)) continue;
+
+                var (opRes, resCols, paramCols) = await _databaseManager.GetProcedureMetadata(_selectedDatabase, schema, name);
+                if (opRes.Success)
+                {
+                    var resSuffix = (_options.PropertyNaming == NamingConvention.Original && name.Contains('_'))
+                        ? $"_{Constants.ModelGeneratorDefaults.ResultSuffix}"
+                        : Constants.ModelGeneratorDefaults.ResultSuffix;
+                    var paramSuffix = (_options.PropertyNaming == NamingConvention.Original && name.Contains('_'))
+                        ? $"_{Constants.ModelGeneratorDefaults.ParametersSuffix}"
+                        : Constants.ModelGeneratorDefaults.ParametersSuffix;
+
+                    if (resCols != null && resCols.Count > 0)
+                    {
+                        objectsToProcess.Add(new TableOperation.Information
+                        {
+                            DatabaseName = _selectedDatabase,
+                            SchemaName = schema,
+                            TableName = $"{name}{resSuffix}",
+                            ObjectType = Constants.ObjectTypes.Procedure,
+                            Columns = resCols
+                        });
+                    }
+
+                    if (paramCols != null && paramCols.Count > 0)
+                    {
+                        objectsToProcess.Add(new TableOperation.Information
+                        {
+                            DatabaseName = _selectedDatabase,
+                            SchemaName = schema,
+                            TableName = $"{name}{paramSuffix}",
+                            ObjectType = Constants.ObjectTypes.ProcedureParameters,
+                            Columns = paramCols
+                        });
+                    }
+                }
+            }
+
+            // 4. Functions
+            foreach (var key in _selectedFunctions)
+            {
+                if (!DevExtensions.TryParseQualifiedName(key, out var schema, out var name)) continue;
+
+                var funcInfo = _allFunctions.FirstOrDefault(f => f.SchemaName == schema && f.FunctionName == name);
+                var funcType = funcInfo?.FunctionType ?? "FN";
+
+                var (opRes, resCols, paramCols) = await _databaseManager.GetFunctionMetadata(_selectedDatabase, schema, name, funcType);
+                if (opRes.Success)
+                {
+                    var resSuffix = (_options.PropertyNaming == NamingConvention.Original && name.Contains('_'))
+                        ? $"_{Constants.ModelGeneratorDefaults.ResultSuffix}"
+                        : Constants.ModelGeneratorDefaults.ResultSuffix;
+                    var paramSuffix = (_options.PropertyNaming == NamingConvention.Original && name.Contains('_'))
+                        ? $"_{Constants.ModelGeneratorDefaults.ParametersSuffix}"
+                        : Constants.ModelGeneratorDefaults.ParametersSuffix;
+
+                    if (resCols != null && resCols.Count > 0)
+                    {
+                        objectsToProcess.Add(new TableOperation.Information
+                        {
+                            DatabaseName = _selectedDatabase,
+                            SchemaName = schema,
+                            TableName = $"{name}{resSuffix}",
+                            ObjectType = Constants.ObjectTypes.Function,
+                            Columns = resCols
+                        });
+                    }
+
+                    if (paramCols != null && paramCols.Count > 0)
+                    {
+                        objectsToProcess.Add(new TableOperation.Information
+                        {
+                            DatabaseName = _selectedDatabase,
+                            SchemaName = schema,
+                            TableName = $"{name}{paramSuffix}",
+                            ObjectType = Constants.ObjectTypes.FunctionParameters,
+                            Columns = paramCols
+                        });
+                    }
+                }
+            }
+
+            _generatedFiles = GeneratorService.GenerateModels(objectsToProcess, _options);
             _selectedFileIndex = _generatedFiles.Count > 0 ? 0 : -1;
 
             Logger.LogInformation(
@@ -811,6 +1141,12 @@
         _selectedDatabase = string.Empty;
         _allTables.Clear();
         _selectedTables.Clear();
+        _allViews.Clear();
+        _selectedViews.Clear();
+        _allProcedures.Clear();
+        _selectedProcedures.Clear();
+        _allFunctions.Clear();
+        _selectedFunctions.Clear();
         _selectedProfileId = null;
         _selectedProfile = null;
         _profiles.Clear();

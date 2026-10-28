@@ -9,7 +9,13 @@ namespace BprDevKit.DataModelGenerator.Services
 {
     public static class DataModelNamingHelper
     {
-        public static string FormatClassName(string rawName, bool removePrefixes, string prefixList, bool singularize)
+        public static string FormatClassName(
+            string rawName,
+            bool removePrefixes,
+            string prefixList,
+            bool singularize,
+            NamingConvention naming = NamingConvention.PascalCase,
+            string? objectType = null)
         {
             if (string.IsNullOrWhiteSpace(rawName)) return "Unnamed";
 
@@ -28,16 +34,25 @@ namespace BprDevKit.DataModelGenerator.Services
                 }
             }
 
-            clean = ToPascalCase(clean);
+            // Apply naming convention to class name
+            clean = naming switch
+            {
+                NamingConvention.Original => SanitizeIdentifier(clean),
+                NamingConvention.CamelCase => ToCamelCase(clean),
+                NamingConvention.SnakeCase => ToSnakeCase(clean),
+                _ => ToPascalCase(clean)
+            };
 
-            if (singularize)
+            // Only singularize Table objects (never singularize Procedures, Functions, or Views) and never when Original naming is chosen
+            var isTable = string.IsNullOrWhiteSpace(objectType) || string.Equals(objectType, Constants.ObjectTypes.Table, StringComparison.OrdinalIgnoreCase);
+            if (singularize && isTable && naming != NamingConvention.Original)
             {
                 clean = Singularize(clean);
             }
 
             if (string.IsNullOrWhiteSpace(clean))
             {
-                clean = ToPascalCase(rawName);
+                clean = naming == NamingConvention.Original ? SanitizeIdentifier(rawName) : ToPascalCase(rawName);
             }
 
             // Ensure valid identifier
@@ -61,6 +76,14 @@ namespace BprDevKit.DataModelGenerator.Services
                 NamingConvention.SnakeCase => ToSnakeCase(rawName),
                 _ => ToPascalCase(rawName)
             };
+        }
+
+        public static string ToHumanReadableTitle(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return string.Empty;
+            var words = SplitIntoWords(name);
+            if (words.Count == 0) return name;
+            return string.Join(" ", words.Select(w => char.ToUpperInvariant(w[0]) + (w.Length > 1 ? w.Substring(1).ToLowerInvariant() : "")));
         }
 
         public static string ToPascalCase(string input)

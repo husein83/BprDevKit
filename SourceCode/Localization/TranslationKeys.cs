@@ -549,6 +549,11 @@ namespace BprDevKit.Localization
         public const string DataModelSelectServer = "DataModel.SelectServer";
         public const string DataModelSelectDatabase = "DataModel.SelectDatabase";
         public const string DataModelSelectTables = "DataModel.SelectTables";
+        public const string DataModelSelectObjects = "DataModel.SelectObjects";
+        public const string DataModelNoObjectsSelected = "DataModel.NoObjectsSelected";
+        public const string DataModelNoViewsFound = "DataModel.NoViewsFound";
+        public const string DataModelNoProceduresFound = "DataModel.NoProceduresFound";
+        public const string DataModelNoFunctionsFound = "DataModel.NoFunctionsFound";
         public const string DataModelLanguage = "DataModel.Language";
         public const string DataModelOptions = "DataModel.Options";
         public const string DataModelGenerate = "DataModel.Generate";
@@ -666,6 +671,30 @@ namespace BprDevKit.Localization
         public const string DataModelCsNavigationPropertyAttributes = "DataModel.CsNavigationPropertyAttributes";
         public const string DataModelCsNavigationPropertyAttributesHelp = "DataModel.CsNavigationPropertyAttributesHelp";
         public const string DataModelCsIncludeSchemaInRelationName = "DataModel.CsIncludeSchemaInRelationName";
+
+        // Annotations Management
+        public const string DataModelCsAnnotationsManagement = "DataModel.CsAnnotationsManagement";
+        public const string DataModelCsAnnotationsManagementDesc = "DataModel.CsAnnotationsManagementDesc";
+        public const string DataModelCsKeyAttribute = "DataModel.CsKeyAttribute";
+        public const string DataModelCsDatabaseGeneratedAttribute = "DataModel.CsDatabaseGeneratedAttribute";
+        public const string DataModelCsRequiredAttribute = "DataModel.CsRequiredAttribute";
+        public const string DataModelCsRequiredScope = "DataModel.CsRequiredScope";
+        public const string DataModelCsRequiredScopeAll = "DataModel.CsRequiredScopeAll";
+        public const string DataModelCsRequiredScopeStrings = "DataModel.CsRequiredScopeStrings";
+        public const string DataModelCsRequiredScopeNonIdentity = "DataModel.CsRequiredScopeNonIdentity";
+        public const string DataModelCsRequiredIncludePk = "DataModel.CsRequiredIncludePk";
+        public const string DataModelCsRequiredErrorMsg = "DataModel.CsRequiredErrorMsg";
+        public const string DataModelCsRequiredErrorMsgHint = "DataModel.CsRequiredErrorMsgHint";
+        public const string DataModelCsStringLengthAttribute = "DataModel.CsStringLengthAttribute";
+        public const string DataModelCsStringLengthKind = "DataModel.CsStringLengthKind";
+        public const string DataModelCsColumnMode = "DataModel.CsColumnMode";
+        public const string DataModelCsColumnModeDiffers = "DataModel.CsColumnModeDiffers";
+        public const string DataModelCsColumnModeAlways = "DataModel.CsColumnModeAlways";
+        public const string DataModelCsColumnModeNever = "DataModel.CsColumnModeNever";
+        public const string DataModelCsColumnTypeName = "DataModel.CsColumnTypeName";
+        public const string DataModelCsDisplayAttribute = "DataModel.CsDisplayAttribute";
+        public const string DataModelCsDescriptionAttribute = "DataModel.CsDescriptionAttribute";
+        public const string DataModelCsKeylessAttribute = "DataModel.CsKeylessAttribute";
 
         // Transformation Engine
         public const string DataModelTransformAddRule = "DataModel.TransformAddRule";

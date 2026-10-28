@@ -18,7 +18,9 @@ namespace BprDevKit.DataModelGenerator.Generators
                 table.TableName,
                 globalOptions.RemoveTablePrefixes,
                 globalOptions.TablePrefixes,
-                globalOptions.SingularizeClassNames);
+                globalOptions.SingularizeClassNames,
+                globalOptions.PropertyNaming,
+                table.ObjectType);
 
             var sb = new StringBuilder();
 
@@ -48,7 +50,8 @@ namespace BprDevKit.DataModelGenerator.Generators
                 ClassName = className,
                 FileName = fileName,
                 Content = sb.ToString().TrimEnd() + Environment.NewLine,
-                Language = DataModelLanguage.Python
+                Language = DataModelLanguage.Python,
+                ObjectType = table.ObjectType
             };
         }
 

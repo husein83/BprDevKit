@@ -1881,6 +1881,54 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
                 return (OperationResult.ErrorResult($"Error executing view query: {ex.Message}", ex), null);
             }
         }
+        public async Task<(OperationResult operationResult, List<ColumnOperation.Information> columns)> GetViewColumns(string databaseName, string schemaName, string viewName)
+        {
+            try
+            {
+                var sql = $@"USE [{databaseName}];
+SELECT
+    c.column_id AS OrdinalPosition,
+    c.name AS ColumnName,
+    ty.name AS DataType,
+    c.max_length AS MaxLength,
+    c.precision AS [Precision],
+    c.scale AS Scale,
+    c.is_nullable AS IsNullable,
+    CAST(0 AS BIT) AS IsIdentity,
+    0 AS IdentitySeed,
+    0 AS IdentityIncrement,
+    CAST(0 AS BIT) AS IsPrimaryKey,
+    c.collation_name AS Collation,
+    NULL AS DefaultValue,
+    NULL AS DefaultConstraintName,
+    NULL AS ComputedFormula,
+    CAST(0 AS BIT) AS IsPersisted,
+    CAST(ep.value AS nvarchar(4000)) AS Description
+FROM [{databaseName}].sys.columns AS c
+INNER JOIN [{databaseName}].sys.views AS v ON v.object_id = c.object_id
+INNER JOIN [{databaseName}].sys.schemas AS s ON s.schema_id = v.schema_id
+INNER JOIN [{databaseName}].sys.types AS ty ON ty.user_type_id = c.user_type_id
+LEFT JOIN [{databaseName}].sys.extended_properties AS ep ON ep.class = 1 AND ep.major_id = c.object_id AND ep.minor_id = c.column_id AND ep.name = N'MS_Description'
+WHERE s.name = '{schemaName.Replace("'", "''")}' AND v.name = '{viewName.Replace("'", "''")}'
+ORDER BY c.column_id;";
+
+                var table = await ExecuteQuery(sql, databaseName);
+                var dummyTable = new TableOperation.Information
+                {
+                    DatabaseName = databaseName,
+                    SchemaName = schemaName,
+                    TableName = viewName,
+                    ObjectType = Constants.ObjectTypes.View
+                };
+
+                var columns = table.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
+                return (OperationResult.SuccessResult($"Retrieved {columns.Count} column(s) for view '{schemaName}.{viewName}'"), columns);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving view columns: {ex.Message}", ex), new List<ColumnOperation.Information>());
+            }
+        }
         #endregion
 
         #region Stored Procedure Operations
@@ -1979,6 +2027,113 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
             catch (Exception ex)
             {
                 return (OperationResult.ErrorResult($"Error retrieving stored procedure information: {ex.Message}", ex), null);
+            }
+        }
+
+        public async Task<(OperationResult operationResult, List<ColumnOperation.Information> resultColumns, List<ColumnOperation.Information> parameters)> GetProcedureMetadata(string databaseName, string schemaName, string procName)
+        {
+            var parameters = new List<ColumnOperation.Information>();
+            var resultColumns = new List<ColumnOperation.Information>();
+
+            try
+            {
+                var dummyTable = new TableOperation.Information
+                {
+                    DatabaseName = databaseName,
+                    SchemaName = schemaName,
+                    TableName = procName,
+                    ObjectType = Constants.ObjectTypes.StoredProcedure
+                };
+
+                // 1. Get Parameters
+                var paramSql = $@"USE [{databaseName}];
+SELECT
+    p.parameter_id AS OrdinalPosition,
+    REPLACE(p.name, '@', '') AS ColumnName,
+    ty.name AS DataType,
+    p.max_length AS MaxLength,
+    p.precision AS [Precision],
+    p.scale AS Scale,
+    CAST(1 AS BIT) AS IsNullable,
+    CAST(0 AS BIT) AS IsIdentity,
+    0 AS IdentitySeed,
+    0 AS IdentityIncrement,
+    CAST(0 AS BIT) AS IsPrimaryKey,
+    NULL AS Collation,
+    NULL AS DefaultValue,
+    NULL AS DefaultConstraintName,
+    NULL AS ComputedFormula,
+    CAST(0 AS BIT) AS IsPersisted,
+    NULL AS Description
+FROM [{databaseName}].sys.parameters AS p
+INNER JOIN [{databaseName}].sys.procedures AS pr ON pr.object_id = p.object_id
+INNER JOIN [{databaseName}].sys.schemas AS s ON s.schema_id = pr.schema_id
+INNER JOIN [{databaseName}].sys.types AS ty ON ty.user_type_id = p.user_type_id
+WHERE s.name = '{schemaName.Replace("'", "''")}' AND pr.name = '{procName.Replace("'", "''")}' AND p.parameter_id > 0
+ORDER BY p.parameter_id;";
+
+                var paramTable = await ExecuteQuery(paramSql, databaseName);
+                parameters = paramTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
+
+                // 2. Get Result Set Columns via sys.dm_exec_describe_first_result_set_for_object
+                try
+                {
+                    var resultSql = $@"USE [{databaseName}];
+SELECT
+    column_ordinal AS OrdinalPosition,
+    ISNULL(name, 'Column' + CAST(column_ordinal AS varchar(10))) AS ColumnName,
+    ISNULL(system_type_name, 'nvarchar(max)') AS DataType,
+    max_length AS MaxLength,
+    precision AS [Precision],
+    scale AS Scale,
+    is_nullable AS IsNullable,
+    CAST(0 AS BIT) AS IsIdentity,
+    0 AS IdentitySeed,
+    0 AS IdentityIncrement,
+    CAST(0 AS BIT) AS IsPrimaryKey,
+    NULL AS Collation,
+    NULL AS DefaultValue,
+    NULL AS DefaultConstraintName,
+    NULL AS ComputedFormula,
+    CAST(0 AS BIT) AS IsPersisted,
+    NULL AS Description
+FROM sys.dm_exec_describe_first_result_set_for_object(OBJECT_ID(N'[{databaseName}].[{schemaName.Replace("'", "''")}].[{procName.Replace("'", "''")}]'), 0)
+WHERE is_hidden = 0
+ORDER BY column_ordinal;";
+
+                    var resultTable = await ExecuteQuery(resultSql, databaseName);
+                    foreach (DataRow row in resultTable.Rows)
+                    {
+                        var rawType = row.GetString("DataType");
+                        var cleanType = rawType.Split('(')[0].Trim();
+                        var col = new ColumnOperation.Information
+                        {
+                            DatabaseName = databaseName,
+                            SchemaName = schemaName,
+                            TableName = procName,
+                            ColumnName = row.GetString("ColumnName"),
+                            OrdinalPosition = row.GetInt32("OrdinalPosition"),
+                            DataType = cleanType,
+                            Length = row.GetInt32("MaxLength"),
+                            Precision = row.GetInt32("Precision"),
+                            Scale = row.GetInt32("Scale"),
+                            IsNullable = row.GetBoolean("IsNullable"),
+                            IsIdentity = false,
+                            IsPrimaryKey = false
+                        };
+                        resultColumns.Add(col);
+                    }
+                }
+                catch
+                {
+                    // Stored proc might not return a tabular result set or requires temporary tables
+                }
+
+                return (OperationResult.SuccessResult($"Retrieved metadata for procedure '{schemaName}.{procName}'"), resultColumns, parameters);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving procedure metadata: {ex.Message}", ex), resultColumns, parameters);
             }
         }
         #endregion
@@ -2083,6 +2238,94 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
             catch (Exception ex)
             {
                 return (OperationResult.ErrorResult($"Error retrieving function information: {ex.Message}", ex), null);
+            }
+        }
+
+        public async Task<(OperationResult operationResult, List<ColumnOperation.Information> resultColumns, List<ColumnOperation.Information> parameters)> GetFunctionMetadata(string databaseName, string schemaName, string funcName, string funcType = "FN")
+        {
+            var parameters = new List<ColumnOperation.Information>();
+            var resultColumns = new List<ColumnOperation.Information>();
+
+            try
+            {
+                var dummyTable = new TableOperation.Information
+                {
+                    DatabaseName = databaseName,
+                    SchemaName = schemaName,
+                    TableName = funcName,
+                    ObjectType = Constants.ObjectTypes.Function
+                };
+
+                // 1. Get Parameters (parameter_id > 0)
+                var paramSql = $@"USE [{databaseName}];
+SELECT
+    p.parameter_id AS OrdinalPosition,
+    REPLACE(p.name, '@', '') AS ColumnName,
+    ty.name AS DataType,
+    p.max_length AS MaxLength,
+    p.precision AS [Precision],
+    p.scale AS Scale,
+    CAST(1 AS BIT) AS IsNullable,
+    CAST(0 AS BIT) AS IsIdentity,
+    0 AS IdentitySeed,
+    0 AS IdentityIncrement,
+    CAST(0 AS BIT) AS IsPrimaryKey,
+    NULL AS Collation,
+    NULL AS DefaultValue,
+    NULL AS DefaultConstraintName,
+    NULL AS ComputedFormula,
+    CAST(0 AS BIT) AS IsPersisted,
+    NULL AS Description
+FROM [{databaseName}].sys.parameters AS p
+INNER JOIN [{databaseName}].sys.objects AS o ON o.object_id = p.object_id
+INNER JOIN [{databaseName}].sys.schemas AS s ON s.schema_id = o.schema_id
+INNER JOIN [{databaseName}].sys.types AS ty ON ty.user_type_id = p.user_type_id
+WHERE s.name = '{schemaName.Replace("'", "''")}' AND o.name = '{funcName.Replace("'", "''")}' AND p.parameter_id > 0
+ORDER BY p.parameter_id;";
+
+                var paramTable = await ExecuteQuery(paramSql, databaseName);
+                parameters = paramTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
+
+                // 2. If Table-Valued Function ('IF', 'TF'), get output table columns from sys.columns
+                var isTableValued = funcType.Equals("IF", StringComparison.OrdinalIgnoreCase) || funcType.Equals("TF", StringComparison.OrdinalIgnoreCase);
+                if (isTableValued)
+                {
+                    var colSql = $@"USE [{databaseName}];
+SELECT
+    c.column_id AS OrdinalPosition,
+    c.name AS ColumnName,
+    ty.name AS DataType,
+    c.max_length AS MaxLength,
+    c.precision AS [Precision],
+    c.scale AS Scale,
+    c.is_nullable AS IsNullable,
+    CAST(0 AS BIT) AS IsIdentity,
+    0 AS IdentitySeed,
+    0 AS IdentityIncrement,
+    CAST(0 AS BIT) AS IsPrimaryKey,
+    c.collation_name AS Collation,
+    NULL AS DefaultValue,
+    NULL AS DefaultConstraintName,
+    NULL AS ComputedFormula,
+    CAST(0 AS BIT) AS IsPersisted,
+    CAST(ep.value AS nvarchar(4000)) AS Description
+FROM [{databaseName}].sys.columns AS c
+INNER JOIN [{databaseName}].sys.objects AS o ON o.object_id = c.object_id
+INNER JOIN [{databaseName}].sys.schemas AS s ON s.schema_id = o.schema_id
+INNER JOIN [{databaseName}].sys.types AS ty ON ty.user_type_id = c.user_type_id
+LEFT JOIN [{databaseName}].sys.extended_properties AS ep ON ep.class = 1 AND ep.major_id = c.object_id AND ep.minor_id = c.column_id AND ep.name = N'MS_Description'
+WHERE s.name = '{schemaName.Replace("'", "''")}' AND o.name = '{funcName.Replace("'", "''")}' AND o.type IN ('IF', 'TF')
+ORDER BY c.column_id;";
+
+                    var colTable = await ExecuteQuery(colSql, databaseName);
+                    resultColumns = colTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
+                }
+
+                return (OperationResult.SuccessResult($"Retrieved metadata for function '{schemaName}.{funcName}'"), resultColumns, parameters);
+            }
+            catch (Exception ex)
+            {
+                return (OperationResult.ErrorResult($"Error retrieving function metadata: {ex.Message}", ex), resultColumns, parameters);
             }
         }
         #endregion

@@ -18,7 +18,9 @@ namespace BprDevKit.DataModelGenerator.Generators
                 table.TableName,
                 globalOptions.RemoveTablePrefixes,
                 globalOptions.TablePrefixes,
-                globalOptions.SingularizeClassNames);
+                globalOptions.SingularizeClassNames,
+                globalOptions.PropertyNaming,
+                table.ObjectType);
 
             var sb = new StringBuilder();
 
@@ -44,7 +46,8 @@ namespace BprDevKit.DataModelGenerator.Generators
                 ClassName = className,
                 FileName = fileName,
                 Content = sb.ToString().TrimEnd() + Environment.NewLine,
-                Language = DataModelLanguage.Dart
+                Language = DataModelLanguage.Dart,
+                ObjectType = table.ObjectType
             };
         }
 
@@ -70,7 +73,7 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
-                var fieldName = DataModelNamingHelper.ToCamelCase(col.ColumnName);
+                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
                 var dartType = SqlTypeMapper.MapToDart(col.DataType, col.IsNullable, options.NullSafety);
                 fields.Add((fieldName, dartType, col.ColumnName, col.IsNullable));
 
@@ -191,7 +194,7 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
-                var fieldName = DataModelNamingHelper.ToCamelCase(col.ColumnName);
+                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
                 var dartType = SqlTypeMapper.MapToDart(col.DataType, col.IsNullable, options.NullSafety);
                 fields.Add((fieldName, dartType, col.ColumnName, col.IsNullable));
 
@@ -247,7 +250,7 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
-                var fieldName = DataModelNamingHelper.ToCamelCase(col.ColumnName);
+                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
                 var dartType = SqlTypeMapper.MapToDart(col.DataType, col.IsNullable, options.NullSafety);
 
                 if (fieldName != col.ColumnName)
