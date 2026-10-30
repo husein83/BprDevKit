@@ -622,112 +622,115 @@ namespace BprDevKit.DataModelGenerator.Generators
                 .Where(fk => globalOptions.IsSchemaAccessAllowed(table.SchemaName, string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName))
                 .ToList();
 
-            if (globalOptions.IncludeNavigationProperties && allowedFks.Count > 0)
+            if (globalOptions.IncludeNavigationProperties)
             {
                 if (options.UseRegions)
                 {
                     sb.AppendLine($"{indent}    #region References");
                 }
 
-                foreach (var fk in allowedFks)
+                if (allowedFks.Count > 0)
                 {
-                    if (string.IsNullOrWhiteSpace(fk.RefTableName)) continue;
-
-                    var refClassName = DataModelNamingHelper.FormatClassName(
-                        fk.RefTableName,
-                        globalOptions.RemoveTablePrefixes,
-                        globalOptions.TablePrefixes,
-                        globalOptions.SingularizeClassNames,
-                        globalOptions.PropertyNaming,
-                        Constants.ObjectTypes.Table);
-
-                    var localPropName = DataModelNamingHelper.FormatPropertyName(fk.ColumnName, globalOptions.PropertyNaming);
-                    var refSchema = string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName;
-                    var refNamespace = ResolveNamespace(options, refSchema, table.DatabaseName ?? string.Empty, fk.RefTableName);
-                    var currentNamespace = ResolveNamespace(options, table.SchemaName, table.DatabaseName ?? string.Empty, table.TableName);
-
-                    var isDifferentNamespace = !string.Equals(refNamespace, currentNamespace, StringComparison.OrdinalIgnoreCase);
-                    var useFullNav = options.UseFullNamespaceForNavTypes || isDifferentNamespace || string.Equals(options.NamespaceMode, "PerSchema", StringComparison.OrdinalIgnoreCase);
-
-                    var targetNamespacePrefix = useFullNav && !string.IsNullOrWhiteSpace(refNamespace)
-                        ? $"{refNamespace}."
-                        : "";
-
-                    var navTypeName = $"{targetNamespacePrefix}{refClassName}";
-                    var targetInversePropName = $"{className}Set{localPropName}";
-
-                    // Only output InverseProperty if the target schema also has permission to access this schema
-                    bool canTargetAccessCurrent = globalOptions.IsSchemaAccessAllowed(refSchema, table.SchemaName);
-
-                    var refPropName = options.NavigationStyle == "Enterprise"
-                        ? $"{refClassName}Ref{localPropName}"
-                        : (refClassName == className ? "Parent" + refClassName : refClassName);
-
-                    var refBackingName = "_" + DataModelNamingHelper.ToCamelCase(refPropName);
-                    if (options.PropertyAccessor == "backing_field")
+                    foreach (var fk in allowedFks)
                     {
-                        sb.AppendLine($"{indent}    private {navTypeName}? {refBackingName};");
-                    }
+                        if (string.IsNullOrWhiteSpace(fk.RefTableName)) continue;
 
-                    if (!string.IsNullOrWhiteSpace(options.CustomNavReferenceAttribute))
-                    {
-                        var targetPk = string.IsNullOrWhiteSpace(fk.RefColumnName) ? "Id" : DataModelNamingHelper.FormatPropertyName(fk.RefColumnName, globalOptions.PropertyNaming);
-                        var customRef = options.CustomNavReferenceAttribute
-                            .Replace("{FkProperty}", localPropName, StringComparison.OrdinalIgnoreCase)
-                            .Replace("{TargetType}", navTypeName, StringComparison.OrdinalIgnoreCase)
-                            .Replace("{TargetClass}", refClassName, StringComparison.OrdinalIgnoreCase)
-                            .Replace("{OtherKey}", targetPk, StringComparison.OrdinalIgnoreCase);
+                        var refClassName = DataModelNamingHelper.FormatClassName(
+                            fk.RefTableName,
+                            globalOptions.RemoveTablePrefixes,
+                            globalOptions.TablePrefixes,
+                            globalOptions.SingularizeClassNames,
+                            globalOptions.PropertyNaming,
+                            Constants.ObjectTypes.Table);
 
-                        if (!customRef.StartsWith("[")) customRef = $"[{customRef}]";
-                        sb.AppendLine($"{indent}    {customRef}");
-                    }
-                    else
-                    {
-                        sb.AppendLine($"{indent}    [ForeignKey(nameof({localPropName}))]");
-                    }
+                        var localPropName = DataModelNamingHelper.FormatPropertyName(fk.ColumnName, globalOptions.PropertyNaming);
+                        var refSchema = string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName;
+                        var refNamespace = ResolveNamespace(options, refSchema, table.DatabaseName ?? string.Empty, fk.RefTableName);
+                        var currentNamespace = ResolveNamespace(options, table.SchemaName, table.DatabaseName ?? string.Empty, table.TableName);
 
-                    if (canTargetAccessCurrent)
-                    {
-                        if (options.NavigationStyle == "Enterprise")
+                        var isDifferentNamespace = !string.Equals(refNamespace, currentNamespace, StringComparison.OrdinalIgnoreCase);
+                        var useFullNav = options.UseFullNamespaceForNavTypes || isDifferentNamespace || string.Equals(options.NamespaceMode, "PerSchema", StringComparison.OrdinalIgnoreCase);
+
+                        var targetNamespacePrefix = useFullNav && !string.IsNullOrWhiteSpace(refNamespace)
+                            ? $"{refNamespace}."
+                            : "";
+
+                        var navTypeName = $"{targetNamespacePrefix}{refClassName}";
+                        var targetInversePropName = $"{className}Set{localPropName}";
+
+                        // Only output InverseProperty if the target schema also has permission to access this schema
+                        bool canTargetAccessCurrent = globalOptions.IsSchemaAccessAllowed(refSchema, table.SchemaName);
+
+                        var refPropName = options.NavigationStyle == "Enterprise"
+                            ? $"{refClassName}Ref{localPropName}"
+                            : (refClassName == className ? "Parent" + refClassName : refClassName);
+
+                        var refBackingName = "_" + DataModelNamingHelper.ToCamelCase(refPropName);
+                        if (options.PropertyAccessor == "backing_field")
                         {
-                            sb.AppendLine($"{indent}    [InverseProperty(nameof({navTypeName}.{targetInversePropName}))]");
+                            sb.AppendLine($"{indent}    private {navTypeName}? {refBackingName};");
                         }
-                        else if (options.IncludeEfCoreTableAttributes)
-                        {
-                            sb.AppendLine($"{indent}    [InverseProperty(nameof({navTypeName}.{className}))]");
-                        }
-                    }
 
-                    if (!string.IsNullOrWhiteSpace(options.NavigationPropertyAttributes))
-                    {
-                        foreach (var navAttrLine in options.NavigationPropertyAttributes.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        if (!string.IsNullOrWhiteSpace(options.CustomNavReferenceAttribute))
                         {
-                            var attr = navAttrLine.Trim();
-                            if (!attr.StartsWith("[")) attr = $"[{attr}]";
-                            sb.AppendLine($"{indent}    {attr}");
-                        }
-                    }
+                            var targetPk = string.IsNullOrWhiteSpace(fk.RefColumnName) ? "Id" : DataModelNamingHelper.FormatPropertyName(fk.RefColumnName, globalOptions.PropertyNaming);
+                            var customRef = options.CustomNavReferenceAttribute
+                                .Replace("{FkProperty}", localPropName, StringComparison.OrdinalIgnoreCase)
+                                .Replace("{TargetType}", navTypeName, StringComparison.OrdinalIgnoreCase)
+                                .Replace("{TargetClass}", refClassName, StringComparison.OrdinalIgnoreCase)
+                                .Replace("{OtherKey}", targetPk, StringComparison.OrdinalIgnoreCase);
 
-                    if (options.PropertyAccessor == "backing_field")
-                    {
-                        sb.AppendLine($"{indent}    public virtual {navTypeName}? {refPropName}");
-                        sb.AppendLine($"{indent}    {{");
-                        sb.AppendLine($"{indent}        get");
-                        sb.AppendLine($"{indent}        {{");
-                        sb.AppendLine($"{indent}            return {refBackingName};");
-                        sb.AppendLine($"{indent}        }}");
-                        sb.AppendLine($"{indent}        set");
-                        sb.AppendLine($"{indent}        {{");
-                        sb.AppendLine($"{indent}            {refBackingName} = value;");
-                        sb.AppendLine($"{indent}        }}");
-                        sb.AppendLine($"{indent}    }}");
-                        sb.AppendLine();
-                    }
-                    else
-                    {
-                        var nullSuffix = options.NullableReferenceTypes ? "?" : "";
-                        sb.AppendLine($"{indent}    public virtual {navTypeName}{nullSuffix} {refPropName} {{ get; set; }}");
-                        sb.AppendLine();
+                            if (!customRef.StartsWith("[")) customRef = $"[{customRef}]";
+                            sb.AppendLine($"{indent}    {customRef}");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"{indent}    [ForeignKey(nameof({localPropName}))]");
+                        }
+
+                        if (canTargetAccessCurrent)
+                        {
+                            if (options.NavigationStyle == "Enterprise")
+                            {
+                                sb.AppendLine($"{indent}    [InverseProperty(nameof({navTypeName}.{targetInversePropName}))]");
+                            }
+                            else if (options.IncludeEfCoreTableAttributes)
+                            {
+                                sb.AppendLine($"{indent}    [InverseProperty(nameof({navTypeName}.{className}))]");
+                            }
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(options.NavigationPropertyAttributes))
+                        {
+                            foreach (var navAttrLine in options.NavigationPropertyAttributes.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                            {
+                                var attr = navAttrLine.Trim();
+                                if (!attr.StartsWith("[")) attr = $"[{attr}]";
+                                sb.AppendLine($"{indent}    {attr}");
+                            }
+                        }
+
+                        if (options.PropertyAccessor == "backing_field")
+                        {
+                            sb.AppendLine($"{indent}    public virtual {navTypeName}? {refPropName}");
+                            sb.AppendLine($"{indent}    {{");
+                            sb.AppendLine($"{indent}        get");
+                            sb.AppendLine($"{indent}        {{");
+                            sb.AppendLine($"{indent}            return {refBackingName};");
+                            sb.AppendLine($"{indent}        }}");
+                            sb.AppendLine($"{indent}        set");
+                            sb.AppendLine($"{indent}        {{");
+                            sb.AppendLine($"{indent}            {refBackingName} = value;");
+                            sb.AppendLine($"{indent}        }}");
+                            sb.AppendLine($"{indent}    }}");
+                            sb.AppendLine();
+                        }
+                        else
+                        {
+                            var nullSuffix = options.NullableReferenceTypes ? "?" : "";
+                            sb.AppendLine($"{indent}    public virtual {navTypeName}{nullSuffix} {refPropName} {{ get; set; }}");
+                            sb.AppendLine();
+                        }
                     }
                 }
 
@@ -752,13 +755,13 @@ namespace BprDevKit.DataModelGenerator.Generators
                     .ThenBy(x => x.Fk.ColumnName)
                     .ToList();
 
+                if (options.UseRegions)
+                {
+                    sb.AppendLine($"{indent}    #region Relations");
+                }
+
                 if (childFks.Count > 0)
                 {
-                    if (options.UseRegions)
-                    {
-                        sb.AppendLine($"{indent}    #region Relations");
-                    }
-
                     foreach (var child in childFks)
                     {
                         var childClassName = DataModelNamingHelper.FormatClassName(
@@ -860,12 +863,12 @@ namespace BprDevKit.DataModelGenerator.Generators
                             sb.AppendLine();
                         }
                     }
+                }
 
-                    if (options.UseRegions)
-                    {
-                        sb.AppendLine($"{indent}    #endregion");
-                        sb.AppendLine();
-                    }
+                if (options.UseRegions)
+                {
+                    sb.AppendLine($"{indent}    #endregion");
+                    sb.AppendLine();
                 }
             }
 
