@@ -239,6 +239,8 @@ namespace BprDevKit.DataModelGenerator.Models
         // DbContext
         public bool GenerateDbContext { get; set; } = false;
         public string DbContextName { get; set; } = "AppDbContext";
+        public string DbContextNamespace { get; set; } = string.Empty;
+        public bool DbContextUseFullyQualifiedModelNames { get; set; } = false;
     }
 
     public class PythonOptions

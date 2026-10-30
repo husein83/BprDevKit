@@ -1885,7 +1885,12 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
         {
             try
             {
-                var sql = $@"USE [{databaseName}];
+                var serverType = _config.Server.DatabaseServerType;
+                string sql;
+
+                if (serverType == DatabaseServerType.SqlServer)
+                {
+                    sql = $@"USE [{databaseName}];
 SELECT
     c.column_id AS OrdinalPosition,
     c.name AS ColumnName,
@@ -1911,6 +1916,86 @@ INNER JOIN [{databaseName}].sys.types AS ty ON ty.user_type_id = c.user_type_id
 LEFT JOIN [{databaseName}].sys.extended_properties AS ep ON ep.class = 1 AND ep.major_id = c.object_id AND ep.minor_id = c.column_id AND ep.name = N'MS_Description'
 WHERE s.name = '{schemaName.Replace("'", "''")}' AND v.name = '{viewName.Replace("'", "''")}'
 ORDER BY c.column_id;";
+                }
+                else if (serverType == DatabaseServerType.PostgreSql)
+                {
+                    sql = $@"SELECT
+    cols.ordinal_position AS OrdinalPosition,
+    cols.column_name AS ColumnName,
+    cols.udt_name AS DataType,
+    COALESCE(cols.character_maximum_length, cols.character_octet_length, 0) AS MaxLength,
+    COALESCE(cols.numeric_precision, cols.datetime_precision, 0) AS Precision,
+    COALESCE(cols.numeric_scale, 0) AS Scale,
+    CASE WHEN cols.is_nullable = 'YES' THEN 1 ELSE 0 END AS IsNullable,
+    0 AS IsIdentity,
+    0 AS IdentitySeed,
+    0 AS IdentityIncrement,
+    0 AS IsPrimaryKey,
+    COALESCE(cols.collation_name, '') AS Collation,
+    NULL AS DefaultValue,
+    NULL AS DefaultConstraintName,
+    NULL AS ComputedFormula,
+    0 AS IsPersisted,
+    COALESCE(col_desc.description, '') AS Description
+FROM information_schema.columns cols
+LEFT JOIN pg_catalog.pg_statio_all_tables st
+    ON st.schemaname = cols.table_schema AND st.relname = cols.table_name
+LEFT JOIN pg_catalog.pg_description col_desc
+    ON col_desc.objoid = st.relid AND col_desc.objsubid = cols.ordinal_position
+WHERE cols.table_schema = '{schemaName.Replace("'", "''")}' AND cols.table_name = '{viewName.Replace("'", "''")}'
+ORDER BY cols.ordinal_position;";
+                }
+                else if (serverType == DatabaseServerType.MySql || serverType == DatabaseServerType.MariaDb)
+                {
+                    var db = !string.IsNullOrWhiteSpace(schemaName) ? schemaName : databaseName;
+                    sql = $@"SELECT
+    ordinal_position AS OrdinalPosition,
+    column_name AS ColumnName,
+    data_type AS DataType,
+    COALESCE(character_maximum_length, 0) AS MaxLength,
+    COALESCE(numeric_precision, datetime_precision, 0) AS Precision,
+    COALESCE(numeric_scale, 0) AS Scale,
+    CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END AS IsNullable,
+    0 AS IsIdentity,
+    0 AS IdentitySeed,
+    0 AS IdentityIncrement,
+    0 AS IsPrimaryKey,
+    COALESCE(collation_name, '') AS Collation,
+    NULL AS DefaultValue,
+    NULL AS DefaultConstraintName,
+    NULL AS ComputedFormula,
+    0 AS IsPersisted,
+    COALESCE(column_comment, '') AS Description
+FROM information_schema.columns
+WHERE table_schema = '{db.Replace("'", "''")}' AND table_name = '{viewName.Replace("'", "''")}'
+ORDER BY ordinal_position;";
+                }
+                else // Sqlite
+                {
+                    sql = $@"SELECT
+    cid AS OrdinalPosition,
+    name AS ColumnName,
+    CASE 
+        WHEN instr(type, '(') > 0 THEN substr(type, 1, instr(type, '(') - 1)
+        ELSE type
+    END AS DataType,
+    0 AS MaxLength,
+    0 AS Precision,
+    0 AS Scale,
+    CASE WHEN ""notnull"" = 0 THEN 1 ELSE 0 END AS IsNullable,
+    0 AS IsIdentity,
+    0 AS IdentitySeed,
+    0 AS IdentityIncrement,
+    0 AS IsPrimaryKey,
+    '' AS Collation,
+    NULL AS DefaultValue,
+    NULL AS DefaultConstraintName,
+    NULL AS ComputedFormula,
+    0 AS IsPersisted,
+    '' AS Description
+FROM pragma_table_info('{viewName.Replace("'", "''")}')
+ORDER BY cid;";
+                }
 
                 var table = await ExecuteQuery(sql, databaseName);
                 var dummyTable = new TableOperation.Information
@@ -2045,8 +2130,12 @@ ORDER BY c.column_id;";
                     ObjectType = Constants.ObjectTypes.StoredProcedure
                 };
 
-                // 1. Get Parameters
-                var paramSql = $@"USE [{databaseName}];
+                var serverType = _config.Server.DatabaseServerType;
+
+                if (serverType == DatabaseServerType.SqlServer)
+                {
+                    // 1. Get Parameters
+                    var paramSql = $@"USE [{databaseName}];
 SELECT
     p.parameter_id AS OrdinalPosition,
     REPLACE(p.name, '@', '') AS ColumnName,
@@ -2072,13 +2161,13 @@ INNER JOIN [{databaseName}].sys.types AS ty ON ty.user_type_id = p.user_type_id
 WHERE s.name = '{schemaName.Replace("'", "''")}' AND pr.name = '{procName.Replace("'", "''")}' AND p.parameter_id > 0
 ORDER BY p.parameter_id;";
 
-                var paramTable = await ExecuteQuery(paramSql, databaseName);
-                parameters = paramTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
+                    var paramTable = await ExecuteQuery(paramSql, databaseName);
+                    parameters = paramTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
 
-                // 2. Get Result Set Columns via sys.dm_exec_describe_first_result_set_for_object
-                try
-                {
-                    var resultSql = $@"USE [{databaseName}];
+                    // 2. Get Result Set Columns via sys.dm_exec_describe_first_result_set_for_object
+                    try
+                    {
+                        var resultSql = $@"USE [{databaseName}];
 SELECT
     column_ordinal AS OrdinalPosition,
     ISNULL(name, 'Column' + CAST(column_ordinal AS varchar(10))) AS ColumnName,
@@ -2101,32 +2190,60 @@ FROM sys.dm_exec_describe_first_result_set_for_object(OBJECT_ID(N'[{databaseName
 WHERE is_hidden = 0
 ORDER BY column_ordinal;";
 
-                    var resultTable = await ExecuteQuery(resultSql, databaseName);
-                    foreach (DataRow row in resultTable.Rows)
-                    {
-                        var rawType = row.GetString("DataType");
-                        var cleanType = rawType.Split('(')[0].Trim();
-                        var col = new ColumnOperation.Information
+                        var resultTable = await ExecuteQuery(resultSql, databaseName);
+                        foreach (DataRow row in resultTable.Rows)
                         {
-                            DatabaseName = databaseName,
-                            SchemaName = schemaName,
-                            TableName = procName,
-                            ColumnName = row.GetString("ColumnName"),
-                            OrdinalPosition = row.GetInt32("OrdinalPosition"),
-                            DataType = cleanType,
-                            Length = row.GetInt32("MaxLength"),
-                            Precision = row.GetInt32("Precision"),
-                            Scale = row.GetInt32("Scale"),
-                            IsNullable = row.GetBoolean("IsNullable"),
-                            IsIdentity = false,
-                            IsPrimaryKey = false
-                        };
-                        resultColumns.Add(col);
+                            var rawType = row.GetString("DataType");
+                            var cleanType = rawType.Split('(')[0].Trim();
+                            var col = new ColumnOperation.Information
+                            {
+                                DatabaseName = databaseName,
+                                SchemaName = schemaName,
+                                TableName = procName,
+                                ColumnName = row.GetString("ColumnName"),
+                                OrdinalPosition = row.GetInt32("OrdinalPosition"),
+                                DataType = cleanType,
+                                Length = row.GetInt32("MaxLength"),
+                                Precision = row.GetInt32("Precision"),
+                                Scale = row.GetInt32("Scale"),
+                                IsNullable = row.GetBoolean("IsNullable"),
+                                IsIdentity = false,
+                                IsPrimaryKey = false
+                            };
+                            resultColumns.Add(col);
+                        }
+                    }
+                    catch
+                    {
+                        // Stored proc might not return a tabular result set or requires temporary tables
                     }
                 }
-                catch
+                else if (serverType == DatabaseServerType.PostgreSql || serverType == DatabaseServerType.MySql || serverType == DatabaseServerType.MariaDb)
                 {
-                    // Stored proc might not return a tabular result set or requires temporary tables
+                    var paramSql = $@"SELECT
+    ordinal_position AS OrdinalPosition,
+    COALESCE(parameter_name, CONCAT('param_', ordinal_position)) AS ColumnName,
+    data_type AS DataType,
+    COALESCE(character_maximum_length, 0) AS MaxLength,
+    COALESCE(numeric_precision, datetime_precision, 0) AS Precision,
+    COALESCE(numeric_scale, 0) AS Scale,
+    1 AS IsNullable,
+    0 AS IsIdentity,
+    0 AS IdentitySeed,
+    0 AS IdentityIncrement,
+    0 AS IsPrimaryKey,
+    NULL AS Collation,
+    NULL AS DefaultValue,
+    NULL AS DefaultConstraintName,
+    NULL AS ComputedFormula,
+    0 AS IsPersisted,
+    NULL AS Description
+FROM information_schema.parameters
+WHERE specific_schema = '{schemaName.Replace("'", "''")}' AND specific_name = '{procName.Replace("'", "''")}'
+ORDER BY ordinal_position;";
+
+                    var paramTable = await ExecuteQuery(paramSql, databaseName);
+                    parameters = paramTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
                 }
 
                 return (OperationResult.SuccessResult($"Retrieved metadata for procedure '{schemaName}.{procName}'"), resultColumns, parameters);
@@ -2256,8 +2373,12 @@ ORDER BY column_ordinal;";
                     ObjectType = Constants.ObjectTypes.Function
                 };
 
-                // 1. Get Parameters (parameter_id > 0)
-                var paramSql = $@"USE [{databaseName}];
+                var serverType = _config.Server.DatabaseServerType;
+
+                if (serverType == DatabaseServerType.SqlServer)
+                {
+                    // 1. Get Parameters (parameter_id > 0)
+                    var paramSql = $@"USE [{databaseName}];
 SELECT
     p.parameter_id AS OrdinalPosition,
     REPLACE(p.name, '@', '') AS ColumnName,
@@ -2283,14 +2404,14 @@ INNER JOIN [{databaseName}].sys.types AS ty ON ty.user_type_id = p.user_type_id
 WHERE s.name = '{schemaName.Replace("'", "''")}' AND o.name = '{funcName.Replace("'", "''")}' AND p.parameter_id > 0
 ORDER BY p.parameter_id;";
 
-                var paramTable = await ExecuteQuery(paramSql, databaseName);
-                parameters = paramTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
+                    var paramTable = await ExecuteQuery(paramSql, databaseName);
+                    parameters = paramTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
 
-                // 2. If Table-Valued Function ('IF', 'TF'), get output table columns from sys.columns
-                var isTableValued = funcType.Equals("IF", StringComparison.OrdinalIgnoreCase) || funcType.Equals("TF", StringComparison.OrdinalIgnoreCase);
-                if (isTableValued)
-                {
-                    var colSql = $@"USE [{databaseName}];
+                    // 2. If Table-Valued Function ('IF', 'TF'), get output table columns from sys.columns
+                    var isTableValued = funcType.Equals("IF", StringComparison.OrdinalIgnoreCase) || funcType.Equals("TF", StringComparison.OrdinalIgnoreCase);
+                    if (isTableValued)
+                    {
+                        var colSql = $@"USE [{databaseName}];
 SELECT
     c.column_id AS OrdinalPosition,
     c.name AS ColumnName,
@@ -2317,8 +2438,36 @@ LEFT JOIN [{databaseName}].sys.extended_properties AS ep ON ep.class = 1 AND ep.
 WHERE s.name = '{schemaName.Replace("'", "''")}' AND o.name = '{funcName.Replace("'", "''")}' AND o.type IN ('IF', 'TF')
 ORDER BY c.column_id;";
 
-                    var colTable = await ExecuteQuery(colSql, databaseName);
-                    resultColumns = colTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
+                        var colTable = await ExecuteQuery(colSql, databaseName);
+                        resultColumns = colTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
+                    }
+                }
+                else if (serverType == DatabaseServerType.PostgreSql || serverType == DatabaseServerType.MySql || serverType == DatabaseServerType.MariaDb)
+                {
+                    var paramSql = $@"SELECT
+    ordinal_position AS OrdinalPosition,
+    COALESCE(parameter_name, CONCAT('param_', ordinal_position)) AS ColumnName,
+    data_type AS DataType,
+    COALESCE(character_maximum_length, 0) AS MaxLength,
+    COALESCE(numeric_precision, datetime_precision, 0) AS Precision,
+    COALESCE(numeric_scale, 0) AS Scale,
+    1 AS IsNullable,
+    0 AS IsIdentity,
+    0 AS IdentitySeed,
+    0 AS IdentityIncrement,
+    0 AS IsPrimaryKey,
+    NULL AS Collation,
+    NULL AS DefaultValue,
+    NULL AS DefaultConstraintName,
+    NULL AS ComputedFormula,
+    0 AS IsPersisted,
+    NULL AS Description
+FROM information_schema.parameters
+WHERE specific_schema = '{schemaName.Replace("'", "''")}' AND specific_name = '{funcName.Replace("'", "''")}'
+ORDER BY ordinal_position;";
+
+                    var paramTable = await ExecuteQuery(paramSql, databaseName);
+                    parameters = paramTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
                 }
 
                 return (OperationResult.SuccessResult($"Retrieved metadata for function '{schemaName}.{funcName}'"), resultColumns, parameters);

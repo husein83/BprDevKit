@@ -47,10 +47,10 @@ namespace BprDevKit.DatabaseManagement.Connections
             return serverType switch
             {
                 DatabaseServerType.SqlServer => new SqlConnection(connectionString),
-                DatabaseServerType.PostgreSql => throw new NotSupportedException("PostgreSQL ADO.NET provider (Npgsql) is not yet registered. SQL Server is currently active."),
-                DatabaseServerType.MySql or DatabaseServerType.MariaDb => throw new NotSupportedException("MySQL/MariaDB ADO.NET provider is not yet registered. SQL Server is currently active."),
-                DatabaseServerType.Oracle => throw new NotSupportedException("Oracle ADO.NET provider is not yet registered. SQL Server is currently active."),
-                DatabaseServerType.Sqlite => throw new NotSupportedException("SQLite ADO.NET provider is not yet registered. SQL Server is currently active."),
+                DatabaseServerType.PostgreSql => new Npgsql.NpgsqlConnection(connectionString),
+                DatabaseServerType.MySql or DatabaseServerType.MariaDb => new MySqlConnector.MySqlConnection(connectionString),
+                DatabaseServerType.Sqlite => new Microsoft.Data.Sqlite.SqliteConnection(connectionString),
+                DatabaseServerType.Oracle => throw new NotSupportedException("Oracle ADO.NET provider is not yet registered. SQL Server, PostgreSQL, MySQL/MariaDB, and SQLite are currently active."),
                 _ => new SqlConnection(connectionString)
             };
         }
@@ -79,14 +79,14 @@ namespace BprDevKit.DatabaseManagement.Connections
 
             try
             {
-                if (serverType != DatabaseServerType.SqlServer)
+                if (serverType == DatabaseServerType.Oracle)
                 {
                     return new ConnectionTestResult
                     {
                         Success = false,
                         LatencyMs = 0,
                         Provider = caps.DisplayName,
-                        Message = $"Provider '{caps.DisplayName}' configuration is valid, but native ADO.NET driver is not registered yet.",
+                        Message = $"Provider '{caps.DisplayName}' configuration is valid, but native Oracle driver is not registered yet.",
                         ErrorDetails = $"Constructed Connection String: {config.Server.BuildConnectionString()}"
                     };
                 }
@@ -95,13 +95,20 @@ namespace BprDevKit.DatabaseManagement.Connections
                 stopwatch.Stop();
 
                 string serverVersion = connection.ServerVersion;
-                string database = connection.Database;
+                string database = string.IsNullOrWhiteSpace(connection.Database) ? "Default" : connection.Database;
 
-                // Query @@VERSION for detailed edition/version information
+                // Query database version dynamically
                 try
                 {
                     await using var cmd = connection.CreateCommand();
-                    cmd.CommandText = "SELECT @@VERSION";
+                    cmd.CommandText = serverType switch
+                    {
+                        DatabaseServerType.SqlServer => "SELECT @@VERSION",
+                        DatabaseServerType.PostgreSql => "SELECT version()",
+                        DatabaseServerType.MySql or DatabaseServerType.MariaDb => "SELECT VERSION()",
+                        DatabaseServerType.Sqlite => "SELECT sqlite_version()",
+                        _ => "SELECT 1"
+                    };
                     cmd.CommandTimeout = Math.Min(10, Math.Max(5, config.Server.CommandTimeout));
                     var scalar = await cmd.ExecuteScalarAsync(cancellationToken);
                     if (scalar is string fullVer && !string.IsNullOrWhiteSpace(fullVer))
@@ -115,7 +122,7 @@ namespace BprDevKit.DatabaseManagement.Connections
                 }
                 catch
                 {
-                    // If @@VERSION query fails, retain connection.ServerVersion
+                    // If version query fails, retain connection.ServerVersion
                 }
 
                 return new ConnectionTestResult

@@ -1205,18 +1205,143 @@ namespace BprDevKit.DataModelGenerator.Generators
             IReadOnlyList<TableOperation.Information> tables,
             DataModelOptions globalOptions)
         {
+            var options = globalOptions.CSharp;
+            var dbName = tables.FirstOrDefault(t => !string.IsNullOrWhiteSpace(t.DatabaseName))?.DatabaseName ?? string.Empty;
+
+            // 1. Resolve DbContext's own namespace cleanly
+            string resolvedDbContextNs;
+            if (!string.IsNullOrWhiteSpace(options.DbContextNamespace))
+            {
+                resolvedDbContextNs = ApplyTokens(options.DbContextNamespace, "Context", dbName, dbContextName);
+            }
+            else if (!string.IsNullOrWhiteSpace(ns))
+            {
+                resolvedDbContextNs = ApplyTokens(ns, "Context", dbName, dbContextName);
+            }
+            else if (string.Equals(options.NamespaceMode, "PerSchema", StringComparison.OrdinalIgnoreCase))
+            {
+                resolvedDbContextNs = !string.IsNullOrWhiteSpace(options.Namespace)
+                    ? ApplyTokens(options.Namespace, "Context", dbName, dbContextName)
+                    : ApplyTokens("{Database}.Context", "Context", dbName, dbContextName);
+            }
+            else
+            {
+                resolvedDbContextNs = ApplyTokens(options.Namespace, "Context", dbName, dbContextName);
+            }
+
+            // 2. Map all entity tables and views
+            var entityTables = tables.Where(t => t.IsEntityTableOrView()).ToList();
+
+            var entityMetadataList = entityTables.Select(table =>
+            {
+                var className = DataModelNamingHelper.FormatClassName(
+                    table.TableName,
+                    globalOptions.RemoveTablePrefixes,
+                    globalOptions.TablePrefixes,
+                    globalOptions.SingularizeClassNames,
+                    globalOptions.PropertyNaming,
+                    table.ObjectType);
+
+                var modelNs = ResolveNamespace(
+                    options,
+                    table.SchemaName,
+                    table.DatabaseName ?? dbName,
+                    table.TableName);
+
+                var rawDbSetName = globalOptions.PropertyNaming == NamingConvention.Original
+                    ? table.TableName
+                    : (className.EndsWith("s", StringComparison.OrdinalIgnoreCase) ? className : className + "s");
+
+                return new
+                {
+                    Table = table,
+                    ClassName = className,
+                    ModelNamespace = modelNs,
+                    FullTypeName = string.IsNullOrWhiteSpace(modelNs) ? className : $"{modelNs}.{className}",
+                    RawDbSetName = rawDbSetName
+                };
+            }).ToList();
+
+            // 3. Collision detection for class names and DbSet names across schemas
+            var classNameCounts = entityMetadataList
+                .GroupBy(x => x.ClassName, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+            var dbSetNameCounts = entityMetadataList
+                .GroupBy(x => x.RawDbSetName, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+            var resolvedEntities = entityMetadataList.Select(item =>
+            {
+                bool hasClassCollision = classNameCounts[item.ClassName] > 1;
+                bool hasDbSetCollision = dbSetNameCounts[item.RawDbSetName] > 1;
+
+                // Use full type name if user requested it, or if there is a class name collision
+                string typeRef = (options.DbContextUseFullyQualifiedModelNames || hasClassCollision)
+                    ? item.FullTypeName
+                    : item.ClassName;
+
+                // Disambiguate DbSet name with schema prefix if there is a collision
+                string effectiveDbSetName = item.RawDbSetName;
+                if (hasDbSetCollision && !string.IsNullOrWhiteSpace(item.Table.SchemaName))
+                {
+                    effectiveDbSetName = $"{item.Table.SchemaName}_{item.RawDbSetName}";
+                }
+
+                return new
+                {
+                    item.Table,
+                    item.ClassName,
+                    item.ModelNamespace,
+                    item.FullTypeName,
+                    TypeRef = typeRef,
+                    DbSetName = effectiveDbSetName
+                };
+            }).ToList();
+
+            // 4. Collect Usings
+            var usings = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            usings.Add("System");
+            usings.Add("Microsoft.EntityFrameworkCore");
+
+            // Add all distinct model namespaces (unless DbContext is in the same namespace)
+            foreach (var item in resolvedEntities)
+            {
+                if (!string.IsNullOrWhiteSpace(item.ModelNamespace) &&
+                    !string.Equals(item.ModelNamespace, resolvedDbContextNs, StringComparison.OrdinalIgnoreCase))
+                {
+                    usings.Add(item.ModelNamespace);
+                }
+            }
+
+            // Add custom usings configured by user
+            if (!string.IsNullOrWhiteSpace(options.CustomUsings))
+            {
+                var customLines = options.CustomUsings.Split(new[] { '\r', '\n', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (var line in customLines)
+                {
+                    var clean = line.Trim();
+                    if (clean.StartsWith("using ", StringComparison.OrdinalIgnoreCase)) clean = clean[6..].Trim().TrimEnd(';');
+                    if (!string.IsNullOrWhiteSpace(clean)) usings.Add(clean);
+                }
+            }
+
+            // 5. Build file content
             var sb = new StringBuilder();
-            sb.AppendLine("using System;");
-            sb.AppendLine("using Microsoft.EntityFrameworkCore;");
+
+            foreach (var u in usings.OrderBy(x => x.StartsWith("System", StringComparison.OrdinalIgnoreCase) ? 0 : 1).ThenBy(x => x))
+            {
+                sb.AppendLine($"using {u};");
+            }
             sb.AppendLine();
 
-            if (!string.IsNullOrWhiteSpace(ns))
+            if (!string.IsNullOrWhiteSpace(resolvedDbContextNs))
             {
-                sb.AppendLine($"namespace {ns}");
+                sb.AppendLine($"namespace {resolvedDbContextNs}");
                 sb.AppendLine("{");
             }
 
-            var indent = string.IsNullOrWhiteSpace(ns) ? "" : "    ";
+            var indent = string.IsNullOrWhiteSpace(resolvedDbContextNs) ? "" : "    ";
 
             sb.AppendLine($"{indent}public class {dbContextName} : DbContext");
             sb.AppendLine($"{indent}{{");
@@ -1225,21 +1350,9 @@ namespace BprDevKit.DataModelGenerator.Generators
             sb.AppendLine($"{indent}    }}");
             sb.AppendLine();
 
-            foreach (var table in tables.Where(t => t.IsEntityTableOrView()))
+            foreach (var entity in resolvedEntities)
             {
-                var className = DataModelNamingHelper.FormatClassName(
-                    table.TableName,
-                    globalOptions.RemoveTablePrefixes,
-                    globalOptions.TablePrefixes,
-                    globalOptions.SingularizeClassNames,
-                    globalOptions.PropertyNaming,
-                    table.ObjectType);
-
-                var dbSetName = globalOptions.PropertyNaming == NamingConvention.Original
-                    ? table.TableName
-                    : (className.EndsWith("s") ? className : className + "s");
-
-                sb.AppendLine($"{indent}    public DbSet<{className}> {dbSetName} {{ get; set; }}");
+                sb.AppendLine($"{indent}    public DbSet<{entity.TypeRef}> {entity.DbSetName} {{ get; set; }}");
             }
 
             sb.AppendLine();
@@ -1248,32 +1361,25 @@ namespace BprDevKit.DataModelGenerator.Generators
             sb.AppendLine($"{indent}        base.OnModelCreating(modelBuilder);");
             sb.AppendLine();
 
-            foreach (var table in tables)
+            foreach (var entity in resolvedEntities)
             {
-                var className = DataModelNamingHelper.FormatClassName(
-                    table.TableName,
-                    globalOptions.RemoveTablePrefixes,
-                    globalOptions.TablePrefixes,
-                    globalOptions.SingularizeClassNames,
-                    globalOptions.PropertyNaming,
-                    table.ObjectType);
-
+                var table = entity.Table;
                 var pks = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pks.Count > 1)
                 {
                     var keys = string.Join(", ", pks.Select(k => $"e.{DataModelNamingHelper.FormatPropertyName(k.ColumnName, globalOptions.PropertyNaming)}"));
-                    sb.AppendLine($"{indent}        modelBuilder.Entity<{className}>().HasKey(e => new {{ {keys} }});");
+                    sb.AppendLine($"{indent}        modelBuilder.Entity<{entity.TypeRef}>().HasKey(e => new {{ {keys} }});");
                 }
                 else if (table.ObjectType == Constants.ObjectTypes.View && pks.Count == 0)
                 {
-                    sb.AppendLine($"{indent}        modelBuilder.Entity<{className}>().HasNoKey().ToView(\"{table.TableName}\", \"{table.SchemaName}\");");
+                    sb.AppendLine($"{indent}        modelBuilder.Entity<{entity.TypeRef}>().HasNoKey().ToView(\"{table.TableName}\", \"{table.SchemaName}\");");
                 }
             }
 
             sb.AppendLine($"{indent}    }}");
             sb.AppendLine($"{indent}}}");
 
-            if (!string.IsNullOrWhiteSpace(ns))
+            if (!string.IsNullOrWhiteSpace(resolvedDbContextNs))
             {
                 sb.AppendLine("}");
             }
@@ -1285,7 +1391,7 @@ namespace BprDevKit.DataModelGenerator.Generators
                 ClassName = dbContextName,
                 FileName = $"{dbContextName}.cs",
                 Content = sb.ToString().TrimEnd() + Environment.NewLine,
-                Namespace = ns ?? string.Empty,
+                Namespace = resolvedDbContextNs ?? string.Empty,
                 Language = DataModelLanguage.CSharp
             };
         }

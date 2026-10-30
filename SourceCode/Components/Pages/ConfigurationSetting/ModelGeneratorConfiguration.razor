@@ -340,8 +340,18 @@
                             @if (_editingProfile.Options.CSharp.GenerateDbContext)
                             {
                                 <div class="ps-3 border-start mb-2">
-                                    <label class="form-label small mb-1">@t[TranslationKeys.DataModelCsDbContextName]</label>
-                                    <input type="text" class="form-control form-control-sm font-monospace" @bind="_editingProfile.Options.CSharp.DbContextName" />
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">@t[TranslationKeys.DataModelCsDbContextName]</label>
+                                        <input type="text" class="form-control form-control-sm font-monospace" placeholder="AppDbContext" @bind="_editingProfile.Options.CSharp.DbContextName" />
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">@t[TranslationKeys.DataModelCsDbContextNamespace]</label>
+                                        <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. {Database}.Context or MyProject.Data" @bind="_editingProfile.Options.CSharp.DbContextNamespace" />
+                                    </div>
+                                    <div class="form-check form-switch mb-1">
+                                        <input class="form-check-input" type="checkbox" id="cs-p-db-fqn" @bind="_editingProfile.Options.CSharp.DbContextUseFullyQualifiedModelNames" />
+                                        <label class="form-check-label small" for="cs-p-db-fqn">@t[TranslationKeys.DataModelCsDbContextUseFullyQualified]</label>
+                                    </div>
                                 </div>
                             }
                         </div>

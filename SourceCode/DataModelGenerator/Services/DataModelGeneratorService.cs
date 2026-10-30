@@ -36,7 +36,7 @@ namespace BprDevKit.DataModelGenerator.Services
                 var contextName = string.IsNullOrWhiteSpace(options.CSharp.DbContextName) ? "AppDbContext" : options.CSharp.DbContextName.Trim();
                 var dbContextFile = CSharpModelGenerator.GenerateDbContext(
                     contextName,
-                    options.CSharp.Namespace,
+                    !string.IsNullOrWhiteSpace(options.CSharp.DbContextNamespace) ? options.CSharp.DbContextNamespace : options.CSharp.Namespace,
                     tables,
                     options);
                 results.Add(dbContextFile);

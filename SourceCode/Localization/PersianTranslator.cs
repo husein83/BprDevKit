@@ -609,6 +609,8 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelCsEfTableAttributes] = "تولید ویژگی [Table] انتیتی فریم‌ورک",
             [TranslationKeys.DataModelCsGenerateDbContext] = "تولید کلاس DbContext برای انتیتی فریم‌ورک",
             [TranslationKeys.DataModelCsDbContextName] = "نام کلاس DbContext",
+            [TranslationKeys.DataModelCsDbContextNamespace] = "فضای نام DbContext (اختیاری)",
+            [TranslationKeys.DataModelCsDbContextUseFullyQualified] = "همیشه از آدرس کامل Namespace مدل‌ها در DbContext استفاده شود (DbSet<Namespace.Class>)",
 
             // Profiles
             [TranslationKeys.DataModelSelectProfileToProceed] = "لطفاً برای بارگذاری تنظیمات تولیدکننده، یک پروفایل پیکربندی انتخاب کنید.",

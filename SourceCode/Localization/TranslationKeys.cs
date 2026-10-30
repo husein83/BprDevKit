@@ -599,6 +599,8 @@ namespace BprDevKit.Localization
         public const string DataModelCsEfTableAttributes = "DataModel.CsEfTableAttributes";
         public const string DataModelCsGenerateDbContext = "DataModel.CsGenerateDbContext";
         public const string DataModelCsDbContextName = "DataModel.CsDbContextName";
+        public const string DataModelCsDbContextNamespace = "DataModel.CsDbContextNamespace";
+        public const string DataModelCsDbContextUseFullyQualified = "DataModel.CsDbContextUseFullyQualified";
 
         // Profiles
         public const string DataModelSelectProfileToProceed = "DataModel.SelectProfileToProceed";

@@ -608,6 +608,8 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelCsEfTableAttributes] = "Generate EF Core [Table] Attributes",
             [TranslationKeys.DataModelCsGenerateDbContext] = "Generate EF Core DbContext Class",
             [TranslationKeys.DataModelCsDbContextName] = "DbContext Class Name",
+            [TranslationKeys.DataModelCsDbContextNamespace] = "DbContext Namespace (Optional)",
+            [TranslationKeys.DataModelCsDbContextUseFullyQualified] = "Always use Fully-Qualified Model Names in DbContext (e.g. DbSet<Models.Customer>)",
 
             // Profiles
             [TranslationKeys.DataModelSelectProfileToProceed] = "Please select a configuration profile to load generator options.",
