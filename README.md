@@ -5,8 +5,9 @@
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)
 ![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4?logo=blazor&logoColor=white)
 ![C#](https://img.shields.io/badge/C%23-13.0-239120?logo=csharp&logoColor=white)
-![Database](https://img.shields.io/badge/SQL%20Server-2016+-CC292B?logo=microsoftsqlserver&logoColor=white)
-![UI](https://img.shields.io/badge/UI-Bootstrap%205%20%7C%20RTL-7952B3?logo=bootstrap&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&logoColor=white)
+![Databases](https://img.shields.io/badge/Databases-SQL%20Server%20%7C%20Oracle-CC292B?logo=microsoftsqlserver&logoColor=white)
+![UI](https://img.shields.io/badge/UI-Bootstrap%205%20%7C%20Dark%20Mode%20%7C%20RTL-7952B3?logo=bootstrap&logoColor=white)
 ![Languages](https://img.shields.io/badge/Languages-Persian%20%7C%20English-blue)
 
 **ابزار جامع، مدرن و قدرتمند توسعه‌دهندگان پایگاه‌داده و تولید خودکار مدل‌های نرم‌افزاری**  
@@ -27,16 +28,17 @@
 1. [معرفی BprDevKit](#fa-overview)
 2. [معماری و تکنولوژی‌ها](#fa-architecture)
 3. [راهنمای ماژول‌ها و امکانات قدم‌به‌قدم](#fa-modules)
-   - [۳.۱. مدیریت سرورها و پایگاه‌های داده (Database Management)](#fa-db-management)
+   - [۳.۱. مدیریت پایگاه‌داده و کنسول اجرای کوئری (Database Management & Query Runner)](#fa-db-management)
    - [۳.۲. تولید دیتامدل چندزبانه (Data Model Generator)](#fa-model-generator)
-   - [۳.۳. تنظیمات پروفایل و گزینه‌های پیشرفته سی‌شارپ (C# Advanced Config)](#fa-csharp-advanced)
+   - [۳.۳. تنظیمات پیشرفته سی‌شارپ، DbContext و Fluent API](#fa-csharp-advanced)
    - [۳.۴. مدیریت منعطف انوتیشن‌ها (Annotations Management)](#fa-annotations)
-   - [۳.۵. موتور تبدیل پیشرفته پراپرتی‌ها (Property Transformations)](#fa-transformations)
+   - [۳.۵. موتور تبدیل پراپرتی‌ها و همگام‌سازی دوطرفه JSON به Dictionary](#fa-transformations)
    - [۳.۶. کنترل دسترسی اسکیماها (Schema Access Control)](#fa-schema-access)
-   - [۳.۷. تنظیمات زبان‌های Python ،Dart و Java](#fa-other-languages)
+   - [۳.۷. پشتیبانی از زبان‌های TypeScript ،Python ،Dart و Java](#fa-other-languages)
    - [۳.۸. تولید اسکریپت پایگاه‌داده (Script Generator)](#fa-script-generator)
    - [۳.۹. پشتیبان‌گیری و بازگردانی تنظیمات (Config Backup & Restore)](#fa-config-backup)
-   - [۳.۱۰. لاگ و مانیتورینگ سیستم (System Logs)](#fa-logs)
+   - [۳.۱۰. تنظیمات نرم‌افزار و پالت اختصاصی تم تاریک (Dark Mode)](#fa-app-settings)
+   - [۳.۱۱. لاگ و مانیتورینگ سیستم (System Logs)](#fa-logs)
 4. [پیش‌نیازها و راه‌اندازی](#fa-getting-started)
 5. [ساخت نسخه مستقل (Release & Publish)](#fa-release)
 
@@ -51,9 +53,11 @@
 <a name="fa-architecture"></a>
 ### ۲. معماری و تکنولوژی‌ها
 - **فریم‌ورک هسته:** Microsoft .NET 10.0 (ASP.NET Core Blazor Server)
-- **زبان برنامه‌نویسی:** C# 13
-- **رابط کاربری:** Bootstrap 5 با پشتیبانی بومی از راست‌چین (RTL) و چپ‌چین (LTR)
-- **بانک اطلاعاتی هدف:** Microsoft SQL Server (2016 تا 2022 و Azure SQL)
+- **زبان‌های پشتیبانی‌شده برای تولید مدل:** C# 13 ،TypeScript ،Python 3 ،Dart و Java 17+
+- **رابط کاربری:** Bootstrap 5 با پشتیبانی بومی از راست‌چین (RTL) و چپ‌چین (LTR)، همراه با پالت تیره اختصاصی، فوق‌مدرن و ارگونومیک (Dark Mode).
+- **بانک‌های اطلاعاتی هدف:** 
+  - Microsoft SQL Server (از نسخه 2016 تا 2022 و Azure SQL)
+  - Oracle Database (با اتصال بومی از طریق پکیج رسمی `Oracle.ManagedDataAccess.Core` و استخراج متادیتای کاتالوگ‌های اوراکل)
 - **معماری نرم‌افزار:** تفکیک ماژولار Domain-Driven، بدون وابستگی‌های سنگین خارجی، دارای لاگر چرخشی اختصاصی (Rolling File Logger) و سیستم رمزنگاری داخلی کانفیگ‌ها.
 
 ---
@@ -62,9 +66,12 @@
 ### ۳. راهنمای ماژول‌ها و امکانات قدم‌به‌قدم
 
 <a name="fa-db-management"></a>
-#### ۳.۱. مدیریت پایگاه‌داده (Database Management)
-این ماژول امکانات جامعی را برای مدیریت اشیاء و داده‌ها فراهم می‌کند:
+#### ۳.۱. مدیریت پایگاه‌داده و کنسول اجرای کوئری (Database Management & Query Runner)
+این ماژول امکانات جامعی را برای مدیریت اشیاء، داده‌ها و کوئری‌زدن مستقیم فراهم می‌کند:
 - **مدیریت کامل اشیاء:** مرور، مشاهده ساختار و تغییرات در جداول (Tables)، ستون‌ها، کلیدهای اصلی (PK)، کلیدهای خارجی (FK)، ایندکس‌ها، قیود چک (Check Constraints)، تریگرها (Triggers)، ویوها (Views)، توابع (Functions) و پروسیجرها (Stored Procedures).
+- **کنسول اجرای سریع کوئری (Quick SQL Query Runner):** 
+  - تب اختصاصی در صفحه مدیریت دیتابیس جهت نوشتن و اجرای سریع دستورات و کوئری‌های SQL بدون نیاز به باز کردن ابزارهای خارجی.
+  - نمایش داده‌ها به صورت جدول ساخت‌یافته و پویا، نمایش زمان اجرای کوئری، تعداد رکوردهای تحت تاثیر، و پیام‌های خطا یا وضعیت به همراه قابلیت پاکسازی سریع.
 - **رمزگشایی آبجکت‌های محافظت‌شده (WITH ENCRYPTION):** مشاهده سورس‌کد پروسیجرها و توابعی که با دستور `WITH ENCRYPTION` در SQL Server قفل شده‌اند.
 - **پشتیبان‌گیری پیشرفته (Database Backup):**
   - **مرورگر فایل سرور (Server Disk Browser):** امکان کلیک روی درایوها و پوشه‌های سرور برای انتخاب دقیق مسیر ذخیره‌سازی، بدون محدود شدن به مسیر پیش‌فرض بکاپ SQL.
@@ -80,7 +87,7 @@
 <a name="fa-model-generator"></a>
 #### ۳.۲. تولید دیتامدل چندزبانه (Data Model Generator)
 ویزارد ساده و سریع در ۳ گام:
-1. **گام اول (Select Server):** انتخاب سرور متصل.
+1. **گام اول (Select Server):** انتخاب سرور متصل (SQL Server یا Oracle).
 2. **گام دوم (Select Database):** انتخاب پایگاه داده مورد نظر.
 3. **گام سوم (Select Profile):** انتخاب پروفایل تنظیمات (پیش‌فرض یا پروفایل سفارشی شما).
 
@@ -93,13 +100,14 @@
 
 ##### تنظیمات عمومی مدل (General Model Settings):
 - **Property Naming Style:** تعیین فرمت نام‌گذاری فیلدها شامل:
+  - `Original` (پیش‌فرض، حفظ دقیق نام ستون در دیتابیس بدون دستکاری)
   - `PascalCase` (استاندارد C#)
-  - `camelCase` (استاندارد Dart و Java)
+  - `camelCase` (استاندارد TypeScript ،Dart و Java)
   - `snake_case` (استاندارد Python)
-  - `Original` (حفظ دقیق نام ستون در دیتابیس)
-- **Strip Common Table/Object Prefixes:** حذف خودکار پیشوندهای متداول از نام کلاس‌ها (مانند `tbl_`، `vw_`، `sp_`، `usp_`).
-- **Singularize Class Names:** مفردسازی هوشمند نام کلاس‌ها (مثلاً تبدیل جدول `Users` به کلاس `User` و `Categories` به `Category`).
-- **Generate Navigation Properties:** تولید خودکار رفرنس‌ها و کالکشن‌های ارتباطی کلید خارجی (FK).
+- **Strip Common Table/Object Prefixes:** حذف خودکار پیشوندهای متداول جداول و آبجکت‌ها از نام کلاس‌ها (مانند `tbl_`، `vw_`، `sp_`، `usp_`) — پیش‌فرض: غیرفعال (`false`).
+- **Strip Common Column/Field Prefixes:** حذف پیشوندهای فنی ستون‌ها و فیلدها از نام پراپرتی‌ها (مانند `fld_`، `col_`) — پیش‌فرض: غیرفعال (`false`).
+- **Singularize Class Names:** مفردسازی هوشمند نام کلاس‌ها (مثلاً تبدیل جدول `Users` به کلاس `User`) — پیش‌فرض: غیرفعال (`false`).
+- **Generate Navigation Properties:** تولید خودکار رفرنس‌ها و کالکشن‌های ارتباطی کلید خارجی (FK). در تمام کلاس‌ها، ریجن‌های `#region References` و `#region Relations` حتی در صورت عدم وجود کلید خارجی برای حفظ ساختار یکنواخت درج می‌شوند.
 - **Include XML / Docstring Comments:** استخراج اتوماتیک توضیحات ستون‌ها (Extended Properties) از دیتابیس و قرار دادن آن به عنوان کامنت بالای هر پراپرتی.
 
 ##### خروجی و دانلود:
@@ -113,24 +121,25 @@
 ---
 
 <a name="fa-csharp-advanced"></a>
-#### ۳.۳. تنظیمات پروفایل و گزینه‌های پیشرفته سی‌شارپ (C# Advanced Config)
-در بخش تنظیمات پروفایل، کنترل کاملی بر معماری کدهای C# وجود دارد:
+#### ۳.۳. تنظیمات پیشرفته سی‌شارپ، DbContext و Fluent API
+در بخش تنظیمات پروفایل، کنترل کاملی بر معماری کدهای C# و Entity Framework Core وجود دارد:
 
-##### ۱. تب ساختار و ریجن‌ها (Structure & Regions):
+##### ۱. ساختار کلاس و ریجن‌ها (Structure & Regions):
 - **C# Type Kind:** انتخاب نوع تعریف (`class`، `record`، یا `struct`).
 - **Property Accessor:** انتخاب نوع پراپرتی (`{ get; set; }` معمولی، `{ get; init; }` تغییرناپذیر، یا `backing_field` چندخطی).
 - **Base Class & Interfaces:** تعیین نام کلاس پایه یا اینترفیس‌هایی که کلاس‌ها باید از آن‌ها ارث‌بری کنند (با پشتیبانی از توکن‌های `{TableName}` و `{ClassName}`).
 - **Partial Class:** تولید کلاس به صورت `public partial class`.
-- **Organize Class with #region Blocks:** تفکیک منظم پراپرتی‌ها، کلیدها، فیلدهای پشتیبان و متدها در بلوک‌های `#region`.
-- **Outer Region Name:** قرار دادن کل اعضای کلاس در یک ریجن سراسری (مثلاً `#region Generator`).
+- **Organize Class with #region Blocks:** تفکیک منظم پراپرتی‌ها، کلیدها، فیلدهای پشتیبان و رفرنس‌ها در بلوک‌های `#region`. ریجن‌های References و Relations حتی برای کلاس‌های فاقد کلید خارجی جهت یکدستی سورس‌کد همیشه ایجاد می‌شوند.
 - **Class Constants Definition:** تعریف ثابت‌های اختصاصی برای هر کلاس با توکن‌های `{TableName}`، `{SchemaName}`، `{ClassName}` و `{Database}`.
-- **Table & Schema Overrides:** تولید خودکار متدهای کمکی نظیر `GetTableName()` و `GetSchemaName()`.
 
-##### ۲. تب فضا‌های نام (Namespace & Usings):
-- **Namespace Mode:**
-  - `Single`: استفاده از یک Namespace سراسری برای کل پروژه.
-  - `PerSchema`: نگاشت و تفکیک خودکار Namespace به ازای هر اسکیمای دیتابیس (مثلاً `MyProject.Sales` برای اسکیمای Sales و `MyProject.HR` برای اسکیمای HR).
-- **Additional Custom Usings:** افزودن Usingهای دلخواه به ابتدای تمامی فایل‌ها.
+##### ۲. تولید خودکار DbContext و Fluent API Configurations:
+- **Generate DbContext:** تولید خودکار کلاس متنی `DbContext` شامل تمام `DbSet<T>`های جداول و ویوها، متدهای کانفیگ و تنظیمات پیشرفته.
+  - **DbContext Namespace:** امکان تعیین فضانام اختصاصی برای کانتکست (مانند `{Database}.Context` یا `MyProject.Data`).
+  - **Use Fully-Qualified Model Names:** جلوگیری از تداخل اسامی جداول هم‌نام در اسکیماهای مختلف با ارجاع دقیق به `DbSet<global::Namespace.ClassName>`.
+- **Generate EntityTypeConfiguration (Fluent API):**
+  - تولید فایل‌های مجزای `{ClassName}Configuration.cs` پیاده‌سازی‌کننده `IEntityTypeConfiguration<T>`.
+  - نگاشت کلیدهای اصلی (`builder.HasKey`)، ستون‌های افزایشی Identity، طول فیلدها، نوع ستون‌های دیتابیس، نام جدول و اسکیما (`builder.ToTable`).
+  - نگاشت کامل روابط کلید خارجی با رفتارهای ارجاعی (`OnDelete`).
 
 ---
 
@@ -152,12 +161,15 @@
 ---
 
 <a name="fa-transformations"></a>
-#### ۳.۵. موتور تبدیل پیشرفته پراپرتی‌ها (Property Transformations)
+#### ۳.۵. موتور تبدیل پراپرتی‌ها و همگام‌سازی دوطرفه JSON به Dictionary
 امکان تغییر نوع و رفتار پراپرتی‌ها بر اساس الگوهای نام ستون یا نوع داده:
-- **تولید ویژگی کمکی `[NotMapped]`:** تولید پراپرتی الحاقی که در دیتابیس ذخیره نمی‌شود اما داده را به شیء ساخت‌یافته تبدیل می‌کند.
+- **تولید ویژگی کمکی `[NotMapped]` با همگام‌سازی دوطرفه (Two-Way Sync):**
+  - فیلد رشته‌ای متناظر با دیتابیس مقدار JSON خود را از متغیرهای دیکشنری می‌خواند.
+  - فیلد دیکشنری `Dictionary<string, object?>` به صورت خودکار تغییرات را با رشته JSON پشت‌صحنه (`_payloadJson`) همگام می‌کند و موقع خواندن از دیتابیس نیز متن را به ساختار دیکشنری تبدیل می‌نماید.
 - **تغییر مستقیم نوع داده (Type Override):** مثلاً تبدیل خودکار ستون عددی `StatusId` به Enum متناظر در C#.
 - **قالب‌های آماده با یک کلیک (Quick Templates):**
-  - **JSON to JsonDocument:** تبدیل خودکار فیلدهای متنی JSON به `JsonDocument?` به همراه پارس و سریالایز خودکار.
+  - **JSON to Dictionary:** تبدیل خودکار فیلدهای متنی JSON به دیکشنری با قابلیت فعال‌سازی سوییچ دوطرفه.
+  - **JSON to JsonDocument:** تبدیل ستون‌های متنی JSON به `JsonDocument?` به همراه پارس و سریالایز خودکار.
   - **XML to XElement:** تبدیل ستون‌های XML به شیء `XElement?`.
   - **CSV to List<string>:** تبدیل رشته‌های کاما-جدا به لیست رشته.
   - **Int to Enum:** تبدیل ستون وضعیت عددی به Enum دلخواه.
@@ -174,7 +186,11 @@
 ---
 
 <a name="fa-other-languages"></a>
-#### ۳.۷. تنظیمات زبان‌های Python ،Dart و Java
+#### ۳.۷. پشتیبانی از زبان‌های TypeScript ،Python ،Dart و Java
+- **TypeScript (جدید 🚀):**
+  - سبک‌های اعلان: `interface`، `type alias`، یا `class`.
+  - گزینه‌های حرفه‌ای: اعمال کلمه کلیدی `readonly` روی کلیدهای اصلی (PK)، تبدیل انواع تاریخ به شیء `Date` یا رشته ایزو `string`، درج دستورات `export` و ایمپورت‌های سفارشی.
+  - تولید کامل ارتباطات ناوبری (Parent Navigation و کالکشن‌های فرزند `Child[]`).
 - **Python:**
   - سبک‌ها: `Pydantic (BaseModel)`، `SQLAlchemy (ORM)`، `Dataclass` یا `TypedDict`.
   - تنظیم Type Hints و مقادیر پیش‌فرض.
@@ -182,7 +198,7 @@
   - سبک‌ها: `Plain Dart`، `JsonSerializable` یا `Freezed`.
   - پشتیبانی کامل از Null Safety و تولید فیلدهای `final`.
 - **Java:**
-  - سبک‌ها: `Java 16+ Record`، `JPA / Hibernate Entity`، `Lombok (@Data, @Builder)` یا کلاس استاندارد با Getters/Setters.
+  - سبک‌ها: `Java 17+ Record`، `JPA / Hibernate Entity`، `Lombok (@Data, @Builder)` یا کلاس استاندارد با Getters/Setters.
   - افزودن انوتیشن‌های Jackson (`@JsonProperty`) و پشتیبانی از `Serializable`.
 
 ---
@@ -205,8 +221,16 @@
 
 ---
 
+<a name="fa-app-settings"></a>
+#### ۳.۱۰. تنظیمات نرم‌افزار و پالت اختصاصی تم تاریک (Dark Mode)
+- **پایداری کامل تم (Theme Persistence):** تم انتخابی کاربر (حالت روشن / حالت تاریک) مستقیماً در تنظیمات نرم‌افزار (`ApplicationConfiguration`) ذخیره می‌شود و با جابه‌جایی بین صفحات و تب‌ها هرگز ریست نمی‌شود.
+- **پالت تاریک لوکس و چشم‌نواز:** طراحی کاملاً اختصاصی سطوح تیره و دوده ای (`#0b0f19`) با گرادینت‌های نوری کیهانی، حذف کارت‌های سفید زننده، کنتراست بالای متون و فونت‌ها، و هایلایت‌های شفاف فیروزه‌ای (`#38bdf8`).
+- **سوئیچ سریع در سایدبار:** دکمه شیشه‌ای مدرن در انتهای سایدبار برای سوئیچ آنی تم همراه با هماهنگی کامل سمت سرور.
+
+---
+
 <a name="fa-logs"></a>
-#### ۳.۱۰. لاگ و مانیتورینگ سیستم (System Logs)
+#### ۳.۱۱. لاگ و مانیتورینگ سیستم (System Logs)
 - سیستم لاگ اختصاصی Rolling File در مسیر محلی بدون وابستگی سنگین.
 - ثبت تمام رخدادهای تولید کد، خطاهای اتصال به دیتابیس و عملیات بکاپ/ریستور.
 - امکان جستجو در متن پیام‌ها، فیلتر بر اساس شدت لاگ (اطلاعات، هشدار، خطا) و مشاهده جزئیات Exception در مودال اختصاصی.
@@ -218,7 +242,7 @@
 
 #### پیش‌نیازها:
 - [.NET 10.0 SDK](https://dotnet.microsoft.com/) یا بالاتر.
-- دسترسی به یک سرور Microsoft SQL Server (لوکال یا ریموت).
+- دسترسی به یک سرور Microsoft SQL Server یا Oracle Database (لوکال یا ریموت).
 
 #### اجرای سریع (Development):
 ```bash
@@ -255,16 +279,17 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 1. [Overview & Philosophy](#en-overview)
 2. [Architecture & Tech Stack](#en-architecture)
 3. [Step-by-Step Feature Walkthrough](#en-features)
-   - [3.1. Database Management](#en-db-management)
+   - [3.1. Database Management & Quick SQL Query Runner](#en-db-management)
    - [3.2. Data Model Generator](#en-model-generator)
-   - [3.3. Advanced C# Architecture & Settings](#en-csharp-advanced)
+   - [3.3. Advanced C# Architecture, DbContext & Fluent API](#en-csharp-advanced)
    - [3.4. Fine-Grained Annotations Management](#en-annotations)
-   - [3.5. Property Transformation Engine](#en-transformations)
+   - [3.5. Property Transformations & Two-Way JSON Synchronization](#en-transformations)
    - [3.6. Schema Access Control](#en-schema-access)
-   - [3.7. Python, Dart, and Java Generators](#en-other-languages)
+   - [3.7. TypeScript, Python, Dart, and Java Generators](#en-other-languages)
    - [3.8. Script Generator](#en-script-generator)
    - [3.9. Configuration Backup & Restore](#en-config-backup)
-   - [3.10. System Logging & Audit](#en-logs)
+   - [3.10. Application Settings & Premium Dark Mode Palette](#en-app-settings)
+   - [3.11. System Logging & Audit](#en-logs)
 4. [Prerequisites & Getting Started](#en-getting-started)
 5. [Build & Release Guide](#en-release)
 
@@ -272,16 +297,18 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 <a name="en-overview"></a>
 ### 1. Overview & Philosophy
-**BprDevKit** is an enterprise-grade developer productivity suite designed to bridge the gap between relational databases and modern software codebases. Instead of writing boilerplate entities, DTOs, or schema scripts by hand, BprDevKit reverses engineers your database structures into clean, highly customizable domain models across multiple programming languages.
+**BprDevKit** is an enterprise-grade developer productivity suite designed to bridge the gap between relational databases and modern software codebases. Instead of writing boilerplate entities, DTOs, or schema scripts by hand, BprDevKit reverse-engineers your database structures into clean, highly customizable domain models across multiple programming languages.
 
 ---
 
 <a name="en-architecture"></a>
 ### 2. Architecture & Tech Stack
 - **Core Framework:** Microsoft .NET 10.0 (ASP.NET Core Blazor Server)
-- **Language:** C# 13
-- **Frontend / Styling:** Bootstrap 5 with native dual-mode RTL (Right-to-Left) and LTR (Left-to-Right) layout
-- **Database Targets:** Microsoft SQL Server (2016 through 2022, Azure SQL Database)
+- **Supported Model Languages:** C# 13, TypeScript, Python 3, Dart, and Java 17+
+- **Frontend & Design:** Bootstrap 5 with native dual-mode RTL (Right-to-Left) and LTR (Left-to-Right) layout, accompanied by a custom, ergonomic, high-contrast Dark Mode palette.
+- **Database Targets:**
+  - Microsoft SQL Server (2016 through 2022, Azure SQL Database)
+  - Oracle Database (via `Oracle.ManagedDataAccess.Core` with catalog views extraction and DDL generators)
 - **Internal Design:** Domain-driven modular design, native rolling file logger, client-side AES encrypted configuration store, and zero heavy third-party dependencies.
 
 ---
@@ -290,8 +317,11 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 ### 3. Step-by-Step Feature Walkthrough
 
 <a name="en-db-management"></a>
-#### 3.1. Database Management
+#### 3.1. Database Management & Quick SQL Query Runner
 - **Complete Object Explorer:** View schema and manage Tables, Columns, Primary Keys (PK), Foreign Keys (FK), Indexes, Check Constraints, Triggers, Views, Functions, and Stored Procedures.
+- **Quick SQL Query Runner:** 
+  - Integrated interactive query console tab in Database Management to execute ad-hoc SQL statements directly in your browser.
+  - Dynamically renders structured data tables, execution duration timers, affected row counts, and status/error alerts with instant clear controls.
 - **Protected Object Decryption:** Decompile and inspect definition source code for Stored Procedures, Views, Triggers, and Functions created `WITH ENCRYPTION`.
 - **Advanced Database Backup:**
   - **Server Disk Browser:** Interactively browse remote or local server disk drives and folders to pick any destination folder, freeing you from default SQL backup directories.
@@ -307,7 +337,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 <a name="en-model-generator"></a>
 #### 3.2. Data Model Generator
 Fast 3-step generation workflow:
-1. **Step 1:** Select active server connection.
+1. **Step 1:** Select active server connection (SQL Server or Oracle).
 2. **Step 2:** Select target database.
 3. **Step 3:** Select or customize a configuration profile.
 
@@ -320,13 +350,14 @@ Fast 3-step generation workflow:
 
 ##### General Model Settings:
 - **Property Naming Style:**
-  - `PascalCase`: Recommended for C#.
-  - `camelCase`: Recommended for Dart and Java.
-  - `snake_case`: Recommended for Python.
-  - `Original`: Exact match to SQL database column casing.
-- **Strip Common Table/Object Prefixes:** Removes prefixes like `tbl_`, `tbl`, `vw_`, `sp_`, `usp_`, `fn_` from generated class names.
-- **Singularize Class Names:** Converts plural table names into singular entity names (e.g., `Users` $\rightarrow$ `User`, `Companies` $\rightarrow$ `Company`), while intelligently preserving View and Stored Procedure names.
-- **Generate Navigation Properties:** Automatically creates reference and collection navigation properties for foreign keys.
+  - `Original`: Exact match to SQL database column casing (default).
+  - `PascalCase`: Standard for C#.
+  - `camelCase`: Standard for TypeScript, Dart, and Java.
+  - `snake_case`: Standard for Python.
+- **Strip Common Table/Object Prefixes:** Removes prefixes like `tbl_`, `vw_`, `sp_`, `usp_` from class names (default: `false`).
+- **Strip Common Column/Field Prefixes:** Strips prefixes like `fld_`, `col_` from property names (default: `false`).
+- **Singularize Class Names:** Converts plural table names into singular entity names (e.g., `Users` $\rightarrow$ `User`), preserving exact casing when desired (default: `false`).
+- **Generate Navigation Properties:** Automatically creates reference and collection navigation properties for foreign keys. Navigation regions (`#region References` and `#region Relations`) are always rendered with closing `#endregion` to maintain consistent architectural structure across all entities.
 - **Include XML / Docstring Comments:** Extracts database extended properties and column descriptions into XML documentation comments (`/// <summary>`) or docstrings.
 
 ##### Output & Packaging:
@@ -340,7 +371,7 @@ Fast 3-step generation workflow:
 ---
 
 <a name="en-csharp-advanced"></a>
-#### 3.3. Advanced C# Architecture & Settings
+#### 3.3. Advanced C# Architecture, DbContext & Fluent API
 Comprehensive options accessible via profile management:
 
 ##### 1. Structure & Regions:
@@ -348,16 +379,16 @@ Comprehensive options accessible via profile management:
 - **Property Accessor:** Choose `{ get; set; }`, `{ get; init; }`, or multi-line `backing_field` (`private _field`).
 - **Base Class & Interfaces:** Specify inheritance using token variables (`{TableName}`, `{ClassName}`).
 - **Partial Class:** Adds `partial` modifier to class signatures.
-- **#region Blocks:** Segregates fields, properties, foreign keys, and constructors cleanly.
-- **Outer Region Name:** Wraps entire class body in an overarching region (e.g., `#region Generator`).
+- **#region Blocks:** Segregates fields, properties, foreign keys, and constructors cleanly. Empty navigation regions are safely preserved.
 - **Class Constants Definition:** Define compile-time constants per entity with token helpers (`{TableName}`, `{SchemaName}`, `{ClassName}`, `{Database}`).
-- **Table & Schema Overrides:** Automatically outputs helper methods such as `GetTableName()` and `GetSchemaName()`.
 
-##### 2. Namespace & Usings:
-- **Namespace Mode:**
-  - `Single`: Applies one global namespace to all generated files.
-  - `PerSchema`: Automatically maps namespaces based on database schemas (e.g., `App.Core.Sales`, `App.Core.Inventory`).
-- **Additional Custom Usings:** Injects custom using directives across all files.
+##### 2. DbContext & Fluent API Generator:
+- **Generate DbContext:** Automatically creates an EF Core `DbContext` class containing all `DbSet<T>` properties for selected tables and views.
+  - **DbContext Namespace:** Customize the target context namespace (e.g. `{Database}.Context` or `MyProject.Data`).
+  - **Fully Qualified Model Names:** Automatically generates `DbSet<global::Namespace.Entity>` when enabled to prevent naming collisions between identical table names across schemas.
+- **Generate EntityTypeConfiguration (Fluent API):**
+  - Generates standalone `{ClassName}Configuration.cs` files implementing `IEntityTypeConfiguration<T>`.
+  - Configures primary keys (`HasKey`), auto-increment identity columns, column names and types (`ToTable`, `HasColumnName`), string lengths, and foreign key relationships with referential actions (`OnDelete`).
 
 ---
 
@@ -379,11 +410,14 @@ Located under the **Custom Attributes** tab:
 ---
 
 <a name="en-transformations"></a>
-#### 3.5. Property Transformation Engine
+#### 3.5. Property Transformations & Two-Way JSON Synchronization
 Dynamic rule engine that alters how columns are represented in the generated models:
-- **`[NotMapped]` Helper Properties:** Adds calculated or parsed properties without altering the primary database column.
+- **`[NotMapped]` Helper Properties with Two-Way Sync:**
+  - Adds a strongly-typed `Dictionary<string, object?>` property backed by an underlying JSON string field (`_payloadJson`).
+  - **Two-Way Synchronization:** Modifying the Dictionary automatically serializes into the database-mapped JSON string, while reading from the database automatically deserializes into the Dictionary.
 - **Type Overrides:** Directly changes property types (e.g., mapping an integer status column to a domain Enum).
 - **One-Click Pre-built Templates:**
+  - **JSON to Dictionary:** Converts JSON columns into dictionaries with optional two-way backing field synchronization.
   - **JSON to JsonDocument:** Converts JSON columns into `JsonDocument?` with automated parsing and serialization getters/setters.
   - **XML to XElement:** Converts XML columns into `XElement?`.
   - **CSV to List<string>:** Converts comma-delimited text into `List<string>?`.
@@ -401,7 +435,11 @@ Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven De
 ---
 
 <a name="en-other-languages"></a>
-#### 3.7. Python, Dart, and Java Generators
+#### 3.7. TypeScript, Python, Dart, and Java Generators
+- **TypeScript (New 🚀):**
+  - Declaration Styles: `interface`, `type alias`, or `class`.
+  - Advanced flags: `readonly` modifier for Primary Keys, Date representation as `Date` object or ISO `string`, automated `export` statements, and custom import headers.
+  - Fully supports Parent and Child collection navigation arrays (`Child[]`).
 - **Python:**
   - Architecture options: `Pydantic (BaseModel)`, `SQLAlchemy (ORM)`, `Dataclass`, or `TypedDict`.
   - Configurable type hints and default values.
@@ -409,7 +447,7 @@ Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven De
   - Architecture options: `Plain Dart`, `JsonSerializable`, or `Freezed`.
   - Full Null Safety support and `final` field modifiers.
 - **Java:**
-  - Architecture options: `Java 16+ Record`, `JPA / Hibernate Entity`, `Lombok (@Data, @Builder)`, or standard POJO with getters/setters.
+  - Architecture options: `Java 17+ Record`, `JPA / Hibernate Entity`, `Lombok (@Data, @Builder)`, or standard POJO with getters/setters.
   - Jackson annotations (`@JsonProperty`) and `Serializable` support.
 
 ---
@@ -432,8 +470,16 @@ Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven De
 
 ---
 
+<a name="en-app-settings"></a>
+#### 3.10. Application Settings & Premium Dark Mode Palette
+- **Persistent Theme Preferences:** Theme choice (Light / Dark mode) is saved directly into the encrypted `ApplicationConfiguration`, ensuring zero resets when switching tabs or pages.
+- **Premium Obsidian / Slate Palette:** Bespoke dark theme styling with deep canvas tones (`#0b0f19`), elimination of jarring white active elements, vibrant cyan-blue accents (`#38bdf8`), and high-contrast typography.
+- **Sidebar Theme Quick Toggle:** Frosted glassmorphism toggle button in the sidebar with instant client-server synchronization.
+
+---
+
 <a name="en-logs"></a>
-#### 3.10. System Logging & Audit
+#### 3.11. System Logging & Audit
 - Built-in rolling file logging engine with zero external dependencies.
 - Logs all model generations, database connection events, and backup/restore executions.
 - Real-time search, severity filtering (Info, Warning, Error), and full stack trace inspection modal.
@@ -445,7 +491,7 @@ Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven De
 
 #### Prerequisites:
 - [.NET 10.0 SDK](https://dotnet.microsoft.com/) or higher.
-- Microsoft SQL Server instance (local or remote).
+- Microsoft SQL Server or Oracle Database instance (local or remote).
 
 #### Quick Start:
 ```bash
