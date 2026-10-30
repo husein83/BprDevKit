@@ -1,4 +1,4 @@
-# BprDevKit (Bpr Developer Toolkit) 🛠️🚀
+# BprDevKit (Bpr Developer Toolkit) 🛠️
 
 <div align="center">
 
@@ -6,7 +6,7 @@
 ![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4?logo=blazor&logoColor=white)
 ![C#](https://img.shields.io/badge/C%23-13.0-239120?logo=csharp&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&logoColor=white)
-![Databases](https://img.shields.io/badge/Databases-SQL%20Server%20%7C%20Oracle-CC292B?logo=microsoftsqlserver&logoColor=white)
+![Databases](https://img.shields.io/badge/Databases-SQL%20Server%20%7C%20Oracle%20%7C%20PostgreSQL%20%7C%20MySQL%20%7C%20MariaDB%20%7C%20SQLite-blue)
 ![UI](https://img.shields.io/badge/UI-Bootstrap%205%20%7C%20Dark%20Mode%20%7C%20RTL-7952B3?logo=bootstrap&logoColor=white)
 ![Languages](https://img.shields.io/badge/Languages-Persian%20%7C%20English-blue)
 
@@ -27,26 +27,27 @@
 ## 📑 فهرست مطالب فارسی
 1. [معرفی BprDevKit](#fa-overview)
 2. [معماری و تکنولوژی‌ها](#fa-architecture)
-3. [راهنمای ماژول‌ها و امکانات قدم‌به‌قدم](#fa-modules)
-   - [۳.۱. مدیریت پایگاه‌داده و کنسول اجرای کوئری (Database Management & Query Runner)](#fa-db-management)
-   - [۳.۲. تولید دیتامدل چندزبانه (Data Model Generator)](#fa-model-generator)
-   - [۳.۳. تنظیمات پیشرفته سی‌شارپ، DbContext و Fluent API](#fa-csharp-advanced)
-   - [۳.۴. مدیریت منعطف انوتیشن‌ها (Annotations Management)](#fa-annotations)
-   - [۳.۵. موتور تبدیل پراپرتی‌ها و همگام‌سازی دوطرفه JSON به Dictionary](#fa-transformations)
-   - [۳.۶. کنترل دسترسی اسکیماها (Schema Access Control)](#fa-schema-access)
-   - [۳.۷. پشتیبانی از زبان‌های TypeScript ،Python ،Dart و Java](#fa-other-languages)
-   - [۳.۸. تولید اسکریپت پایگاه‌داده (Script Generator)](#fa-script-generator)
-   - [۳.۹. پشتیبان‌گیری و بازگردانی تنظیمات (Config Backup & Restore)](#fa-config-backup)
-   - [۳.۱۰. تنظیمات نرم‌افزار و پالت اختصاصی تم تاریک (Dark Mode)](#fa-app-settings)
-   - [۳.۱۱. لاگ و مانیتورینگ سیستم (System Logs)](#fa-logs)
-4. [پیش‌نیازها و راه‌اندازی](#fa-getting-started)
-5. [ساخت نسخه مستقل (Release & Publish)](#fa-release)
+3. [پایگاه‌های داده تحت پشتیبانی](#fa-supported-databases)
+4. [راهنمای ماژول‌ها و امکانات قدم‌به‌قدم](#fa-modules)
+   - [۴.۱. مدیریت پایگاه‌داده و کنسول اجرای کوئری (Database Management & Query Runner)](#fa-db-management)
+   - [۴.۲. تولید دیتامدل چندزبانه (Data Model Generator)](#fa-model-generator)
+   - [۴.۳. تنظیمات پیشرفته سی‌شارپ، DbContext و Fluent API](#fa-csharp-advanced)
+   - [۴.۴. مدیریت منعطف انوتیشن‌ها (Annotations Management)](#fa-annotations)
+   - [۴.۵. موتور تبدیل پراپرتی‌ها و همگام‌سازی دوطرفه JSON به Dictionary](#fa-transformations)
+   - [۴.۶. کنترل دسترسی اسکیماها (Schema Access Control)](#fa-schema-access)
+   - [۴.۷. پشتیبانی از زبان‌های TypeScript ،Python ،Dart و Java](#fa-other-languages)
+   - [۴.۸. تولید اسکریپت پایگاه‌داده (Script Generator)](#fa-script-generator)
+   - [۴.۹. پشتیبان‌گیری و بازگردانی تنظیمات (Config Backup & Restore)](#fa-config-backup)
+   - [۴.۱۰. تنظیمات نرم‌افزار و پالت اختصاصی تم تاریک (Dark Mode)](#fa-app-settings)
+   - [۴.۱۱. لاگ و مانیتورینگ سیستم (System Logs)](#fa-logs)
+5. [پیش‌نیازها و راه‌اندازی](#fa-getting-started)
+6. [ساخت نسخه مستقل و پرتابل (Release & Publish)](#fa-release)
 
 ---
 
 <a name="fa-overview"></a>
 ### ۱. معرفی BprDevKit
-**BprDevKit** یک پلتفرم تحت وب پیشرفته، سبک و سریع است که با هدف خودکارسازی کارهای زمان‌بر دیتابیس و برنامه‌نویسی بک‌اند توسعه یافته است. این ابزار به توسعه‌دهندگان و مدیران دیتابیس (DBA) اجازه می‌دهد به جای صرف ساعت‌ها زمان برای نوشتن دستی کلاس‌های دیتامدل، مدیریت دستی اسکریپت‌ها یا اتصال جداگانه به SSMS، تمام این فرآیندها را در یک داشبورد مدرن، دوزبانه و استاندارد انجام دهند.
+**BprDevKit** یک پلتفرم تحت وب پیشرفته، سبک و سریع است که با هدف خودکارسازی کارهای زمان‌بر دیتابیس و برنامه‌نویسی بک‌اند توسعه یافته است. این ابزار به توسعه‌دهندگان و مدیران دیتابیس (DBA) اجازه می‌دهد به جای صرف ساعت‌ها زمان برای نوشتن دستی کلاس‌های دیتامدل، مدیریت دستی اسکریپت‌ها یا اتصال جداگانه به نرم‌افزارهای مدیریتی سنگین، تمام این فرآیندها را در یک داشبورد مدرن، دوزبانه و استاندارد انجام دهند.
 
 ---
 
@@ -54,19 +55,32 @@
 ### ۲. معماری و تکنولوژی‌ها
 - **فریم‌ورک هسته:** Microsoft .NET 10.0 (ASP.NET Core Blazor Server)
 - **زبان‌های پشتیبانی‌شده برای تولید مدل:** C# 13 ،TypeScript ،Python 3 ،Dart و Java 17+
-- **رابط کاربری:** Bootstrap 5 با پشتیبانی بومی از راست‌چین (RTL) و چپ‌چین (LTR)، همراه با پالت تیره اختصاصی، فوق‌مدرن و ارگونومیک (Dark Mode).
-- **بانک‌های اطلاعاتی هدف:** 
-  - Microsoft SQL Server (از نسخه 2016 تا 2022 و Azure SQL)
-  - Oracle Database (با اتصال بومی از طریق پکیج رسمی `Oracle.ManagedDataAccess.Core` و استخراج متادیتای کاتالوگ‌های اوراکل)
-- **معماری نرم‌افزار:** تفکیک ماژولار Domain-Driven، بدون وابستگی‌های سنگین خارجی، دارای لاگر چرخشی اختصاصی (Rolling File Logger) و سیستم رمزنگاری داخلی کانفیگ‌ها.
+- **رابط کاربری:** Bootstrap 5 با پشتیبانی بومی از راست‌چین (RTL) و چپ‌چین (LTR)، همراه با پالت تیره اختصاصی، ارگونومیک و بدون خستگی چشم (Dark Mode).
+- **سیستم ذخیره‌سازی پیکربندی:** رمزنگاری محلی AES-256 فایل‌های تنظیمات بدون نیاز به دیتابیس واسط.
+- **معماری نرم‌افزار:** تفکیک ماژولار Domain-Driven، بدون وابستگی‌های سنگین خارجی، دارای لاگر چرخشی اختصاصی (Rolling File Logger).
+
+---
+
+<a name="fa-supported-databases"></a>
+### ۳. پایگاه‌های داده تحت پشتیبانی
+BprDevKit از طیف گسترده‌ای از محبوب‌ترین پایگاه‌های داده رابطه‌ای پشتیبانی می‌کند و ژنراتورهای اختصاصی SQL و مهندسی معکوس متادیتا برای هر کدام پیاده‌سازی شده است:
+
+| پایگاه داده | نسخه و توضیحات | درایور اتصال |
+| :--- | :--- | :--- |
+| **Microsoft SQL Server** | نسخه‌های 2016 تا 2022 و Azure SQL Database | `Microsoft.Data.SqlClient` |
+| **Oracle Database** | نسخه‌های 11g تا 23ai با پشتیبانی از کاتالوگ‌های سراسری اوراکل | `Oracle.ManagedDataAccess.Core` |
+| **PostgreSQL** | نسخه‌های 10 به بالا با پشتیبانی از اسکیماها و انواع داده پیشرفته | `Npgsql` |
+| **MySQL** | نسخه‌های 5.7 و 8.0 به بالا | `MySqlConnector` |
+| **MariaDB** | نسخه‌های 10.3 به بالا | `MySqlConnector` |
+| **SQLite** | پایگاه داده سبک فایل‌محور SQLite 3 | `Microsoft.Data.Sqlite` |
 
 ---
 
 <a name="fa-modules"></a>
-### ۳. راهنمای ماژول‌ها و امکانات قدم‌به‌قدم
+### ۴. راهنمای ماژول‌ها و امکانات قدم‌به‌قدم
 
 <a name="fa-db-management"></a>
-#### ۳.۱. مدیریت پایگاه‌داده و کنسول اجرای کوئری (Database Management & Query Runner)
+#### ۴.۱. مدیریت پایگاه‌داده و کنسول اجرای کوئری (Database Management & Query Runner)
 این ماژول امکانات جامعی را برای مدیریت اشیاء، داده‌ها و کوئری‌زدن مستقیم فراهم می‌کند:
 - **مدیریت کامل اشیاء:** مرور، مشاهده ساختار و تغییرات در جداول (Tables)، ستون‌ها، کلیدهای اصلی (PK)، کلیدهای خارجی (FK)، ایندکس‌ها، قیود چک (Check Constraints)، تریگرها (Triggers)، ویوها (Views)، توابع (Functions) و پروسیجرها (Stored Procedures).
 - **کنسول اجرای سریع کوئری (Quick SQL Query Runner):** 
@@ -85,9 +99,9 @@
 ---
 
 <a name="fa-model-generator"></a>
-#### ۳.۲. تولید دیتامدل چندزبانه (Data Model Generator)
+#### ۴.۲. تولید دیتامدل چندزبانه (Data Model Generator)
 ویزارد ساده و سریع در ۳ گام:
-1. **گام اول (Select Server):** انتخاب سرور متصل (SQL Server یا Oracle).
+1. **گام اول (Select Server):** انتخاب سرور متصل.
 2. **گام دوم (Select Database):** انتخاب پایگاه داده مورد نظر.
 3. **گام سوم (Select Profile):** انتخاب پروفایل تنظیمات (پیش‌فرض یا پروفایل سفارشی شما).
 
@@ -104,7 +118,7 @@
   - `PascalCase` (استاندارد C#)
   - `camelCase` (استاندارد TypeScript ،Dart و Java)
   - `snake_case` (استاندارد Python)
-- **Strip Common Table/Object Prefixes:** حذف خودکار پیشوندهای متداول جداول و آبجکت‌ها از نام کلاس‌ها (مانند `tbl_`، `vw_`، `sp_`، `usp_`) — پیش‌فرض: غیرفعال (`false`).
+- **Strip Common Table/Object Prefixes:** حذف پیشوندهای متداول جداول و آبجکت‌ها از نام کلاس‌ها (مانند `tbl_`، `vw_`، `sp_`، `usp_`) — پیش‌فرض: غیرفعال (`false`).
 - **Strip Common Column/Field Prefixes:** حذف پیشوندهای فنی ستون‌ها و فیلدها از نام پراپرتی‌ها (مانند `fld_`، `col_`) — پیش‌فرض: غیرفعال (`false`).
 - **Singularize Class Names:** مفردسازی هوشمند نام کلاس‌ها (مثلاً تبدیل جدول `Users` به کلاس `User`) — پیش‌فرض: غیرفعال (`false`).
 - **Generate Navigation Properties:** تولید خودکار رفرنس‌ها و کالکشن‌های ارتباطی کلید خارجی (FK). در تمام کلاس‌ها، ریجن‌های `#region References` و `#region Relations` حتی در صورت عدم وجود کلید خارجی برای حفظ ساختار یکنواخت درج می‌شوند.
@@ -121,7 +135,7 @@
 ---
 
 <a name="fa-csharp-advanced"></a>
-#### ۳.۳. تنظیمات پیشرفته سی‌شارپ، DbContext و Fluent API
+#### ۴.۳. تنظیمات پیشرفته سی‌شارپ، DbContext و Fluent API
 در بخش تنظیمات پروفایل، کنترل کاملی بر معماری کدهای C# و Entity Framework Core وجود دارد:
 
 ##### ۱. ساختار کلاس و ریجن‌ها (Structure & Regions):
@@ -144,7 +158,7 @@
 ---
 
 <a name="fa-annotations"></a>
-#### ۳.۴. مدیریت منعطف انوتیشن‌ها (Annotations Management)
+#### ۴.۴. مدیریت منعطف انوتیشن‌ها (Annotations Management)
 در تب **Custom Attributes**، سیستمی مدرن برای کنترل DataAnnotations تعبیه شده است:
 
 | قابلیت / انوتیشن | کاربرد و تنظیمات موجود |
@@ -161,7 +175,7 @@
 ---
 
 <a name="fa-transformations"></a>
-#### ۳.۵. موتور تبدیل پراپرتی‌ها و همگام‌سازی دوطرفه JSON به Dictionary
+#### ۴.۵. موتور تبدیل پراپرتی‌ها و همگام‌سازی دوطرفه JSON به Dictionary
 امکان تغییر نوع و رفتار پراپرتی‌ها بر اساس الگوهای نام ستون یا نوع داده:
 - **تولید ویژگی کمکی `[NotMapped]` با همگام‌سازی دوطرفه (Two-Way Sync):**
   - فیلد رشته‌ای متناظر با دیتابیس مقدار JSON خود را از متغیرهای دیکشنری می‌خواند.
@@ -177,7 +191,7 @@
 ---
 
 <a name="fa-schema-access"></a>
-#### ۳.۶. کنترل دسترسی اسکیماها (Schema Access Control)
+#### ۴.۶. کنترل دسترسی اسکیماها (Schema Access Control)
 در پروژه‌های بزرگ با معماری **Modular Monolith** یا **Domain-Driven Design (DDD)**، وابستگی‌های کنترل‌نشده بین اسکیماها می‌تواند معماری را تخریب کند:
 - این قابلیت به شما اجازه می‌دهد روابط مجاز بین اسکیماها را مشخص کنید.
 - اگر یک اسکیما اجازه دسترسی به اسکیمای دیگر را نداشته باشد، کلیدهای خارجی و ارجاعات ناوبری (Navigation Properties) بین آن‌ها در مدل خروجی حذف خواهد شد.
@@ -186,10 +200,10 @@
 ---
 
 <a name="fa-other-languages"></a>
-#### ۳.۷. پشتیبانی از زبان‌های TypeScript ،Python ،Dart و Java
-- **TypeScript (جدید 🚀):**
+#### ۴.۷. پشتیبانی از زبان‌های TypeScript ،Python ،Dart و Java
+- **TypeScript:**
   - سبک‌های اعلان: `interface`، `type alias`، یا `class`.
-  - گزینه‌های حرفه‌ای: اعمال کلمه کلیدی `readonly` روی کلیدهای اصلی (PK)، تبدیل انواع تاریخ به شیء `Date` یا رشته ایزو `string`، درج دستورات `export` و ایمپورت‌های سفارشی.
+  - گزینه‌های کاربردی: اعمال کلمه کلیدی `readonly` روی کلیدهای اصلی (PK)، تبدیل انواع تاریخ به شیء `Date` یا رشته استاندارد ایزو `string`، درج دستورات `export` و ایمپورت‌های سفارشی.
   - تولید کامل ارتباطات ناوبری (Parent Navigation و کالکشن‌های فرزند `Child[]`).
 - **Python:**
   - سبک‌ها: `Pydantic (BaseModel)`، `SQLAlchemy (ORM)`، `Dataclass` یا `TypedDict`.
@@ -204,8 +218,8 @@
 ---
 
 <a name="fa-script-generator"></a>
-#### ۳.۸. تولید اسکریپت پایگاه‌داده (Script Generator)
-- امکان انتخاب دسته‌ای جداول، ویوها، پروسیجرها و توابع.
+#### ۴.۸. تولید اسکریپت پایگاه‌داده (Script Generator)
+- امکان انتخاب دسته‌ای جداول، ویوها، پروسیجرها و توابع در انواع دیتابیس‌ها.
 - گزینه‌های تولید اسکریپت:
   - ساخت ساختار (`CREATE`)
   - حذف و ساخت مجدد (`DROP AND CREATE`)
@@ -215,22 +229,22 @@
 ---
 
 <a name="fa-config-backup"></a>
-#### ۳.۹. پشتیبان‌گیری و بازگردانی تنظیمات (Config Backup & Restore)
+#### ۴.۹. پشتیبان‌گیری و بازگردانی تنظیمات (Config Backup & Restore)
 - خروجی گرفتن از تمام سرورهای متصل، پروفایل‌های مدل‌ساز و تنظیمات در قالب یک فایل رمزنگاری‌شده `.json`.
 - امکان بازگردانی سریع در کامپیوتر یا محیط‌های دیگر با پیش‌نمایش تعداد سرورها و پروفایل‌ها پیش از اعمال نهایی.
 
 ---
 
 <a name="fa-app-settings"></a>
-#### ۳.۱۰. تنظیمات نرم‌افزار و پالت اختصاصی تم تاریک (Dark Mode)
+#### ۴.۱۰. تنظیمات نرم‌افزار و پالت اختصاصی تم تاریک (Dark Mode)
 - **پایداری کامل تم (Theme Persistence):** تم انتخابی کاربر (حالت روشن / حالت تاریک) مستقیماً در تنظیمات نرم‌افزار (`ApplicationConfiguration`) ذخیره می‌شود و با جابه‌جایی بین صفحات و تب‌ها هرگز ریست نمی‌شود.
-- **پالت تاریک لوکس و چشم‌نواز:** طراحی کاملاً اختصاصی سطوح تیره و دوده ای (`#0b0f19`) با گرادینت‌های نوری کیهانی، حذف کارت‌های سفید زننده، کنتراست بالای متون و فونت‌ها، و هایلایت‌های شفاف فیروزه‌ای (`#38bdf8`).
+- **پالت تاریک لوکس و چشم‌نواز:** طراحی ارگونومیک سطوح تیره (`#0b0f19`) با گرادینت‌های نوری کیهانی، حذف کارت‌های سفید زننده، کنتراست بالای متون و فونت‌ها، و هایلایت‌های شفاف فیروزه‌ای (`#38bdf8`).
 - **سوئیچ سریع در سایدبار:** دکمه شیشه‌ای مدرن در انتهای سایدبار برای سوئیچ آنی تم همراه با هماهنگی کامل سمت سرور.
 
 ---
 
 <a name="fa-logs"></a>
-#### ۳.۱۱. لاگ و مانیتورینگ سیستم (System Logs)
+#### ۴.۱۱. لاگ و مانیتورینگ سیستم (System Logs)
 - سیستم لاگ اختصاصی Rolling File در مسیر محلی بدون وابستگی سنگین.
 - ثبت تمام رخدادهای تولید کد، خطاهای اتصال به دیتابیس و عملیات بکاپ/ریستور.
 - امکان جستجو در متن پیام‌ها، فیلتر بر اساس شدت لاگ (اطلاعات، هشدار، خطا) و مشاهده جزئیات Exception در مودال اختصاصی.
@@ -238,13 +252,13 @@
 ---
 
 <a name="fa-getting-started"></a>
-### ۴. پیش‌نیازها و راه‌اندازی
+### ۵. پیش‌نیازها و راه‌اندازی
 
 #### پیش‌نیازها:
-- [.NET 10.0 SDK](https://dotnet.microsoft.com/) یا بالاتر.
-- دسترسی به یک سرور Microsoft SQL Server یا Oracle Database (لوکال یا ریموت).
+- [.NET 10.0 SDK](https://dotnet.microsoft.com/) یا بالاتر (تنها در صورت اجرای سورس‌کد).
+- دسترسی به یکی از پایگاه‌های داده تحت پشتیبانی (SQL Server ،Oracle ،PostgreSQL ،MySQL ،MariaDB ،SQLite).
 
-#### اجرای سریع (Development):
+#### اجرای سریع از روی سورس‌کد (Development):
 ```bash
 # کلون ریپازیتوری
 git clone https://github.com/husein83/BprDevKit.git
@@ -258,13 +272,13 @@ dotnet run --project SourceCode/BprDevKit.csproj
 ---
 
 <a name="fa-release"></a>
-### ۵. ساخت نسخه مستقل (Release & Publish)
+### ۶. ساخت نسخه مستقل و پرتابل (Release & Publish)
 
-#### ساخت نسخه پرتابل (Self-Contained برای ویندوز بدون نیاز به نصب بودن .NET روی سیستم مقصد):
+#### ساخت نسخه پرتابل مستقل (Self-Contained Single-File برای ویندوز بدون نیاز به نصب بودن .NET روی سیستم مقصد):
 ```bash
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/Standalone SourceCode/BprDevKit.csproj
+dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.2.0-Standalone
 ```
-فایل خروجی `Release/Standalone/BprDevKit.exe` را می‌توانید به راحتی جابه‌جا کرده و روی هر سیستم ویندوز ۶۴ بیتی با دو بار کلیک اجرا فرمایید.
+فایل خروجی `BprDevKit.exe` یک نسخه کاملاً مستقل و خودکفا است که بدون نیاز به پیش‌نیاز ران‌تایم، بر روی هر سیستم ویندوز ۶۴ بیتی با دو بار کلیک اجرا می‌شود.
 
 ---
 
@@ -278,20 +292,21 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 ## 📑 English Table of Contents
 1. [Overview & Philosophy](#en-overview)
 2. [Architecture & Tech Stack](#en-architecture)
-3. [Step-by-Step Feature Walkthrough](#en-features)
-   - [3.1. Database Management & Quick SQL Query Runner](#en-db-management)
-   - [3.2. Data Model Generator](#en-model-generator)
-   - [3.3. Advanced C# Architecture, DbContext & Fluent API](#en-csharp-advanced)
-   - [3.4. Fine-Grained Annotations Management](#en-annotations)
-   - [3.5. Property Transformations & Two-Way JSON Synchronization](#en-transformations)
-   - [3.6. Schema Access Control](#en-schema-access)
-   - [3.7. TypeScript, Python, Dart, and Java Generators](#en-other-languages)
-   - [3.8. Script Generator](#en-script-generator)
-   - [3.9. Configuration Backup & Restore](#en-config-backup)
-   - [3.10. Application Settings & Premium Dark Mode Palette](#en-app-settings)
-   - [3.11. System Logging & Audit](#en-logs)
-4. [Prerequisites & Getting Started](#en-getting-started)
-5. [Build & Release Guide](#en-release)
+3. [Supported Databases](#en-supported-databases)
+4. [Step-by-Step Feature Walkthrough](#en-features)
+   - [4.1. Database Management & Quick SQL Query Runner](#en-db-management)
+   - [4.2. Data Model Generator](#en-model-generator)
+   - [4.3. Advanced C# Architecture, DbContext & Fluent API](#en-csharp-advanced)
+   - [4.4. Fine-Grained Annotations Management](#en-annotations)
+   - [4.5. Property Transformations & Two-Way JSON Synchronization](#en-transformations)
+   - [4.6. Schema Access Control](#en-schema-access)
+   - [4.7. TypeScript, Python, Dart, and Java Generators](#en-other-languages)
+   - [4.8. Script Generator](#en-script-generator)
+   - [4.9. Configuration Backup & Restore](#en-config-backup)
+   - [4.10. Application Settings & Premium Dark Mode Palette](#en-app-settings)
+   - [4.11. System Logging & Audit](#en-logs)
+5. [Prerequisites & Getting Started](#en-getting-started)
+6. [Build & Release Guide (Standalone Packaging)](#en-release)
 
 ---
 
@@ -305,19 +320,32 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 ### 2. Architecture & Tech Stack
 - **Core Framework:** Microsoft .NET 10.0 (ASP.NET Core Blazor Server)
 - **Supported Model Languages:** C# 13, TypeScript, Python 3, Dart, and Java 17+
-- **Frontend & Design:** Bootstrap 5 with native dual-mode RTL (Right-to-Left) and LTR (Left-to-Right) layout, accompanied by a custom, ergonomic, high-contrast Dark Mode palette.
-- **Database Targets:**
-  - Microsoft SQL Server (2016 through 2022, Azure SQL Database)
-  - Oracle Database (via `Oracle.ManagedDataAccess.Core` with catalog views extraction and DDL generators)
-- **Internal Design:** Domain-driven modular design, native rolling file logger, client-side AES encrypted configuration store, and zero heavy third-party dependencies.
+- **Frontend & Design:** Bootstrap 5 with native dual-mode RTL (Right-to-Left) and LTR (Left-to-Right) layout, accompanied by an ergonomic, high-contrast Dark Mode palette.
+- **Internal Security:** Local AES-256 encrypted configuration storage with no external database requirements.
+- **Design Philosophy:** Domain-driven modular design, native rolling file logger, and zero heavy third-party dependencies.
+
+---
+
+<a name="en-supported-databases"></a>
+### 3. Supported Databases
+BprDevKit provides dedicated SQL generator engines, metadata extractors, and connection management for six major database platforms:
+
+| Database Engine | Supported Versions & Features | Connection Provider |
+| :--- | :--- | :--- |
+| **Microsoft SQL Server** | 2016 through 2022, Azure SQL Database | `Microsoft.Data.SqlClient` |
+| **Oracle Database** | 11g through 23ai with Oracle global catalog extraction | `Oracle.ManagedDataAccess.Core` |
+| **PostgreSQL** | PostgreSQL 10+ with schema and custom data type support | `Npgsql` |
+| **MySQL** | MySQL 5.7 and 8.0+ | `MySqlConnector` |
+| **MariaDB** | MariaDB 10.3+ | `MySqlConnector` |
+| **SQLite** | Embedded SQLite 3 file-based database | `Microsoft.Data.Sqlite` |
 
 ---
 
 <a name="en-features"></a>
-### 3. Step-by-Step Feature Walkthrough
+### 4. Step-by-Step Feature Walkthrough
 
 <a name="en-db-management"></a>
-#### 3.1. Database Management & Quick SQL Query Runner
+#### 4.1. Database Management & Quick SQL Query Runner
 - **Complete Object Explorer:** View schema and manage Tables, Columns, Primary Keys (PK), Foreign Keys (FK), Indexes, Check Constraints, Triggers, Views, Functions, and Stored Procedures.
 - **Quick SQL Query Runner:** 
   - Integrated interactive query console tab in Database Management to execute ad-hoc SQL statements directly in your browser.
@@ -335,9 +363,9 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 ---
 
 <a name="en-model-generator"></a>
-#### 3.2. Data Model Generator
+#### 4.2. Data Model Generator
 Fast 3-step generation workflow:
-1. **Step 1:** Select active server connection (SQL Server or Oracle).
+1. **Step 1:** Select active server connection.
 2. **Step 2:** Select target database.
 3. **Step 3:** Select or customize a configuration profile.
 
@@ -371,7 +399,7 @@ Fast 3-step generation workflow:
 ---
 
 <a name="en-csharp-advanced"></a>
-#### 3.3. Advanced C# Architecture, DbContext & Fluent API
+#### 4.3. Advanced C# Architecture, DbContext & Fluent API
 Comprehensive options accessible via profile management:
 
 ##### 1. Structure & Regions:
@@ -393,7 +421,7 @@ Comprehensive options accessible via profile management:
 ---
 
 <a name="en-annotations"></a>
-#### 3.4. Fine-Grained Annotations Management
+#### 4.4. Fine-Grained Annotations Management
 Located under the **Custom Attributes** tab:
 
 | Attribute Feature | Capabilities & Configurations |
@@ -410,7 +438,7 @@ Located under the **Custom Attributes** tab:
 ---
 
 <a name="en-transformations"></a>
-#### 3.5. Property Transformations & Two-Way JSON Synchronization
+#### 4.5. Property Transformations & Two-Way JSON Synchronization
 Dynamic rule engine that alters how columns are represented in the generated models:
 - **`[NotMapped]` Helper Properties with Two-Way Sync:**
   - Adds a strongly-typed `Dictionary<string, object?>` property backed by an underlying JSON string field (`_payloadJson`).
@@ -426,7 +454,7 @@ Dynamic rule engine that alters how columns are represented in the generated mod
 ---
 
 <a name="en-schema-access"></a>
-#### 3.6. Schema Access Control
+#### 4.6. Schema Access Control
 Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven Design (DDD)**:
 - Define explicit allowed dependency pathways between database schemas.
 - If Schema A is forbidden from referencing Schema B, all cross-schema foreign keys and navigation properties between them are omitted during generation.
@@ -435,10 +463,10 @@ Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven De
 ---
 
 <a name="en-other-languages"></a>
-#### 3.7. TypeScript, Python, Dart, and Java Generators
-- **TypeScript (New 🚀):**
+#### 4.7. TypeScript, Python, Dart, and Java Generators
+- **TypeScript:**
   - Declaration Styles: `interface`, `type alias`, or `class`.
-  - Advanced flags: `readonly` modifier for Primary Keys, Date representation as `Date` object or ISO `string`, automated `export` statements, and custom import headers.
+  - Configurable flags: `readonly` modifier for Primary Keys, Date representation as `Date` object or ISO `string`, automated `export` statements, and custom import headers.
   - Fully supports Parent and Child collection navigation arrays (`Child[]`).
 - **Python:**
   - Architecture options: `Pydantic (BaseModel)`, `SQLAlchemy (ORM)`, `Dataclass`, or `TypedDict`.
@@ -453,7 +481,7 @@ Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven De
 ---
 
 <a name="en-script-generator"></a>
-#### 3.8. Script Generator
+#### 4.8. Script Generator
 - Select any combination of database objects (Tables, Views, Procedures, Functions).
 - Script generation modes:
   - `CREATE`
@@ -464,14 +492,14 @@ Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven De
 ---
 
 <a name="en-config-backup"></a>
-#### 3.9. Configuration Backup & Restore
+#### 4.9. Configuration Backup & Restore
 - Export all server connection details, generator profiles, and app settings into an encrypted `.json` configuration file.
 - Restore onto other developer workstations or environments with a pre-import summary verification.
 
 ---
 
 <a name="en-app-settings"></a>
-#### 3.10. Application Settings & Premium Dark Mode Palette
+#### 4.10. Application Settings & Premium Dark Mode Palette
 - **Persistent Theme Preferences:** Theme choice (Light / Dark mode) is saved directly into the encrypted `ApplicationConfiguration`, ensuring zero resets when switching tabs or pages.
 - **Premium Obsidian / Slate Palette:** Bespoke dark theme styling with deep canvas tones (`#0b0f19`), elimination of jarring white active elements, vibrant cyan-blue accents (`#38bdf8`), and high-contrast typography.
 - **Sidebar Theme Quick Toggle:** Frosted glassmorphism toggle button in the sidebar with instant client-server synchronization.
@@ -479,7 +507,7 @@ Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven De
 ---
 
 <a name="en-logs"></a>
-#### 3.11. System Logging & Audit
+#### 4.11. System Logging & Audit
 - Built-in rolling file logging engine with zero external dependencies.
 - Logs all model generations, database connection events, and backup/restore executions.
 - Real-time search, severity filtering (Info, Warning, Error), and full stack trace inspection modal.
@@ -487,13 +515,13 @@ Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven De
 ---
 
 <a name="en-getting-started"></a>
-### 4. Prerequisites & Getting Started
+### 5. Prerequisites & Getting Started
 
 #### Prerequisites:
-- [.NET 10.0 SDK](https://dotnet.microsoft.com/) or higher.
-- Microsoft SQL Server or Oracle Database instance (local or remote).
+- [.NET 10.0 SDK](https://dotnet.microsoft.com/) or higher (only required when running from source code).
+- Access to any supported database (SQL Server, Oracle, PostgreSQL, MySQL, MariaDB, SQLite).
 
-#### Quick Start:
+#### Quick Start from Source (Development):
 ```bash
 # Clone the repository
 git clone https://github.com/husein83/BprDevKit.git
@@ -507,13 +535,13 @@ Open your browser and navigate to `http://localhost:5000` or `https://localhost:
 ---
 
 <a name="en-release"></a>
-### 5. Build & Release Guide
+### 6. Build & Release Guide (Standalone Packaging)
 
-#### Build Self-Contained Standalone Executable (Windows x64 - No .NET installation required on target machine):
+#### Build Self-Contained Standalone Executable (Windows x64 - Zero .NET installation required on target machine):
 ```bash
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/Standalone SourceCode/BprDevKit.csproj
+dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.2.0-Standalone
 ```
-The output `Release/Standalone/BprDevKit.exe` can be distributed as a portable standalone executable.
+The output `BprDevKit.exe` is completely self-contained and ready to execute on any 64-bit Windows machine by double-clicking.
 
 ---
 
