@@ -1,5 +1,7 @@
+@using BprDevKit.Config
+@using BprDevKit.Utility
 <!DOCTYPE html>
-<html lang="en">
+<html lang="@(ApplicationConfiguration.Config.Language == Language.Persian ? "fa" : "en")" dir="@(ApplicationConfiguration.Config.Language == Language.Persian ? "rtl" : "ltr")" data-bs-theme="@(ApplicationConfiguration.Config.Theme ?? "light")">
 
 <head>
     <meta charset="utf-8" />
@@ -12,6 +14,14 @@
     <link rel="stylesheet" href="@Assets["BprDevKit.styles.css"]" />
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
+    <script>
+        try {
+            var savedTheme = '@(ApplicationConfiguration.Config.Theme ?? "light")';
+            var localTheme = localStorage.getItem('bpr_theme');
+            var activeTheme = localTheme || savedTheme;
+            document.documentElement.setAttribute('data-bs-theme', activeTheme);
+        } catch (e) {}
+    </script>
     <HeadOutlet />
 </head>
 
@@ -20,6 +30,56 @@
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script>
+        window.themeManager = {
+            getTheme: function() {
+                try {
+                    return localStorage.getItem('bpr_theme') || '@(ApplicationConfiguration.Config.Theme ?? "light")';
+                } catch(e) {
+                    return '@(ApplicationConfiguration.Config.Theme ?? "light")';
+                }
+            },
+            setTheme: function(theme) {
+                try { localStorage.setItem('bpr_theme', theme); } catch(e) {}
+                document.documentElement.setAttribute('data-bs-theme', theme);
+                this.updateUi(theme);
+                try {
+                    fetch('/api/theme/' + encodeURIComponent(theme), { method: 'POST' }).catch(function(){});
+                } catch(e) {}
+            },
+            toggleTheme: function() {
+                var current = this.getTheme();
+                var next = current === 'dark' ? 'light' : 'dark';
+                this.setTheme(next);
+            },
+            updateUi: function(theme) {
+                var isDark = theme === 'dark';
+                var icon = document.getElementById('theme-toggle-icon');
+                var labelLight = document.getElementById('theme-label-light');
+                var labelDark = document.getElementById('theme-label-dark');
+                if (icon) {
+                    icon.className = isDark ? 'bi bi-sun-fill text-warning' : 'bi bi-moon-stars-fill';
+                }
+                if (labelLight && labelDark) {
+                    labelLight.style.display = isDark ? 'inline' : 'none';
+                    labelDark.style.display = isDark ? 'none' : 'inline';
+                }
+            },
+            initTheme: function() {
+                var theme = this.getTheme();
+                document.documentElement.setAttribute('data-bs-theme', theme);
+                var self = this;
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', function() { self.updateUi(theme); });
+                } else {
+                    self.updateUi(theme);
+                }
+            }
+        };
+        window.themeManager.initTheme();
+        document.addEventListener('blazor:enhancedload', function() {
+            window.themeManager.initTheme();
+        });
+
         window.copyTextToClipboard = async function (text) {
             if (navigator.clipboard && window.isSecureContext) {
                 try {

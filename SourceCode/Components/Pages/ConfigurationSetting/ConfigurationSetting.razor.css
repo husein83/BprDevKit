@@ -150,3 +150,130 @@
 .settings-server-list .font-monospace { color: #0f766e; font-weight: 650; }
 .settings-server-list .badge { padding: 0.45rem 0.6rem; font-weight: 600; }
 .settings-server-list .btn-group .btn { min-width: 2.25rem; border-radius: 0.45rem !important; }
+
+
+/* ==========================================================================
+   Dark Mode Scoped Overrides for ConfigurationSetting
+   ========================================================================== */
+[data-bs-theme="dark"] .settings-page {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .settings-hero {
+    background:
+        radial-gradient(circle at 88% 15%, rgba(56, 189, 248, 0.22), transparent 45%),
+        radial-gradient(circle at 12% 85%, rgba(99, 102, 241, 0.18), transparent 45%),
+        linear-gradient(135deg, #0b1120 0%, #172554 52%, #0b1120 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.45) !important;
+}
+
+[data-bs-theme="dark"] .settings-hero h1 {
+    color: #f8fafc !important;
+}
+
+[data-bs-theme="dark"] .settings-hero > div > p:last-child {
+    color: #94a3b8 !important;
+}
+
+[data-bs-theme="dark"] .settings-eyebrow {
+    color: #38bdf8 !important;
+}
+
+/* Dark Mode Summary Cards - Fix White Active Card */
+[data-bs-theme="dark"] .config-summary-card {
+    background: #111827 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: #f1f5f9 !important;
+}
+
+[data-bs-theme="dark"] .config-summary-card:hover {
+    border-color: #38bdf8 !important;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45) !important;
+    transform: translateY(-3px);
+}
+
+[data-bs-theme="dark"] .config-summary-card.active-card {
+    border-color: #38bdf8 !important;
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.16), rgba(99, 102, 241, 0.22)) !important;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35), 0 14px 30px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-bs-theme="dark"] .config-summary-card.active-card h4 {
+    color: #ffffff !important;
+}
+
+[data-bs-theme="dark"] .config-summary-card.active-card .text-muted {
+    color: #bae6fd !important;
+}
+
+[data-bs-theme="dark"] .config-summary-card.active-card i.bi-chevron-right,
+[data-bs-theme="dark"] .config-summary-card.active-card i.bi-chevron-left {
+    color: #38bdf8 !important;
+}
+
+[data-bs-theme="dark"] .icon-server {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(5, 150, 105, 0.32)) !important;
+    color: #34d399 !important;
+}
+
+[data-bs-theme="dark"] .icon-app {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(37, 99, 235, 0.32)) !important;
+    color: #60a5fa !important;
+}
+
+[data-bs-theme="dark"] .icon-models {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(147, 51, 234, 0.32)) !important;
+    color: #c084fc !important;
+}
+
+[data-bs-theme="dark"] .icon-backup {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(217, 119, 6, 0.32)) !important;
+    color: #fbbf24 !important;
+}
+
+/* Nav Tabs & Panels */
+[data-bs-theme="dark"] .config-nav-tabs {
+    border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-bs-theme="dark"] .config-nav-tabs .nav-link {
+    color: #94a3b8 !important;
+}
+
+[data-bs-theme="dark"] .config-nav-tabs .nav-link:hover {
+    color: #38bdf8 !important;
+    background: rgba(56, 189, 248, 0.08) !important;
+}
+
+[data-bs-theme="dark"] .config-nav-tabs .nav-link.active {
+    color: #38bdf8 !important;
+    background: transparent !important;
+    border-bottom: 3px solid #38bdf8 !important;
+}
+
+[data-bs-theme="dark"] .settings-server-list,
+[data-bs-theme="dark"] .settings-editor {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    background-color: #111827 !important;
+    box-shadow: 0 16px 35px rgba(0, 0, 0, 0.45) !important;
+}
+
+[data-bs-theme="dark"] .settings-server-list thead th {
+    background-color: #151f32 !important;
+    color: #94a3b8 !important;
+    border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-bs-theme="dark"] .settings-server-list tbody tr:hover {
+    background: rgba(56, 189, 248, 0.06) !important;
+}
+
+[data-bs-theme="dark"] .settings-server-list tbody td {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+    color: #e2e8f0 !important;
+}
+
+[data-bs-theme="dark"] .settings-server-list .font-monospace {
+    color: #38bdf8 !important;
+}

@@ -223,6 +223,15 @@ namespace BprDevKit.Localization
             [TranslationKeys.DbTabForceDisconnect] = "Disconnect active users and roll back their transactions",
             [TranslationKeys.DbTabIgnoreIfNotExists] = "Treat an already deleted database as successful",
             [TranslationKeys.DbTabDetailsTitle] = "Database details",
+            [TranslationKeys.DbQuickQueryRunner] = "Quick Query",
+            [TranslationKeys.DbQueryExecute] = "Execute",
+            [TranslationKeys.DbQueryRowsAffected] = "Rows",
+            [TranslationKeys.DbQueryExecutionTime] = "Duration",
+            [TranslationKeys.DbQuerySelectDatabase] = "Select Database",
+            [TranslationKeys.DbQueryExecuting] = "Executing query...",
+            [TranslationKeys.DbQueryExportCsv] = "Export CSV",
+            [TranslationKeys.DbQueryExportJson] = "Export JSON",
+            [TranslationKeys.DbQueryClear] = "Clear",
 
             // Schema Management Tab
             [TranslationKeys.SchemaTabSubtitle] = "Create, rename, reassign, inspect, and remove schemas in the selected database.",
@@ -585,6 +594,7 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelCommonSettings] = "General Model Settings",
             [TranslationKeys.DataModelPropertyNaming] = "Property Naming Style",
             [TranslationKeys.DataModelRemovePrefixes] = "Strip Common Table/Object Prefixes (e.g. tbl_, vw_, usp_)",
+            [TranslationKeys.DataModelRemoveColumnPrefixes] = "Strip Common Column/Field Prefixes (e.g. fld_, col_)",
             [TranslationKeys.DataModelSingularize] = "Singularize Class Names (Users -> User)",
             [TranslationKeys.DataModelIncludeNavigation] = "Generate Navigation Properties (Foreign Keys)",
             [TranslationKeys.DataModelIncludeDocComments] = "Include XML / Docstring Comments from DB Descriptions",
@@ -610,6 +620,8 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelCsDbContextName] = "DbContext Class Name",
             [TranslationKeys.DataModelCsDbContextNamespace] = "DbContext Namespace (Optional)",
             [TranslationKeys.DataModelCsDbContextUseFullyQualified] = "Always use Fully-Qualified Model Names in DbContext (e.g. DbSet<Models.Customer>)",
+            [TranslationKeys.DataModelCsGenerateFluentApi] = "Generate Separate IEntityTypeConfiguration<T> Fluent API Classes",
+            [TranslationKeys.DataModelCsEntityConfigNamespace] = "Configurations Namespace (Tokens: {Database}, {Schema})",
 
             // Profiles
             [TranslationKeys.DataModelSelectProfileToProceed] = "Please select a configuration profile to load generator options.",
@@ -719,6 +731,8 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelTransformGetter] = "Getter Expression Template",
             [TranslationKeys.DataModelTransformSetter] = "Setter Expression Template",
             [TranslationKeys.DataModelTransformUsing] = "Required Using Directive",
+            [TranslationKeys.DataModelTransformTwoWaySync] = "Enable Bidirectional Synchronization (Database <-> Helper)",
+            [TranslationKeys.DataModelTransformTwoWaySyncHelp] = "Automatically synchronizes the raw JSON string with the parsed Dictionary/object so EF Core persists changes on SaveChanges.",
             [TranslationKeys.DataModelTransformNoRules] = "No transformation rules defined. Add a rule or pick a pre-built template.",
 
             // Generic other languages
@@ -845,7 +859,14 @@ namespace BprDevKit.Localization
             [TranslationKeys.ZipPackagingBySchema] = "Folders by Schema (e.g. dbo/User.cs)",
             [TranslationKeys.ZipPackagingByNamespace] = "Folders by Namespace",
             [TranslationKeys.ZipPackagingHelp] = "How model files are organized into directories inside the ZIP file",
-            [TranslationKeys.DataModelDownloadSeparateZips] = "Download Separate ZIP per Schema"
+            [TranslationKeys.DataModelDownloadSeparateZips] = "Download Separate ZIP per Schema",
+
+            // Theme
+            [TranslationKeys.ThemeLightMode] = "Light Mode",
+            [TranslationKeys.ThemeDarkMode] = "Dark Mode",
+            [TranslationKeys.ThemeToggle] = "Toggle Light / Dark Mode",
+            [TranslationKeys.ThemeSetting] = "Application Theme",
+            [TranslationKeys.ThemeSettingHelp] = "Choose the visual appearance for the entire application (Light or Dark mode)."
         };
 
         public string this[string key]

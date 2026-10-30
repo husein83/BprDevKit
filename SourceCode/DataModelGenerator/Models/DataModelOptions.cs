@@ -8,7 +8,8 @@ namespace BprDevKit.DataModelGenerator.Models
         CSharp,
         Python,
         Dart,
-        Java
+        Java,
+        TypeScript
     }
 
     public enum NamingConvention
@@ -29,11 +30,13 @@ namespace BprDevKit.DataModelGenerator.Models
     public class DataModelOptions
     {
         public DataModelLanguage Language { get; set; } = DataModelLanguage.CSharp;
-        public NamingConvention PropertyNaming { get; set; } = NamingConvention.PascalCase;
+        public NamingConvention PropertyNaming { get; set; } = NamingConvention.Original;
         public ZipPackagingStructure ZipPackaging { get; set; } = ZipPackagingStructure.BySchema;
-        public bool RemoveTablePrefixes { get; set; } = true;
+        public bool RemoveTablePrefixes { get; set; } = false;
         public string TablePrefixes { get; set; } = "tbl_,tbl,vw_,view_,sp_,usp_,fn_,ufn_";
-        public bool SingularizeClassNames { get; set; } = true;
+        public bool RemoveColumnPrefixes { get; set; } = false;
+        public string ColumnPrefixes { get; set; } = "fld_,col_";
+        public bool SingularizeClassNames { get; set; } = false;
         public bool IncludeNavigationProperties { get; set; } = true;
         public bool IncludeDocumentationComments { get; set; } = true;
 
@@ -42,6 +45,7 @@ namespace BprDevKit.DataModelGenerator.Models
         public PythonOptions Python { get; set; } = new();
         public DartOptions Dart { get; set; } = new();
         public JavaOptions Java { get; set; } = new();
+        public TypeScriptOptions TypeScript { get; set; } = new();
 
         // Schema Access Control / Hierarchy
         public bool EnableSchemaAccessControl { get; set; } = false;
@@ -118,6 +122,12 @@ namespace BprDevKit.DataModelGenerator.Models
 
         /// <summary>Additional using required (e.g. "System.Text.Json", "System.Xml.Linq")</summary>
         public string RequiredUsing { get; set; } = "System.Text.Json";
+
+        /// <summary>
+        /// When true, synchronizes the database string property and the [NotMapped] helper property bidirectionally
+        /// so EF Core persists dictionary changes to the database on SaveChanges.
+        /// </summary>
+        public bool EnableTwoWaySync { get; set; } = true;
     }
 
     /// <summary>
@@ -241,6 +251,21 @@ namespace BprDevKit.DataModelGenerator.Models
         public string DbContextName { get; set; } = "AppDbContext";
         public string DbContextNamespace { get; set; } = string.Empty;
         public bool DbContextUseFullyQualifiedModelNames { get; set; } = false;
+
+        // Fluent API / EntityTypeConfiguration
+        public bool GenerateEntityTypeConfigurations { get; set; } = false;
+        public string EntityConfigurationNamespace { get; set; } = string.Empty;
+    }
+
+    public class TypeScriptOptions
+    {
+        public string TypeKind { get; set; } = "interface"; // interface, type, class
+        public bool IncludeReadonlyId { get; set; } = false;
+        public bool DateTypeAsDate { get; set; } = true; // true: Date, false: string
+        public bool IncludeExport { get; set; } = true;
+        public bool IncludeNavigationProperties { get; set; } = true;
+        public string CustomImports { get; set; } = string.Empty;
+        public string CustomClassBodySnippet { get; set; } = string.Empty;
     }
 
     public class PythonOptions

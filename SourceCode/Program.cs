@@ -47,4 +47,14 @@ app.MapRazorComponents<App>()
 
 ApplicationConfiguration.LoadConfig();
 
+app.MapPost("/api/theme/{theme}", (string theme) =>
+{
+    if (theme == "dark" || theme == "light")
+    {
+        ApplicationConfiguration.Config.Theme = theme;
+        ApplicationConfiguration.SaveChanges(ApplicationConfiguration.Config);
+    }
+    return Results.Ok();
+}).DisableAntiforgery();
+
 app.Run();

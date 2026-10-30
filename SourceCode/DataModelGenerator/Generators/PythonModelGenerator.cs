@@ -84,8 +84,8 @@ namespace BprDevKit.DataModelGenerator.Generators
             foreach (var col in table.Columns)
             {
                 var fieldName = options.UseSnakeCaseProperties
-                    ? DataModelNamingHelper.ToSnakeCase(col.ColumnName)
-                    : DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
+                    ? DataModelNamingHelper.FormatPropertyName(col.ColumnName, NamingConvention.SnakeCase, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes)
+                    : DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
 
                 var pyType = SqlTypeMapper.MapToPython(col.DataType, col.IsNullable, options.UseOptionalTypeHinting);
 
@@ -146,8 +146,8 @@ namespace BprDevKit.DataModelGenerator.Generators
             foreach (var col in table.Columns)
             {
                 var fieldName = options.UseSnakeCaseProperties
-                    ? DataModelNamingHelper.ToSnakeCase(col.ColumnName)
-                    : DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
+                    ? DataModelNamingHelper.FormatPropertyName(col.ColumnName, NamingConvention.SnakeCase, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes)
+                    : DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
 
                 var pyType = SqlTypeMapper.MapToPython(col.DataType, col.IsNullable, options.UseOptionalTypeHinting);
                 var defaultVal = col.IsNullable ? " = None" : "";
@@ -194,8 +194,8 @@ namespace BprDevKit.DataModelGenerator.Generators
             foreach (var col in table.Columns)
             {
                 var fieldName = options.UseSnakeCaseProperties
-                    ? DataModelNamingHelper.ToSnakeCase(col.ColumnName)
-                    : DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
+                    ? DataModelNamingHelper.FormatPropertyName(col.ColumnName, NamingConvention.SnakeCase, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes)
+                    : DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
 
                 var sqlaType = MapToSqlAlchemyType(col.DataType, col.Length);
                 var args = new List<string> { sqlaType };
@@ -266,8 +266,8 @@ namespace BprDevKit.DataModelGenerator.Generators
             foreach (var col in table.Columns)
             {
                 var fieldName = options.UseSnakeCaseProperties
-                    ? DataModelNamingHelper.ToSnakeCase(col.ColumnName)
-                    : DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
+                    ? DataModelNamingHelper.FormatPropertyName(col.ColumnName, NamingConvention.SnakeCase, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes)
+                    : DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
 
                 var pyType = SqlTypeMapper.MapToPython(col.DataType, col.IsNullable, options.UseOptionalTypeHinting);
                 sb.AppendLine($"    {fieldName}: {pyType}");

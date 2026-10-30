@@ -3,6 +3,7 @@
 @using BprDevKit.Utility
 @using BprDevKit.Localization
 @inject ITranslationFactory TranslationFactory
+@inject IJSRuntime JSRuntime
 @implements IDisposable
 
 @{
@@ -56,9 +57,21 @@
                         <small class="text-muted mt-1 d-block">@t[TranslationKeys.ServerLanguageHelp]</small>
                     </div>
 
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">@t[TranslationKeys.ThemeSetting]</label>
+                        <select class="form-select" @bind="_appConfig.Theme">
+                            <option value="light">@t[TranslationKeys.ThemeLightMode]</option>
+                            <option value="dark">@t[TranslationKeys.ThemeDarkMode]</option>
+                        </select>
+                        <small class="text-muted mt-1 d-block">@t[TranslationKeys.ThemeSettingHelp]</small>
+                    </div>
+
                     <div class="col-12">
                         <div class="card bg-light-subtle border p-3 rounded-3">
-                            <h6 class="fw-bold mb-2 text-primary"><i class="bi bi-fonts me-2"></i>@t[TranslationKeys.FontSettingsHelp]</h6>
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <i class="bi bi-fonts text-primary fs-5"></i>
+                                <span class="small fw-semibold">@t[TranslationKeys.FontSettingsHelp]</span>
+                            </div>
                             <div class="row g-3 mt-1">
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">@t[TranslationKeys.PersianFont]</label>
@@ -166,14 +179,19 @@
         }
     }
 
-    private void SaveApplicationConfig()
+    private async Task SaveApplicationConfig()
     {
         try
         {
             TranslationFactory.SetLanguage(_appConfig.Language);
             AppConfig.SaveChanges(_appConfig);
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("window.themeManager.setTheme", _appConfig.Theme);
+            }
+            catch { }
             _bprMessage = BprMessage.Success(TranslationFactory.Current[TranslationKeys.SaveAppSettings]);
-            OnConfigurationChanged.InvokeAsync();
+            await OnConfigurationChanged.InvokeAsync();
             StateHasChanged();
         }
         catch (Exception ex)

@@ -48,6 +48,17 @@
             </NavLink>
         </nav>
 
+        <div class="px-3 py-2 border-top border-secondary border-opacity-25 d-flex align-items-center justify-content-between">
+            <button class="btn btn-sm theme-toggle-btn w-100 d-flex align-items-center justify-content-center gap-2"
+                    type="button"
+                    onclick="window.themeManager.toggleTheme()"
+                    title="@t[TranslationKeys.ThemeToggle]">
+                <i class="bi bi-moon-stars-fill" id="theme-toggle-icon"></i>
+                <small id="theme-label-dark">@t[TranslationKeys.ThemeDarkMode]</small>
+                <small id="theme-label-light" style="display: none;">@t[TranslationKeys.ThemeLightMode]</small>
+            </button>
+        </div>
+
         <footer class="sidebar-footer">
             <span class="footer-dot"></span>
             <span>@Constants.Copyright</span>

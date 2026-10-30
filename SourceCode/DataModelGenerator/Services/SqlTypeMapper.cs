@@ -290,6 +290,24 @@ namespace BprDevKit.DataModelGenerator.Services
             }
         }
 
+        public static string MapToTypeScript(string sqlDataType, bool isNullable, bool dateAsDate = true)
+        {
+            if (string.IsNullOrWhiteSpace(sqlDataType)) return "any";
+            var clean = sqlDataType.Trim().ToLowerInvariant().Split('(')[0].Trim();
+
+            var baseType = clean switch
+            {
+                "bit" or "boolean" or "bool" => "boolean",
+                "tinyint" or "smallint" or "int" or "integer" or "bigint" or "decimal" or "numeric" or "money" or "smallmoney" or "float" or "real" or "double" or "number" => "number",
+                "char" or "nchar" or "varchar" or "nvarchar" or "varchar2" or "nvarchar2" or "text" or "ntext" or "xml" or "uniqueidentifier" or "uuid" or "guid" or "json" or "jsonb" => "string",
+                "date" or "datetime" or "datetime2" or "smalldatetime" or "datetimeoffset" or "timestamp" or "time" => dateAsDate ? "Date" : "string",
+                "binary" or "varbinary" or "image" or "blob" or "bytea" or "raw" => "Uint8Array",
+                _ => "any"
+            };
+
+            return isNullable ? $"{baseType} | null" : baseType;
+        }
+
         public static string NormalizeType(string sqlDataType)
         {
             if (string.IsNullOrWhiteSpace(sqlDataType)) return "varchar";

@@ -74,6 +74,10 @@
               "target": "Package",
               "version": "[10.0.3, )"
             },
+            "Oracle.ManagedDataAccess.Core": {
+              "target": "Package",
+              "version": "[23.26.400, )"
+            },
             "System.Security.Cryptography.Pkcs": {
               "target": "Package",
               "version": "[9.0.21, )"

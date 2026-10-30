@@ -151,6 +151,10 @@
             {
                 <TriggerManagementTab ServerConfig="_selectedServer" OnOperationComplete="NotifyOperationCompleted" />
             }
+            else if (_activeTab == "query")
+            {
+                <QuickQueryRunnerTab ServerConfig="_selectedServer" />
+            }
             else
             {
                 <div class="text-center text-muted py-5">
@@ -172,7 +176,8 @@
         ("views", TranslationKeys.Views, "bi-eye"),
         ("procedures", TranslationKeys.StoredProcedures, "bi-terminal"),
         ("functions", TranslationKeys.Functions, "bi-braces"),
-        ("triggers", TranslationKeys.Triggers, "bi-lightning-charge")
+        ("triggers", TranslationKeys.Triggers, "bi-lightning-charge"),
+        ("query", TranslationKeys.DbQuickQueryRunner, "bi-play-circle-fill")
     };
 
     private List<ServerConfiguration> _serverConfigurations = new();

@@ -24,10 +24,21 @@ namespace BprDevKit.DataModelGenerator.Services
                     DataModelLanguage.Python => PythonModelGenerator.Generate(table, options, tables),
                     DataModelLanguage.Dart => DartModelGenerator.Generate(table, options, tables),
                     DataModelLanguage.Java => JavaModelGenerator.Generate(table, options, tables),
+                    DataModelLanguage.TypeScript => TypeScriptModelGenerator.Generate(table, options, tables),
                     DataModelLanguage.CSharp or _ => CSharpModelGenerator.Generate(table, options, tables)
                 };
 
                 results.Add(file);
+            }
+
+            // Optionally generate separate IEntityTypeConfiguration<T> Fluent API files for C#
+            if (options.Language == DataModelLanguage.CSharp && options.CSharp.GenerateEntityTypeConfigurations)
+            {
+                foreach (var table in tables)
+                {
+                    var configFile = CSharpModelGenerator.GenerateEntityConfiguration(table, options, tables);
+                    results.Add(configFile);
+                }
             }
 
             // Optionally generate DbContext for C#

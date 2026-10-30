@@ -1,0 +1,330 @@
+@using System.Data
+@using System.Diagnostics
+@using System.Text
+@using System.Text.Json
+@using BprDevKit.Config
+@using BprDevKit.DatabaseManagement
+@using BprDevKit.DatabaseManagement.Connections
+@using BprDevKit.Localization
+@using BprDevKit.Utility
+@inject DatabaseManagerFactory DatabaseManagerFactory
+@inject ITranslationFactory TranslationFactory
+@inject IJSRuntime JSRuntime
+
+@{
+    var t = TranslationFactory.Current;
+}
+
+<div class="quick-query-runner">
+    <!-- Header Controls -->
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body p-3">
+            <div class="row g-2 align-items-center mb-3">
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold mb-1">
+                        <i class="bi bi-database me-1 text-primary"></i>@t[TranslationKeys.DbQuerySelectDatabase]
+                    </label>
+                    <select class="form-select form-select-sm" @bind="_selectedDatabase" disabled="@_isExecuting">
+                        @foreach (var db in _databases)
+                        {
+                            <option value="@db">@db</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-8 text-end align-self-end">
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" type="button" @onclick="InsertSelectVersion" disabled="@_isExecuting">
+                            Version
+                        </button>
+                        <button class="btn btn-outline-secondary" type="button" @onclick="InsertSelectTables" disabled="@_isExecuting">
+                            List Tables
+                        </button>
+                        <button class="btn btn-outline-danger" type="button" @onclick="ClearQuery" disabled="@_isExecuting">
+                            <i class="bi bi-trash me-1"></i>@t[TranslationKeys.DbQueryClear]
+                        </button>
+                        <button class="btn btn-success px-4" type="button" @onclick="ExecuteSqlAsync" disabled="@(_isExecuting || string.IsNullOrWhiteSpace(_sqlQuery))">
+                            @if (_isExecuting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                @t[TranslationKeys.DbQueryExecuting]
+                            }
+                            else
+                            {
+                                <i class="bi bi-play-fill me-1"></i>
+                                @t[TranslationKeys.DbQueryExecute]
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SQL Query Input -->
+            <div class="position-relative">
+                <textarea class="form-control font-monospace"
+                          rows="6"
+                          placeholder="-- Enter your SQL query here (e.g. SELECT * FROM Users)..."
+                          @bind="_sqlQuery"
+                          disabled="@_isExecuting"
+                          style="font-size: 0.9rem; resize: vertical; tab-size: 4;"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Alert -->
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger shadow-sm d-flex align-items-start gap-2 mb-3">
+            <i class="bi bi-exclamation-triangle-fill fs-5 mt-1"></i>
+            <div class="flex-grow-1">
+                <div class="fw-bold mb-1">Execution Error</div>
+                <pre class="mb-0 font-monospace text-wrap" style="font-size: 0.85rem;">@_errorMessage</pre>
+            </div>
+        </div>
+    }
+
+    <!-- Query Results -->
+    @if (_resultSet != null)
+    {
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge text-bg-success">
+                        <i class="bi bi-check-lg me-1"></i>Success
+                    </span>
+                    <span class="badge text-bg-light border text-muted">
+                        <i class="bi bi-stopwatch me-1"></i>@_executionTimeMs ms
+                    </span>
+                    <span class="badge text-bg-light border text-muted">
+                        <i class="bi bi-table me-1"></i>@_resultSet.Rows.Count @t[TranslationKeys.DbQueryRowsAffected]
+                    </span>
+                    <span class="badge text-bg-light border text-muted">
+                        @_resultSet.Columns.Count Columns
+                    </span>
+                </div>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" type="button" @onclick="ExportCsvAsync" title="Download CSV">
+                        <i class="bi bi-file-earmark-spreadsheet me-1"></i>@t[TranslationKeys.DbQueryExportCsv]
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="ExportJsonAsync" title="Download JSON">
+                        <i class="bi bi-file-earmark-code me-1"></i>@t[TranslationKeys.DbQueryExportJson]
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                @if (_resultSet.Rows.Count == 0)
+                {
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-3 d-block mb-1"></i>
+                        No rows returned.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                        <table class="table table-hover table-sm table-striped mb-0 font-monospace" style="font-size: 0.85rem;">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th style="width: 40px;" class="text-muted text-center">#</th>
+                                    @foreach (DataColumn col in _resultSet.Columns)
+                                    {
+                                        <th title="@col.DataType.Name">@col.ColumnName</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (int i = 0; i < Math.Min(500, _resultSet.Rows.Count); i++)
+                                {
+                                    var row = _resultSet.Rows[i];
+                                    <tr>
+                                        <td class="text-muted text-center small">@(i + 1)</td>
+                                        @foreach (DataColumn col in _resultSet.Columns)
+                                        {
+                                            var val = row[col];
+                                            if (val == DBNull.Value || val == null)
+                                            {
+                                                <td><span class="badge text-bg-secondary opacity-50 font-monospace" style="font-size: 0.7rem;">NULL</span></td>
+                                            }
+                                            else
+                                            {
+                                                <td class="text-truncate" style="max-width: 320px;" title="@val.ToString()">
+                                                    @val.ToString()
+                                                </td>
+                                            }
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (_resultSet.Rows.Count > 500)
+                    {
+                        <div class="card-footer bg-light text-muted small text-center py-2">
+                            Showing first 500 of @_resultSet.Rows.Count rows. Use CSV/JSON export to inspect the complete dataset.
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public ServerConfiguration ServerConfig { get; set; } = null!;
+
+    private string _selectedDatabase = string.Empty;
+    private List<string> _databases = new();
+    private string _sqlQuery = "SELECT @@VERSION AS ServerVersion;";
+    private DataTable? _resultSet;
+    private bool _isExecuting = false;
+    private string? _errorMessage;
+    private long _executionTimeMs = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDatabasesAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadDatabasesAsync();
+    }
+
+    private async Task LoadDatabasesAsync()
+    {
+        if (ServerConfig == null) return;
+        try
+        {
+            var manager = DatabaseManagerFactory.Create(ServerConfig);
+            var (res, dbs) = await manager.GetDatabases();
+            if (res.Success && dbs != null && dbs.Count > 0)
+            {
+                _databases = dbs;
+                if (string.IsNullOrWhiteSpace(_selectedDatabase) || !_databases.Contains(_selectedDatabase))
+                {
+                    _selectedDatabase = _databases[0];
+                }
+            }
+        }
+        catch
+        {
+            // Ignore load failure
+        }
+    }
+
+    private void InsertSelectVersion()
+    {
+        _sqlQuery = ServerConfig.Server.DatabaseServerType switch
+        {
+            DatabaseServerType.SqlServer => "SELECT @@VERSION AS Version;",
+            DatabaseServerType.PostgreSql => "SELECT version() AS Version;",
+            DatabaseServerType.MySql or DatabaseServerType.MariaDb => "SELECT VERSION() AS Version;",
+            DatabaseServerType.Oracle => "SELECT banner AS Version FROM v$version WHERE ROWNUM = 1;",
+            DatabaseServerType.Sqlite => "SELECT sqlite_version() AS Version;",
+            _ => "SELECT 1 AS Result;"
+        };
+    }
+
+    private void InsertSelectTables()
+    {
+        _sqlQuery = ServerConfig.Server.DatabaseServerType switch
+        {
+            DatabaseServerType.SqlServer => "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES ORDER BY TABLE_SCHEMA, TABLE_NAME;",
+            DatabaseServerType.PostgreSql => "SELECT table_schema, table_name, table_type FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name;",
+            DatabaseServerType.MySql or DatabaseServerType.MariaDb => "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_ROWS FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME;",
+            DatabaseServerType.Oracle => "SELECT owner, table_name FROM all_tables WHERE secondary = 'N' ORDER BY owner, table_name;",
+            DatabaseServerType.Sqlite => "SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') ORDER BY name;",
+            _ => "SELECT 1;"
+        };
+    }
+
+    private void ClearQuery()
+    {
+        _sqlQuery = string.Empty;
+        _resultSet = null;
+        _errorMessage = null;
+    }
+
+    private async Task ExecuteSqlAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_sqlQuery)) return;
+        _isExecuting = true;
+        _errorMessage = null;
+        _resultSet = null;
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var manager = DatabaseManagerFactory.Create(ServerConfig);
+            _resultSet = await manager.ExecuteQueryAsync(_sqlQuery.Trim(), _selectedDatabase);
+            sw.Stop();
+            _executionTimeMs = sw.ElapsedMilliseconds;
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            _executionTimeMs = sw.ElapsedMilliseconds;
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isExecuting = false;
+        }
+    }
+
+    private async Task ExportCsvAsync()
+    {
+        if (_resultSet == null || _resultSet.Columns.Count == 0) return;
+        var sb = new StringBuilder();
+
+        // Header
+        var colHeaders = new List<string>();
+        foreach (DataColumn col in _resultSet.Columns)
+        {
+            colHeaders.Add($"\"{col.ColumnName.Replace("\"", "\"\"")}\"");
+        }
+        sb.AppendLine(string.Join(",", colHeaders));
+
+        // Rows
+        foreach (DataRow row in _resultSet.Rows)
+        {
+            var rowVals = new List<string>();
+            foreach (DataColumn col in _resultSet.Columns)
+            {
+                var val = row[col];
+                if (val == DBNull.Value || val == null)
+                {
+                    rowVals.Add("\"\"");
+                }
+                else
+                {
+                    rowVals.Add($"\"{val.ToString()?.Replace("\"", "\"\"")}\"");
+                }
+            }
+            sb.AppendLine(string.Join(",", rowVals));
+        }
+
+        var filename = $"query_result_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+        await JSRuntime.InvokeVoidAsync("downloadTextFile", filename, sb.ToString());
+    }
+
+    private async Task ExportJsonAsync()
+    {
+        if (_resultSet == null || _resultSet.Columns.Count == 0) return;
+        var list = new List<Dictionary<string, object?>>();
+
+        foreach (DataRow row in _resultSet.Rows)
+        {
+            var dict = new Dictionary<string, object?>();
+            foreach (DataColumn col in _resultSet.Columns)
+            {
+                var val = row[col];
+                dict[col.ColumnName] = val == DBNull.Value ? null : val;
+            }
+            list.Add(dict);
+        }
+
+        var json = JsonSerializer.Serialize(list, new JsonSerializerOptions { WriteIndented = true });
+        var filename = $"query_result_{DateTime.Now:yyyyMMdd_HHmmss}.json";
+        await JSRuntime.InvokeVoidAsync("downloadTextFile", filename, json);
+    }
+}

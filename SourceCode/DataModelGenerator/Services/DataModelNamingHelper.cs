@@ -64,17 +64,36 @@ namespace BprDevKit.DataModelGenerator.Services
             return clean;
         }
 
-        public static string FormatPropertyName(string rawName, NamingConvention convention)
+        public static string FormatPropertyName(
+            string rawName,
+            NamingConvention convention,
+            bool removePrefixes = false,
+            string? prefixList = null)
         {
             if (string.IsNullOrWhiteSpace(rawName)) return "Property";
 
+            var clean = rawName.Trim();
+
+            if (removePrefixes && !string.IsNullOrWhiteSpace(prefixList))
+            {
+                var prefixes = prefixList.Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (var prefix in prefixes)
+                {
+                    if (clean.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && clean.Length > prefix.Length)
+                    {
+                        clean = clean.Substring(prefix.Length);
+                        break;
+                    }
+                }
+            }
+
             return convention switch
             {
-                NamingConvention.Original => SanitizeIdentifier(rawName),
-                NamingConvention.PascalCase => ToPascalCase(rawName),
-                NamingConvention.CamelCase => ToCamelCase(rawName),
-                NamingConvention.SnakeCase => ToSnakeCase(rawName),
-                _ => ToPascalCase(rawName)
+                NamingConvention.Original => SanitizeIdentifier(clean),
+                NamingConvention.PascalCase => ToPascalCase(clean),
+                NamingConvention.CamelCase => ToCamelCase(clean),
+                NamingConvention.SnakeCase => ToSnakeCase(clean),
+                _ => ToPascalCase(clean)
             };
         }
 

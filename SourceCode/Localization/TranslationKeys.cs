@@ -214,6 +214,15 @@ namespace BprDevKit.Localization
         public const string DbTabForceDisconnect = "DbTab.ForceDisconnect";
         public const string DbTabIgnoreIfNotExists = "DbTab.IgnoreIfNotExists";
         public const string DbTabDetailsTitle = "DbTab.DetailsTitle";
+        public const string DbQuickQueryRunner = "Db.QuickQueryRunner";
+        public const string DbQueryExecute = "Db.QueryExecute";
+        public const string DbQueryRowsAffected = "Db.QueryRowsAffected";
+        public const string DbQueryExecutionTime = "Db.QueryExecutionTime";
+        public const string DbQuerySelectDatabase = "Db.QuerySelectDatabase";
+        public const string DbQueryExecuting = "Db.QueryExecuting";
+        public const string DbQueryExportCsv = "Db.QueryExportCsv";
+        public const string DbQueryExportJson = "Db.QueryExportJson";
+        public const string DbQueryClear = "Db.QueryClear";
 
         // Schema Management Tab
         public const string SchemaTabSubtitle = "SchemaTab.Subtitle";
@@ -576,6 +585,7 @@ namespace BprDevKit.Localization
         public const string DataModelCommonSettings = "DataModel.CommonSettings";
         public const string DataModelPropertyNaming = "DataModel.PropertyNaming";
         public const string DataModelRemovePrefixes = "DataModel.RemovePrefixes";
+        public const string DataModelRemoveColumnPrefixes = "DataModel.RemoveColumnPrefixes";
         public const string DataModelSingularize = "DataModel.Singularize";
         public const string DataModelIncludeNavigation = "DataModel.IncludeNavigation";
         public const string DataModelIncludeDocComments = "DataModel.IncludeDocComments";
@@ -601,6 +611,8 @@ namespace BprDevKit.Localization
         public const string DataModelCsDbContextName = "DataModel.CsDbContextName";
         public const string DataModelCsDbContextNamespace = "DataModel.CsDbContextNamespace";
         public const string DataModelCsDbContextUseFullyQualified = "DataModel.CsDbContextUseFullyQualified";
+        public const string DataModelCsGenerateFluentApi = "DataModel.CsGenerateFluentApi";
+        public const string DataModelCsEntityConfigNamespace = "DataModel.CsEntityConfigNamespace";
 
         // Profiles
         public const string DataModelSelectProfileToProceed = "DataModel.SelectProfileToProceed";
@@ -712,6 +724,8 @@ namespace BprDevKit.Localization
         public const string DataModelTransformGetter = "DataModel.TransformGetter";
         public const string DataModelTransformSetter = "DataModel.TransformSetter";
         public const string DataModelTransformUsing = "DataModel.TransformUsing";
+        public const string DataModelTransformTwoWaySync = "DataModel.TransformTwoWaySync";
+        public const string DataModelTransformTwoWaySyncHelp = "DataModel.TransformTwoWaySyncHelp";
         public const string DataModelTransformNoRules = "DataModel.TransformNoRules";
 
         // Generic other languages
@@ -839,5 +853,12 @@ namespace BprDevKit.Localization
         public const string ZipPackagingByNamespace = "DataModel.ZipPackagingByNamespace";
         public const string ZipPackagingHelp = "DataModel.ZipPackagingHelp";
         public const string DataModelDownloadSeparateZips = "DataModel.DownloadSeparateZips";
+
+        // Theme
+        public const string ThemeLightMode = "Theme.LightMode";
+        public const string ThemeDarkMode = "Theme.DarkMode";
+        public const string ThemeToggle = "Theme.Toggle";
+        public const string ThemeSetting = "Theme.Setting";
+        public const string ThemeSettingHelp = "Theme.SettingHelp";
     }
 }

@@ -178,3 +178,57 @@
         min-height: 24rem;
     }
 }
+
+/* Dark Mode Scoped Overrides */
+[data-bs-theme="dark"] .database-management-page {
+    --management-navy: #f8fafc;
+    --management-blue: #38bdf8;
+    --management-indigo: #818cf8;
+    --management-slate: #94a3b8;
+    --management-border: rgba(255, 255, 255, 0.08);
+    --management-surface: #111827;
+}
+
+[data-bs-theme="dark"] .management-hero {
+    background:
+        radial-gradient(circle at top right, rgba(56, 189, 248, 0.22), transparent 40%),
+        linear-gradient(135deg, #0b1120, #172554 55%, #1e1b4b) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-bs-theme="dark"] .server-selection-card {
+    background: #111827 !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 16px 35px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-bs-theme="dark"] .management-workspace {
+    background: #111827 !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 16px 35px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-bs-theme="dark"] .management-workspace .card-header {
+    background: #151f32 !important;
+    border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-bs-theme="dark"] .management-tab {
+    color: #94a3b8 !important;
+}
+
+[data-bs-theme="dark"] .management-tab:hover:not(:disabled) {
+    color: #38bdf8 !important;
+    background: rgba(56, 189, 248, 0.08) !important;
+}
+
+[data-bs-theme="dark"] .management-tab.active {
+    background: linear-gradient(135deg, #0284c7, #2563eb) !important;
+    color: #ffffff !important;
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.35) !important;
+}
+
+[data-bs-theme="dark"] .management-tab:disabled {
+    color: #475569 !important;
+}

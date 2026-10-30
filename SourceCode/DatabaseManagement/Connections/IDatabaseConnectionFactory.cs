@@ -50,7 +50,7 @@ namespace BprDevKit.DatabaseManagement.Connections
                 DatabaseServerType.PostgreSql => new Npgsql.NpgsqlConnection(connectionString),
                 DatabaseServerType.MySql or DatabaseServerType.MariaDb => new MySqlConnector.MySqlConnection(connectionString),
                 DatabaseServerType.Sqlite => new Microsoft.Data.Sqlite.SqliteConnection(connectionString),
-                DatabaseServerType.Oracle => throw new NotSupportedException("Oracle ADO.NET provider is not yet registered. SQL Server, PostgreSQL, MySQL/MariaDB, and SQLite are currently active."),
+                DatabaseServerType.Oracle => new Oracle.ManagedDataAccess.Client.OracleConnection(connectionString),
                 _ => new SqlConnection(connectionString)
             };
         }
@@ -79,18 +79,6 @@ namespace BprDevKit.DatabaseManagement.Connections
 
             try
             {
-                if (serverType == DatabaseServerType.Oracle)
-                {
-                    return new ConnectionTestResult
-                    {
-                        Success = false,
-                        LatencyMs = 0,
-                        Provider = caps.DisplayName,
-                        Message = $"Provider '{caps.DisplayName}' configuration is valid, but native Oracle driver is not registered yet.",
-                        ErrorDetails = $"Constructed Connection String: {config.Server.BuildConnectionString()}"
-                    };
-                }
-
                 await using var connection = await OpenConnectionAsync(config, cancellationToken: cancellationToken);
                 stopwatch.Stop();
 
@@ -107,6 +95,7 @@ namespace BprDevKit.DatabaseManagement.Connections
                         DatabaseServerType.PostgreSql => "SELECT version()",
                         DatabaseServerType.MySql or DatabaseServerType.MariaDb => "SELECT VERSION()",
                         DatabaseServerType.Sqlite => "SELECT sqlite_version()",
+                        DatabaseServerType.Oracle => "SELECT banner FROM v$version WHERE ROWNUM = 1",
                         _ => "SELECT 1"
                     };
                     cmd.CommandTimeout = Math.Min(10, Math.Max(5, config.Server.CommandTimeout));

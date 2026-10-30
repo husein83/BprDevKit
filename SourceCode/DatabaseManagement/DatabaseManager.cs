@@ -1970,6 +1970,31 @@ FROM information_schema.columns
 WHERE table_schema = '{db.Replace("'", "''")}' AND table_name = '{viewName.Replace("'", "''")}'
 ORDER BY ordinal_position;";
                 }
+                else if (serverType == DatabaseServerType.Oracle)
+                {
+                    sql = $@"SELECT 
+    c.column_id AS OrdinalPosition,
+    c.column_name AS ColumnName,
+    c.data_type AS DataType,
+    NVL(c.data_length, 0) AS MaxLength,
+    NVL(c.data_precision, 0) AS Precision,
+    NVL(c.data_scale, 0) AS Scale,
+    CASE WHEN c.nullable = 'Y' THEN 1 ELSE 0 END AS IsNullable,
+    0 AS IsIdentity,
+    0 AS IdentitySeed,
+    0 AS IdentityIncrement,
+    0 AS IsPrimaryKey,
+    '' AS Collation,
+    NULL AS DefaultValue,
+    NULL AS DefaultConstraintName,
+    NULL AS ComputedFormula,
+    0 AS IsPersisted,
+    NVL(comm.comments, '') AS Description
+FROM all_tab_columns c
+LEFT JOIN all_col_comments comm ON comm.owner = c.owner AND comm.table_name = c.table_name AND comm.column_name = c.column_name
+WHERE c.owner = '{schemaName.Replace("'", "''").ToUpperInvariant()}' AND c.table_name = '{viewName.Replace("'", "''").ToUpperInvariant()}'
+ORDER BY c.column_id";
+                }
                 else // Sqlite
                 {
                     sql = $@"SELECT
@@ -2245,6 +2270,35 @@ ORDER BY ordinal_position;";
                     var paramTable = await ExecuteQuery(paramSql, databaseName);
                     parameters = paramTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
                 }
+                else if (serverType == DatabaseServerType.Oracle)
+                {
+                    var paramSql = $@"SELECT
+    position AS OrdinalPosition,
+    NVL(argument_name, 'param_' || position) AS ColumnName,
+    data_type AS DataType,
+    NVL(data_length, 0) AS MaxLength,
+    NVL(data_precision, 0) AS Precision,
+    NVL(data_scale, 0) AS Scale,
+    1 AS IsNullable,
+    0 AS IsIdentity,
+    0 AS IdentitySeed,
+    0 AS IdentityIncrement,
+    0 AS IsPrimaryKey,
+    NULL AS Collation,
+    NULL AS DefaultValue,
+    NULL AS DefaultConstraintName,
+    NULL AS ComputedFormula,
+    0 AS IsPersisted,
+    NULL AS Description
+FROM all_arguments
+WHERE owner = '{schemaName.Replace("'", "''").ToUpperInvariant()}'
+  AND object_name = '{procName.Replace("'", "''").ToUpperInvariant()}'
+  AND position > 0
+ORDER BY position";
+
+                    var paramTable = await ExecuteQuery(paramSql, databaseName);
+                    parameters = paramTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
+                }
 
                 return (OperationResult.SuccessResult($"Retrieved metadata for procedure '{schemaName}.{procName}'"), resultColumns, parameters);
             }
@@ -2465,6 +2519,35 @@ ORDER BY c.column_id;";
 FROM information_schema.parameters
 WHERE specific_schema = '{schemaName.Replace("'", "''")}' AND specific_name = '{funcName.Replace("'", "''")}'
 ORDER BY ordinal_position;";
+
+                    var paramTable = await ExecuteQuery(paramSql, databaseName);
+                    parameters = paramTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();
+                }
+                else if (serverType == DatabaseServerType.Oracle)
+                {
+                    var paramSql = $@"SELECT
+    position AS OrdinalPosition,
+    NVL(argument_name, 'param_' || position) AS ColumnName,
+    data_type AS DataType,
+    NVL(data_length, 0) AS MaxLength,
+    NVL(data_precision, 0) AS Precision,
+    NVL(data_scale, 0) AS Scale,
+    1 AS IsNullable,
+    0 AS IsIdentity,
+    0 AS IdentitySeed,
+    0 AS IdentityIncrement,
+    0 AS IsPrimaryKey,
+    NULL AS Collation,
+    NULL AS DefaultValue,
+    NULL AS DefaultConstraintName,
+    NULL AS ComputedFormula,
+    0 AS IsPersisted,
+    NULL AS Description
+FROM all_arguments
+WHERE owner = '{schemaName.Replace("'", "''").ToUpperInvariant()}'
+  AND object_name = '{funcName.Replace("'", "''").ToUpperInvariant()}'
+  AND position > 0
+ORDER BY position";
 
                     var paramTable = await ExecuteQuery(paramSql, databaseName);
                     parameters = paramTable.Rows.Cast<DataRow>().Select(row => MapColumn(dummyTable, row)).ToList();

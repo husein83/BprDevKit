@@ -110,7 +110,7 @@ namespace BprDevKit.DataModelGenerator.Generators
             for (int i = 0; i < table.Columns.Count; i++)
             {
                 var col = table.Columns[i];
-                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
+                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 var javaType = SqlTypeMapper.MapToJava(col.DataType, col.IsNullable);
                 var comma = (i < table.Columns.Count - 1) ? "," : "";
 
@@ -175,7 +175,7 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
-                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
+                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 var javaType = SqlTypeMapper.MapToJava(col.DataType, col.IsNullable);
                 fields.Add((fieldName, javaType, col.ColumnName, col));
 

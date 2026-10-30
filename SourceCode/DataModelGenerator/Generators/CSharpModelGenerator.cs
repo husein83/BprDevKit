@@ -172,7 +172,7 @@ namespace BprDevKit.DataModelGenerator.Generators
                     var colArgs = new List<string>();
                     foreach (var c in cols)
                     {
-                        var propName = DataModelNamingHelper.FormatPropertyName(c, globalOptions.PropertyNaming);
+                        var propName = DataModelNamingHelper.FormatPropertyName(c, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                         if (options.UseNameofInAttributes)
                         {
                             colArgs.Add($"nameof({propName})");
@@ -265,7 +265,7 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
-                var propName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
+                var propName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 if (propName == className)
                 {
                     propName += "Property";
@@ -289,6 +289,24 @@ namespace BprDevKit.DataModelGenerator.Generators
                     csharpType = matchingRule.TargetType;
                 }
 
+                // Check for Two-Way JSON Synchronization
+                bool isTwoWaySync = matchingRule != null
+                    && matchingRule.ActionType == "NotMappedHelper"
+                    && matchingRule.EnableTwoWaySync
+                    && (csharpType == "string" || csharpType == "string?");
+
+                var helperName = "";
+                var helperBackingName = "";
+                if (matchingRule != null && matchingRule.ActionType == "NotMappedHelper")
+                {
+                    helperName = InterpolateTemplate(matchingRule.HelperPropertyNameTemplate, propName, col.ColumnName, matchingRule.TargetType, className);
+                    if (string.IsNullOrWhiteSpace(helperName))
+                    {
+                        helperName = propName + "Data";
+                    }
+                    helperBackingName = "_" + DataModelNamingHelper.ToCamelCase(helperName);
+                }
+
                 // Documentation comments
                 if (globalOptions.IncludeDocumentationComments && !string.IsNullOrWhiteSpace(col.Description))
                 {
@@ -298,7 +316,12 @@ namespace BprDevKit.DataModelGenerator.Generators
                 }
 
                 var backingFieldName = "_" + DataModelNamingHelper.ToCamelCase(propName);
-                if (options.PropertyAccessor == "backing_field")
+                if (isTwoWaySync)
+                {
+                    sb.AppendLine($"{indent}    private {csharpType} {backingFieldName};");
+                    sb.AppendLine($"{indent}    private {matchingRule!.TargetType} {helperBackingName};");
+                }
+                else if (options.PropertyAccessor == "backing_field")
                 {
                     sb.AppendLine($"{indent}    private {csharpType} {backingFieldName};");
                 }
@@ -503,7 +526,21 @@ namespace BprDevKit.DataModelGenerator.Generators
                 var isOverridden = overridePropNames.Contains(propName) || overridePropNames.Contains(col.ColumnName);
                 var modifier = isOverridden ? "public override " : "public ";
 
-                if (matchingRule != null && matchingRule.ActionType == "CustomGetterSetter")
+                if (isTwoWaySync)
+                {
+                    // Main DB Property: sends serialized dictionary or raw string to DB, resets cached helper on external assignment
+                    sb.AppendLine($"{indent}    {modifier}{csharpType} {propName}");
+                    sb.AppendLine($"{indent}    {{");
+                    sb.AppendLine($"{indent}        get => {helperBackingName} != null ? JsonSerializer.Serialize({helperBackingName}) : {backingFieldName};");
+                    sb.AppendLine($"{indent}        set");
+                    sb.AppendLine($"{indent}        {{");
+                    sb.AppendLine($"{indent}            {backingFieldName} = value;");
+                    sb.AppendLine($"{indent}            {helperBackingName} = null;");
+                    sb.AppendLine($"{indent}        }}");
+                    sb.AppendLine($"{indent}    }}");
+                    sb.AppendLine();
+                }
+                else if (matchingRule != null && matchingRule.ActionType == "CustomGetterSetter")
                 {
                     // Custom Getter / Setter body
                     var getterCode = InterpolateTemplate(matchingRule.GetterTemplate, propName, col.ColumnName, matchingRule.TargetType, className);
@@ -559,19 +596,9 @@ namespace BprDevKit.DataModelGenerator.Generators
                 // Smart Transformation Rule: NotMappedHelper
                 if (matchingRule != null && matchingRule.ActionType == "NotMappedHelper")
                 {
-                    var helperName = InterpolateTemplate(matchingRule.HelperPropertyNameTemplate, propName, col.ColumnName, matchingRule.TargetType, className);
-                    if (string.IsNullOrWhiteSpace(helperName))
+                    if (isTwoWaySync)
                     {
-                        helperName = propName + "Helper";
-                    }
-
-                    var getterCode = InterpolateTemplate(matchingRule.GetterTemplate, propName, col.ColumnName, matchingRule.TargetType, className);
-                    var setterCode = InterpolateTemplate(matchingRule.SetterTemplate, propName, col.ColumnName, matchingRule.TargetType, className);
-
-                    if (options.PropertyAccessor == "backing_field")
-                    {
-                        var helperBacking = "_" + DataModelNamingHelper.ToCamelCase(helperName);
-                        sb.AppendLine($"{indent}    private {matchingRule.TargetType} {helperBacking};");
+                        var cleanTarget = matchingRule.TargetType.TrimEnd('?');
                         sb.AppendLine($"{indent}    [NotMapped]");
                         if (!string.IsNullOrWhiteSpace(options.DefaultPropertyAttributes))
                         {
@@ -586,24 +613,69 @@ namespace BprDevKit.DataModelGenerator.Generators
                         sb.AppendLine($"{indent}    {{");
                         sb.AppendLine($"{indent}        get");
                         sb.AppendLine($"{indent}        {{");
-                        sb.AppendLine($"{indent}            return {helperBacking};");
+                        sb.AppendLine($"{indent}            if ({helperBackingName} == null && !string.IsNullOrWhiteSpace({backingFieldName}))");
+                        sb.AppendLine($"{indent}            {{");
+                        sb.AppendLine($"{indent}                try");
+                        sb.AppendLine($"{indent}                {{");
+                        sb.AppendLine($"{indent}                    {helperBackingName} = JsonSerializer.Deserialize<{cleanTarget}>({backingFieldName});");
+                        sb.AppendLine($"{indent}                }}");
+                        sb.AppendLine($"{indent}                catch");
+                        sb.AppendLine($"{indent}                {{");
+                        sb.AppendLine($"{indent}                    {helperBackingName} = null;");
+                        sb.AppendLine($"{indent}                }}");
+                        sb.AppendLine($"{indent}            }}");
+                        sb.AppendLine($"{indent}            return {helperBackingName};");
                         sb.AppendLine($"{indent}        }}");
                         sb.AppendLine($"{indent}        set");
                         sb.AppendLine($"{indent}        {{");
-                        sb.AppendLine($"{indent}            {helperBacking} = value;");
+                        sb.AppendLine($"{indent}            {helperBackingName} = value;");
+                        sb.AppendLine($"{indent}            {backingFieldName} = value == null ? null : JsonSerializer.Serialize(value);");
                         sb.AppendLine($"{indent}        }}");
                         sb.AppendLine($"{indent}    }}");
                         sb.AppendLine();
                     }
                     else
                     {
-                        sb.AppendLine($"{indent}    [NotMapped]");
-                        sb.AppendLine($"{indent}    public {matchingRule.TargetType} {helperName}");
-                        sb.AppendLine($"{indent}    {{");
-                        sb.AppendLine($"{indent}        get => {getterCode};");
-                        sb.AppendLine($"{indent}        set => {setterCode};");
-                        sb.AppendLine($"{indent}    }}");
-                        sb.AppendLine();
+                        var getterCode = InterpolateTemplate(matchingRule.GetterTemplate, propName, col.ColumnName, matchingRule.TargetType, className);
+                        var setterCode = InterpolateTemplate(matchingRule.SetterTemplate, propName, col.ColumnName, matchingRule.TargetType, className);
+
+                        if (options.PropertyAccessor == "backing_field")
+                        {
+                            var helperBacking = "_" + DataModelNamingHelper.ToCamelCase(helperName);
+                            sb.AppendLine($"{indent}    private {matchingRule.TargetType} {helperBacking};");
+                            sb.AppendLine($"{indent}    [NotMapped]");
+                            if (!string.IsNullOrWhiteSpace(options.DefaultPropertyAttributes))
+                            {
+                                foreach (var attrLine in options.DefaultPropertyAttributes.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                                {
+                                    var attr = attrLine.Trim();
+                                    if (!attr.StartsWith("[")) attr = $"[{attr}]";
+                                    sb.AppendLine($"{indent}    {attr}");
+                                }
+                            }
+                            sb.AppendLine($"{indent}    public {matchingRule.TargetType} {helperName}");
+                            sb.AppendLine($"{indent}    {{");
+                            sb.AppendLine($"{indent}        get");
+                            sb.AppendLine($"{indent}        {{");
+                            sb.AppendLine($"{indent}            return {helperBacking};");
+                            sb.AppendLine($"{indent}        }}");
+                            sb.AppendLine($"{indent}        set");
+                            sb.AppendLine($"{indent}        {{");
+                            sb.AppendLine($"{indent}            {helperBacking} = value;");
+                            sb.AppendLine($"{indent}        }}");
+                            sb.AppendLine($"{indent}    }}");
+                            sb.AppendLine();
+                        }
+                        else
+                        {
+                            sb.AppendLine($"{indent}    [NotMapped]");
+                            sb.AppendLine($"{indent}    public {matchingRule.TargetType} {helperName}");
+                            sb.AppendLine($"{indent}    {{");
+                            sb.AppendLine($"{indent}        get => {getterCode};");
+                            sb.AppendLine($"{indent}        set => {setterCode};");
+                            sb.AppendLine($"{indent}    }}");
+                            sb.AppendLine();
+                        }
                     }
                 }
             }
@@ -643,7 +715,7 @@ namespace BprDevKit.DataModelGenerator.Generators
                             globalOptions.PropertyNaming,
                             Constants.ObjectTypes.Table);
 
-                        var localPropName = DataModelNamingHelper.FormatPropertyName(fk.ColumnName, globalOptions.PropertyNaming);
+                        var localPropName = DataModelNamingHelper.FormatPropertyName(fk.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                         var refSchema = string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName;
                         var refNamespace = ResolveNamespace(options, refSchema, table.DatabaseName ?? string.Empty, fk.RefTableName);
                         var currentNamespace = ResolveNamespace(options, table.SchemaName, table.DatabaseName ?? string.Empty, table.TableName);
@@ -673,7 +745,7 @@ namespace BprDevKit.DataModelGenerator.Generators
 
                         if (!string.IsNullOrWhiteSpace(options.CustomNavReferenceAttribute))
                         {
-                            var targetPk = string.IsNullOrWhiteSpace(fk.RefColumnName) ? "Id" : DataModelNamingHelper.FormatPropertyName(fk.RefColumnName, globalOptions.PropertyNaming);
+                            var targetPk = string.IsNullOrWhiteSpace(fk.RefColumnName) ? "Id" : DataModelNamingHelper.FormatPropertyName(fk.RefColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                             var customRef = options.CustomNavReferenceAttribute
                                 .Replace("{FkProperty}", localPropName, StringComparison.OrdinalIgnoreCase)
                                 .Replace("{TargetType}", navTypeName, StringComparison.OrdinalIgnoreCase)
@@ -772,7 +844,7 @@ namespace BprDevKit.DataModelGenerator.Generators
                             globalOptions.PropertyNaming,
                             Constants.ObjectTypes.Table);
 
-                        var childFkPropName = DataModelNamingHelper.FormatPropertyName(child.Fk.ColumnName, globalOptions.PropertyNaming);
+                        var childFkPropName = DataModelNamingHelper.FormatPropertyName(child.Fk.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                         var childNamespace = ResolveNamespace(options, child.ChildTable.SchemaName, table.DatabaseName ?? string.Empty, child.ChildTable.TableName);
                         var currentNamespace = ResolveNamespace(options, table.SchemaName, table.DatabaseName ?? string.Empty, table.TableName);
 
@@ -1370,7 +1442,7 @@ namespace BprDevKit.DataModelGenerator.Generators
                 var pks = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pks.Count > 1)
                 {
-                    var keys = string.Join(", ", pks.Select(k => $"e.{DataModelNamingHelper.FormatPropertyName(k.ColumnName, globalOptions.PropertyNaming)}"));
+                    var keys = string.Join(", ", pks.Select(k => $"e.{DataModelNamingHelper.FormatPropertyName(k.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes)}"));
                     sb.AppendLine($"{indent}        modelBuilder.Entity<{entity.TypeRef}>().HasKey(e => new {{ {keys} }});");
                 }
                 else if (table.ObjectType == Constants.ObjectTypes.View && pks.Count == 0)
@@ -1396,6 +1468,143 @@ namespace BprDevKit.DataModelGenerator.Generators
                 Content = sb.ToString().TrimEnd() + Environment.NewLine,
                 Namespace = resolvedDbContextNs ?? string.Empty,
                 Language = DataModelLanguage.CSharp
+            };
+        }
+
+        public static GeneratedModelFile GenerateEntityConfiguration(
+            TableOperation.Information table,
+            DataModelOptions globalOptions,
+            IReadOnlyList<TableOperation.Information> allTables)
+        {
+            var options = globalOptions.CSharp;
+            var className = DataModelNamingHelper.FormatClassName(
+                table.TableName,
+                globalOptions.RemoveTablePrefixes,
+                globalOptions.TablePrefixes,
+                globalOptions.SingularizeClassNames,
+                globalOptions.PropertyNaming,
+                table.ObjectType);
+
+            var modelNamespace = ResolveNamespace(options, table.SchemaName, table.DatabaseName ?? string.Empty, table.TableName);
+            var configNamespace = !string.IsNullOrWhiteSpace(options.EntityConfigurationNamespace)
+                ? ApplyTokens(options.EntityConfigurationNamespace, table.SchemaName, table.DatabaseName ?? string.Empty, table.TableName)
+                : (string.IsNullOrWhiteSpace(modelNamespace) ? "Configurations" : $"{modelNamespace}.Configurations");
+
+            var sb = new StringBuilder();
+            sb.AppendLine("// <auto-generated>");
+            sb.AppendLine("//     This code was generated by BprDevKit.");
+            sb.AppendLine("// </auto-generated>");
+            sb.AppendLine();
+            sb.AppendLine("using System;");
+            sb.AppendLine("using Microsoft.EntityFrameworkCore;");
+            sb.AppendLine("using Microsoft.EntityFrameworkCore.Metadata.Builders;");
+            if (!string.IsNullOrWhiteSpace(modelNamespace) && !string.Equals(modelNamespace, configNamespace, StringComparison.OrdinalIgnoreCase))
+            {
+                sb.AppendLine($"using {modelNamespace};");
+            }
+            sb.AppendLine();
+
+            sb.AppendLine($"namespace {configNamespace}");
+            sb.AppendLine("{");
+            sb.AppendLine($"    public class {className}Configuration : IEntityTypeConfiguration<{className}>");
+            sb.AppendLine("    {");
+            sb.AppendLine($"        public void Configure(EntityTypeBuilder<{className}> builder)");
+            sb.AppendLine("        {");
+
+            // ToTable / ToView
+            var schemaArg = string.IsNullOrWhiteSpace(table.SchemaName) ? "" : $", \"{table.SchemaName}\"";
+            if (table.ObjectType == Constants.ObjectTypes.View)
+            {
+                sb.AppendLine($"            builder.ToView(\"{table.TableName}\"{schemaArg});");
+            }
+            else
+            {
+                sb.AppendLine($"            builder.ToTable(\"{table.TableName}\"{schemaArg});");
+            }
+            sb.AppendLine();
+
+            // Primary Key
+            var pks = table.Columns.Where(c => c.IsPrimaryKey).ToList();
+            if (pks.Count == 1)
+            {
+                var pkProp = DataModelNamingHelper.FormatPropertyName(pks[0].ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
+                sb.AppendLine($"            builder.HasKey(e => e.{pkProp});");
+                sb.AppendLine();
+            }
+            else if (pks.Count > 1)
+            {
+                var keys = string.Join(", ", pks.Select(k => $"e.{DataModelNamingHelper.FormatPropertyName(k.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes)}"));
+                sb.AppendLine($"            builder.HasKey(e => new {{ {keys} }});");
+                sb.AppendLine();
+            }
+            else if (table.ObjectType == Constants.ObjectTypes.View)
+            {
+                sb.AppendLine("            builder.HasNoKey();");
+                sb.AppendLine();
+            }
+
+            // Property Configurations
+            foreach (var col in table.Columns)
+            {
+                var propName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
+                var propCalls = new StringBuilder($"            builder.Property(e => e.{propName})");
+
+                if (propName != col.ColumnName)
+                {
+                    propCalls.Append($".HasColumnName(\"{col.ColumnName}\")");
+                }
+                if (!string.IsNullOrWhiteSpace(col.DataType))
+                {
+                    propCalls.Append($".HasColumnType(\"{col.DataType}\")");
+                }
+                if (!col.IsNullable)
+                {
+                    propCalls.Append(".IsRequired()");
+                }
+                if (col.Length.HasValue && col.Length.Value > 0 && col.Length.Value < 8000 && (col.DataType.Contains("char") || col.DataType.Contains("varchar")))
+                {
+                    propCalls.Append($".HasMaxLength({col.Length.Value})");
+                }
+                if (col.IsIdentity)
+                {
+                    propCalls.Append(".ValueGeneratedOnAdd()");
+                }
+                propCalls.Append(";");
+                sb.AppendLine(propCalls.ToString());
+            }
+
+            // Foreign Key Configurations
+            if (globalOptions.IncludeNavigationProperties && table.ForeignKeys.Count > 0)
+            {
+                sb.AppendLine();
+                foreach (var fk in table.ForeignKeys)
+                {
+                    if (string.IsNullOrWhiteSpace(fk.RefTableName)) continue;
+                    var localProp = DataModelNamingHelper.FormatPropertyName(fk.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
+                    var refClass = DataModelNamingHelper.FormatClassName(fk.RefTableName, globalOptions.RemoveTablePrefixes, globalOptions.TablePrefixes, globalOptions.SingularizeClassNames, globalOptions.PropertyNaming, Constants.ObjectTypes.Table);
+
+                    var fkName = string.IsNullOrWhiteSpace(fk.FKName) ? "" : $".HasConstraintName(\"{fk.FKName}\")";
+                    sb.AppendLine($"            builder.HasOne(d => d.{refClass})");
+                    sb.AppendLine($"                .WithMany(p => p.{className}Set{localProp})");
+                    sb.AppendLine($"                .HasForeignKey(d => d.{localProp}){fkName};");
+                }
+            }
+
+            sb.AppendLine("        }");
+            sb.AppendLine("    }");
+            sb.AppendLine("}");
+
+            var content = sb.ToString();
+            return new GeneratedModelFile
+            {
+                TableName = $"{className}Configuration",
+                SchemaName = table.SchemaName,
+                ClassName = $"{className}Configuration",
+                FileName = $"{className}Configuration.cs",
+                Language = DataModelLanguage.CSharp,
+                Content = content,
+                Namespace = configNamespace,
+                ObjectType = Constants.ObjectTypes.Table
             };
         }
 

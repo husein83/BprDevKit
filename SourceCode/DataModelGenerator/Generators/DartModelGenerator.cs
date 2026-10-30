@@ -73,7 +73,7 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
-                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
+                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 var dartType = SqlTypeMapper.MapToDart(col.DataType, col.IsNullable, options.NullSafety);
                 fields.Add((fieldName, dartType, col.ColumnName, col.IsNullable));
 
@@ -194,7 +194,7 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
-                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
+                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 var dartType = SqlTypeMapper.MapToDart(col.DataType, col.IsNullable, options.NullSafety);
                 fields.Add((fieldName, dartType, col.ColumnName, col.IsNullable));
 
@@ -250,7 +250,7 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
-                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming);
+                var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 var dartType = SqlTypeMapper.MapToDart(col.DataType, col.IsNullable, options.NullSafety);
 
                 if (fieldName != col.ColumnName)

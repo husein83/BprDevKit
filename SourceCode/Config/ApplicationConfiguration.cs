@@ -11,6 +11,8 @@ namespace BprDevKit.Config
         #region Property
         public Language Language { get; set; } = Language.English;
 
+        public string Theme { get; set; } = "light";
+
         public string PersianFont { get; set; } = "AppFontFa";
 
         public string EnglishFont { get; set; } = "AppFontEn";
@@ -35,6 +37,10 @@ namespace BprDevKit.Config
                 if (decryptedContent.TryDevDeserialize<ApplicationConfiguration>(out var result) && result.HasAny())
                 {
                     Config = result!;
+                    if (string.IsNullOrWhiteSpace(Config.Theme))
+                    {
+                        Config.Theme = "light";
+                    }
                 }
             }
         }

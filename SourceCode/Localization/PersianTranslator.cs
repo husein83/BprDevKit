@@ -223,6 +223,15 @@ namespace BprDevKit.Localization
             [TranslationKeys.DbTabForceDisconnect] = "قطع ارتباط تمام کاربران فعال و بازگرداندن تراکنش‌های آن‌ها",
             [TranslationKeys.DbTabIgnoreIfNotExists] = "در صورتی که دیتابیس از قبل وجود نداشت، موفقیت‌آمیز در نظر گرفته شود",
             [TranslationKeys.DbTabDetailsTitle] = "جزئیات پایگاه داده",
+            [TranslationKeys.DbQuickQueryRunner] = "اجرای کوئری سریع",
+            [TranslationKeys.DbQueryExecute] = "اجرا",
+            [TranslationKeys.DbQueryRowsAffected] = "ردیف‌ها",
+            [TranslationKeys.DbQueryExecutionTime] = "مدت زمان",
+            [TranslationKeys.DbQuerySelectDatabase] = "انتخاب پایگاه داده",
+            [TranslationKeys.DbQueryExecuting] = "در حال اجرای کوئری...",
+            [TranslationKeys.DbQueryExportCsv] = "خروجی CSV",
+            [TranslationKeys.DbQueryExportJson] = "خروجی JSON",
+            [TranslationKeys.DbQueryClear] = "پاک‌کردن",
 
             // Schema Management Tab
             [TranslationKeys.SchemaTabSubtitle] = "ایجاد، تغییر نام، بررسی و حذف طرح‌واره‌ها (Schemas) در دیتابیس انتخابی.",
@@ -586,6 +595,7 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelCommonSettings] = "تنظیمات عمومی مدل",
             [TranslationKeys.DataModelPropertyNaming] = "سبک نام‌گذاری پراپرتی‌ها",
             [TranslationKeys.DataModelRemovePrefixes] = "حذف پیشوندهای متداول جداول و آبجکت‌ها (مانند tbl_ ، vw_ ، usp_)",
+            [TranslationKeys.DataModelRemoveColumnPrefixes] = "حذف پیشوندهای متداول ستون‌ها و فیلدها (مانند fld_ ، col_)",
             [TranslationKeys.DataModelSingularize] = "مفرد کردن نام کلاس‌ها (Users -> User)",
             [TranslationKeys.DataModelIncludeNavigation] = "تولید پراپرتی‌های ناوبری (کلیدهای خارجی)",
             [TranslationKeys.DataModelIncludeDocComments] = "درج کامنت‌های مستندات از توضیحات دیتابیس",
@@ -611,6 +621,8 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelCsDbContextName] = "نام کلاس DbContext",
             [TranslationKeys.DataModelCsDbContextNamespace] = "فضای نام DbContext (اختیاری)",
             [TranslationKeys.DataModelCsDbContextUseFullyQualified] = "همیشه از آدرس کامل Namespace مدل‌ها در DbContext استفاده شود (DbSet<Namespace.Class>)",
+            [TranslationKeys.DataModelCsGenerateFluentApi] = "تولید کلاس‌های مجزای پیکربندی Fluent API (IEntityTypeConfiguration)",
+            [TranslationKeys.DataModelCsEntityConfigNamespace] = "فضای نام کلاس‌های پیکربندی (توکن‌ها: {Database} و {Schema})",
 
             // Profiles
             [TranslationKeys.DataModelSelectProfileToProceed] = "لطفاً برای بارگذاری تنظیمات تولیدکننده، یک پروفایل پیکربندی انتخاب کنید.",
@@ -720,6 +732,8 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelTransformGetter] = "قالب عبارت Getter",
             [TranslationKeys.DataModelTransformSetter] = "قالب عبارت Setter",
             [TranslationKeys.DataModelTransformUsing] = "Using مورد نیاز",
+            [TranslationKeys.DataModelTransformTwoWaySync] = "فعال‌سازی سنکرون دوطرفه هوشمند (دیتابیس <-> هلپر)",
+            [TranslationKeys.DataModelTransformTwoWaySyncHelp] = "تغییرات پراپرتی دیکشنری/آبجکت را به صورت خودکار به ستون رشته‌ای JSON منتقل می‌کند تا در SaveChanges دیتابیس ذخیره شود.",
             [TranslationKeys.DataModelTransformNoRules] = "هیچ قانون تبدیلی تعریف نشده است. می‌توانید با کلیک روی افزودن یا قالب‌های آماده قانون بسازید.",
 
             // Generic other languages
@@ -846,7 +860,14 @@ namespace BprDevKit.Localization
             [TranslationKeys.ZipPackagingBySchema] = "پوشه‌بندی بر اساس اسکیما (مانند dbo/User.cs)",
             [TranslationKeys.ZipPackagingByNamespace] = "پوشه‌بندی بر اساس فضای نام (Namespace)",
             [TranslationKeys.ZipPackagingHelp] = "نحوه سازماندهی فایل‌های مدل در ساختار فایل فشرده ZIP",
-            [TranslationKeys.DataModelDownloadSeparateZips] = "دانلود زیپ جداگانه برای هر اسکیما"
+            [TranslationKeys.DataModelDownloadSeparateZips] = "دانلود زیپ جداگانه برای هر اسکیما",
+
+            // Theme
+            [TranslationKeys.ThemeLightMode] = "حالت روشن",
+            [TranslationKeys.ThemeDarkMode] = "حالت تاریک",
+            [TranslationKeys.ThemeToggle] = "تغییر حالت روشن / تاریک",
+            [TranslationKeys.ThemeSetting] = "تم ظاهری برنامه",
+            [TranslationKeys.ThemeSettingHelp] = "انتخاب پوسته ظاهری برای کل محیط نرم‌افزار (حالت روشن یا تاریک)."
         };
 
         public string this[string key]

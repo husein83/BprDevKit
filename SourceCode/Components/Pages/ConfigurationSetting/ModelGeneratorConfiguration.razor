@@ -207,6 +207,10 @@
                             type="button" @onclick="() => _editingProfile.Options.Language = DataModelLanguage.Java">
                         Java
                     </button>
+                    <button class="btn @(_editingProfile.Options.Language == DataModelLanguage.TypeScript ? "btn-primary" : "btn-outline-secondary")"
+                            type="button" @onclick="() => _editingProfile.Options.Language = DataModelLanguage.TypeScript">
+                        TypeScript
+                    </button>
                 </div>
             </div>
 
@@ -351,6 +355,20 @@
                                     <div class="form-check form-switch mb-1">
                                         <input class="form-check-input" type="checkbox" id="cs-p-db-fqn" @bind="_editingProfile.Options.CSharp.DbContextUseFullyQualifiedModelNames" />
                                         <label class="form-check-label small" for="cs-p-db-fqn">@t[TranslationKeys.DataModelCsDbContextUseFullyQualified]</label>
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="form-check form-switch mb-2 mt-3">
+                                <input class="form-check-input" type="checkbox" id="cs-p-fluent" @bind="_editingProfile.Options.CSharp.GenerateEntityTypeConfigurations" />
+                                <label class="form-check-label small fw-semibold" for="cs-p-fluent">@t[TranslationKeys.DataModelCsGenerateFluentApi]</label>
+                            </div>
+                            @if (_editingProfile.Options.CSharp.GenerateEntityTypeConfigurations)
+                            {
+                                <div class="ps-3 border-start mb-2">
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">@t[TranslationKeys.DataModelCsEntityConfigNamespace]</label>
+                                        <input type="text" class="form-control form-control-sm font-monospace" placeholder="e.g. {Database}.Configurations" @bind="_editingProfile.Options.CSharp.EntityConfigurationNamespace" />
                                     </div>
                                 </div>
                             }
@@ -1246,6 +1264,13 @@
                                         <label class="form-label small mb-1">@t[TranslationKeys.DataModelTransformHelperPropName]</label>
                                         <input type="text" class="form-control form-control-sm font-monospace" placeholder="{PropertyName}Data" @bind="_editingRule.HelperPropertyNameTemplate" />
                                     </div>
+                                    <div class="col-12">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="rule-twoway" @bind="_editingRule.EnableTwoWaySync" />
+                                            <label class="form-check-label small" for="rule-twoway">@t[TranslationKeys.DataModelTransformTwoWaySync]</label>
+                                        </div>
+                                        <div class="form-text small">@t[TranslationKeys.DataModelTransformTwoWaySyncHelp]</div>
+                                    </div>
                                 }
                                 <div class="col-12">
                                     <label class="form-label small mb-1">@t[TranslationKeys.DataModelTransformGetter]</label>
@@ -1438,6 +1463,46 @@
                     </div>
                 </div>
             }
+            else if (_editingProfile.Options.Language == DataModelLanguage.TypeScript)
+            {
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">TypeScript Declaration Style</label>
+                        <select class="form-select form-select-sm" @bind="_editingProfile.Options.TypeScript.TypeKind">
+                            <option value="interface">interface</option>
+                            <option value="type">type alias</option>
+                            <option value="class">class</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Date Representation</label>
+                        <select class="form-select form-select-sm" @bind="_editingProfile.Options.TypeScript.DateTypeAsDate">
+                            <option value="true">Date object</option>
+                            <option value="false">string (ISO format)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check form-switch mt-4">
+                            <input class="form-check-input" type="checkbox" id="ts-p-export" @bind="_editingProfile.Options.TypeScript.IncludeExport" />
+                            <label class="form-check-label small" for="ts-p-export">Export type / interface</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="ts-p-readonly" @bind="_editingProfile.Options.TypeScript.IncludeReadonlyId" />
+                            <label class="form-check-label small" for="ts-p-readonly">Make Primary Key properties 'readonly'</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="ts-p-nav" @bind="_editingProfile.Options.TypeScript.IncludeNavigationProperties" />
+                            <label class="form-check-label small" for="ts-p-nav">Generate Navigation references (Parent &amp; Child arrays)</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold mb-1">Custom Imports</label>
+                        <textarea class="form-control form-control-sm font-monospace" rows="3" placeholder="import { BaseEntity } from './base';" @bind="_editingProfile.Options.TypeScript.CustomImports"></textarea>
+                    </div>
+                </div>
+            }
 
             <!-- Common Settings Card -->
             <div class="mt-4 p-3 bg-light rounded border">
@@ -1461,7 +1526,15 @@
                         </div>
                         @if (_editingProfile.Options.RemoveTablePrefixes)
                         {
-                            <input type="text" class="form-control form-control-sm" placeholder="tbl_,tbl,vw_" @bind="_editingProfile.Options.TablePrefixes" />
+                            <input type="text" class="form-control form-control-sm mb-2" placeholder="tbl_,tbl,vw_" @bind="_editingProfile.Options.TablePrefixes" />
+                        }
+                        <div class="form-check form-switch mb-1">
+                            <input class="form-check-input" type="checkbox" id="p-rem-col-prefix" @bind="_editingProfile.Options.RemoveColumnPrefixes" />
+                            <label class="form-check-label small" for="p-rem-col-prefix">@t[TranslationKeys.DataModelRemoveColumnPrefixes]</label>
+                        </div>
+                        @if (_editingProfile.Options.RemoveColumnPrefixes)
+                        {
+                            <input type="text" class="form-control form-control-sm" placeholder="fld_,col_" @bind="_editingProfile.Options.ColumnPrefixes" />
                         }
                     </div>
                     <div class="col-md-4">
