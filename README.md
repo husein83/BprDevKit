@@ -236,7 +236,20 @@ BprDevKit از طیف گسترده‌ای از محبوب‌ترین پایگا�
 ---
 
 <a name="fa-app-settings"></a>
-#### ۴.۱۰. تنظیمات نرم‌افزار و پالت اختصاصی تم تاریک (Dark Mode)
+#### ۴.۱۰. تنظیمات نرم‌افزار، تم تاریک و اجرای خودکار (Application Settings & Startup)
+- **تنظیم پورت و اجرای خودکار مرورگر (ServerSettings in appsettings.json):**
+  کاربر می‌تواند پورت اجرای نرم‌افزار و رفتار راه‌اندازی را مستقیماً در فایل `appsettings.json` سفارشی‌سازی کند:
+  ```json
+  "ServerSettings": {
+    "Port": 5000,
+    "Host": "localhost",
+    "UseHttps": false,
+    "OpenBrowserOnStartup": true
+  }
+  ```
+  - **پورت دلخواه (`Port`):** امکان اجرای همزمان یا تغییر پورت به هر شماره پورت آزاد (مانند `8080`، `5050` و ...).
+  - **باز شدن خودکار مرورگر (`OpenBrowserOnStartup`):** اگر روی `true` تنظیم باشد، به محض اجرای فایل `BprDevKit.exe`، مرورگر پیش‌فرض سیستم به طور خودکار باز شده و به داشبورد نرم‌افزار متصل می‌شود.
+- **آیکون رسمی نرم‌افزار (Application Icon):** فایل اجرایی `BprDevKit.exe` و تب مرورگر مجهز به آیکون اختصاصی وکتور و شکیل چندکیفیته (شامل اندازه‌های ۱۶، ۳۲، ۴۸، ۶۴، ۱۲۸ و ۲۵۶ پیکسل) سازگار با Taskbar و Windows Explorer هستند.
 - **پایداری کامل تم (Theme Persistence):** تم انتخابی کاربر (حالت روشن / حالت تاریک) مستقیماً در تنظیمات نرم‌افزار (`ApplicationConfiguration`) ذخیره می‌شود و با جابه‌جایی بین صفحات و تب‌ها هرگز ریست نمی‌شود.
 - **پالت تاریک لوکس و چشم‌نواز:** طراحی ارگونومیک سطوح تیره (`#0b0f19`) با گرادینت‌های نوری کیهانی، حذف کارت‌های سفید زننده، کنتراست بالای متون و فونت‌ها، و هایلایت‌های شفاف فیروزه‌ای (`#38bdf8`).
 - **سوئیچ سریع در سایدبار:** دکمه شیشه‌ای مدرن در انتهای سایدبار برای سوئیچ آنی تم همراه با هماهنگی کامل سمت سرور.
@@ -499,7 +512,20 @@ Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven De
 ---
 
 <a name="en-app-settings"></a>
-#### 4.10. Application Settings & Premium Dark Mode Palette
+#### 4.10. Application Settings, Startup & Premium Dark Mode Palette
+- **Configurable Port & Auto-Launch Browser (ServerSettings in appsettings.json):**
+  Port binding, host listening, and browser launch behavior can be customized directly in `appsettings.json`:
+  ```json
+  "ServerSettings": {
+    "Port": 5000,
+    "Host": "localhost",
+    "UseHttps": false,
+    "OpenBrowserOnStartup": true
+  }
+  ```
+  - **Custom Port (`Port`):** Run on any preferred open port (e.g., `8080`, `5050`, `3000`).
+  - **Automatic Browser Launch (`OpenBrowserOnStartup`):** When set to `true`, launching `BprDevKit.exe` automatically opens the default web browser and navigates directly to the dashboard with zero manual typing required.
+- **Official Application Icon:** `BprDevKit.exe` and browser tabs feature an official multi-resolution embedded Windows icon container (16x16 up to 256x256) for crisp display in the Windows Taskbar, Start Menu, and Explorer.
 - **Persistent Theme Preferences:** Theme choice (Light / Dark mode) is saved directly into the encrypted `ApplicationConfiguration`, ensuring zero resets when switching tabs or pages.
 - **Premium Obsidian / Slate Palette:** Bespoke dark theme styling with deep canvas tones (`#0b0f19`), elimination of jarring white active elements, vibrant cyan-blue accents (`#38bdf8`), and high-contrast typography.
 - **Sidebar Theme Quick Toggle:** Frosted glassmorphism toggle button in the sidebar with instant client-server synchronization.

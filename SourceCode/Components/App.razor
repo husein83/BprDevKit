@@ -1,157 +1,7 @@
-@using BprDevKit.Config
-@using BprDevKit.Utility
-<!DOCTYPE html>
-<html lang="@(ApplicationConfiguration.Config.Language == Language.Persian ? "fa" : "en")" dir="@(ApplicationConfiguration.Config.Language == Language.Persian ? "rtl" : "ltr")" data-bs-theme="@(ApplicationConfiguration.Config.Theme ?? "light")">
-
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <base href="/" />
-    <ResourcePreloader />
-    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
-    <link rel="stylesheet" href="@Assets["lib/bootstrap-icons/font/bootstrap-icons.min.css"]" />
-    <link rel="stylesheet" href="@Assets["app.css"]" />
-    <link rel="stylesheet" href="@Assets["BprDevKit.styles.css"]" />
-    <ImportMap />
-    <link rel="icon" type="image/png" href="favicon.png" />
-    <script>
-        try {
-            var savedTheme = '@(ApplicationConfiguration.Config.Theme ?? "light")';
-            var localTheme = localStorage.getItem('bpr_theme');
-            var activeTheme = localTheme || savedTheme;
-            document.documentElement.setAttribute('data-bs-theme', activeTheme);
-        } catch (e) {}
-    </script>
-    <HeadOutlet />
-</head>
-
-<body>
-    <Routes />
-    <ReconnectModal />
-    <script src="@Assets["_framework/blazor.web.js"]"></script>
-    <script>
-        window.themeManager = {
-            getTheme: function() {
-                try {
-                    return localStorage.getItem('bpr_theme') || '@(ApplicationConfiguration.Config.Theme ?? "light")';
-                } catch(e) {
-                    return '@(ApplicationConfiguration.Config.Theme ?? "light")';
-                }
-            },
-            setTheme: function(theme) {
-                try { localStorage.setItem('bpr_theme', theme); } catch(e) {}
-                document.documentElement.setAttribute('data-bs-theme', theme);
-                this.updateUi(theme);
-                try {
-                    fetch('/api/theme/' + encodeURIComponent(theme), { method: 'POST' }).catch(function(){});
-                } catch(e) {}
-            },
-            toggleTheme: function() {
-                var current = this.getTheme();
-                var next = current === 'dark' ? 'light' : 'dark';
-                this.setTheme(next);
-            },
-            updateUi: function(theme) {
-                var isDark = theme === 'dark';
-                var icon = document.getElementById('theme-toggle-icon');
-                var labelLight = document.getElementById('theme-label-light');
-                var labelDark = document.getElementById('theme-label-dark');
-                if (icon) {
-                    icon.className = isDark ? 'bi bi-sun-fill text-warning' : 'bi bi-moon-stars-fill';
-                }
-                if (labelLight && labelDark) {
-                    labelLight.style.display = isDark ? 'inline' : 'none';
-                    labelDark.style.display = isDark ? 'none' : 'inline';
-                }
-            },
-            initTheme: function() {
-                var theme = this.getTheme();
-                document.documentElement.setAttribute('data-bs-theme', theme);
-                var self = this;
-                if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', function() { self.updateUi(theme); });
-                } else {
-                    self.updateUi(theme);
-                }
-            }
-        };
-        window.themeManager.initTheme();
-        document.addEventListener('blazor:enhancedload', function() {
-            window.themeManager.initTheme();
-        });
-
-        window.copyTextToClipboard = async function (text) {
-            if (navigator.clipboard && window.isSecureContext) {
-                try {
-                    await navigator.clipboard.writeText(text);
-                    return true;
-                } catch (e) { }
-            }
-            try {
-                var textArea = document.createElement("textarea");
-                textArea.value = text;
-                textArea.style.position = "fixed";
-                textArea.style.left = "-999999px";
-                textArea.style.top = "-999999px";
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                var success = document.execCommand('copy');
-                document.body.removeChild(textArea);
-                return success;
-            } catch (err) {
-                return false;
-            }
-        };
-
-        window.downloadTextFile = function (filename, textContent) {
-            try {
-                var blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
-                var url = URL.createObjectURL(blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                return true;
-            } catch (err) {
-                console.error("Download failed:", err);
-                return false;
-            }
-        };
-
-        window.downloadBase64File = function (filename, base64Content, contentType) {
-            try {
-                contentType = contentType || 'application/zip';
-                var byteCharacters = atob(base64Content);
-                var byteArrays = [];
-                for (var offset = 0; offset < byteCharacters.length; offset += 512) {
-                    var slice = byteCharacters.slice(offset, offset + 512);
-                    var byteNumbers = new Array(slice.length);
-                    for (var i = 0; i < slice.length; i++) {
-                        byteNumbers[i] = slice.charCodeAt(i);
-                    }
-                    var byteArray = new Uint8Array(byteNumbers);
-                    byteArrays.push(byteArray);
-                }
-                var blob = new Blob(byteArrays, { type: contentType });
-                var url = URL.createObjectURL(blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                return true;
-            } catch (err) {
-                console.error("Binary download failed:", err);
-                return false;
-            }
-        };
-    </script>
-</body>
-
-</html>
+@using BprDevKit.Config@using BprDevKit.Utility<!DOCTYPE html><html lang="@(ApplicationConfiguration.Config.Language == Language.Persian ? "fa" : "en")" dir="@(ApplicationConfiguration.Config.Language == Language.Persian ? "rtl" : "ltr")" data-bs-theme="@(ApplicationConfiguration.Config.Theme ?? "light")">
+<head>    <meta charset="utf-8" />    <meta name="viewport" content="width=device-width, initial-scale=1.0" />    <base href="/" />    <ResourcePreloader />    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />    <link rel="stylesheet" href="@Assets["lib/bootstrap-icons/font/bootstrap-icons.min.css"]" />    <link rel="stylesheet" href="@Assets["app.css"]" />    <link rel="stylesheet" href="@Assets["BprDevKit.styles.css"]" />    <ImportMap />    <link rel="icon" type="image/x-icon" href="favicon.ico" />    <link rel="icon" type="image/png" href="favicon.png" />    <script>            (function() {                try {                    var serverTheme = '@(ApplicationConfiguration.Config.Theme ?? "light")';                    document.documentElement.setAttribute('data-bs-theme', serverTheme);                    localStorage.setItem('bpr_theme', serverTheme);                } catch (e) { }            })();    </script>    <HeadOutlet /></head>
+<body>    <Routes />    <ReconnectModal />    <script src="@Assets["_framework/blazor.web.js"]"></script>    <script>            window.themeManager = {                getTheme: function() {                    try {                        return document.documentElement.getAttribute('data-bs-theme') ||                            localStorage.getItem('bpr_theme') ||                            '@(ApplicationConfiguration.Config.Theme ?? "light")';                    } catch (e) {                        return '@(ApplicationConfiguration.Config.Theme ?? "light")';                    }                },                setTheme: function(theme) {                    if (theme !== 'dark' && theme !== 'light') {                        theme = 'light';                    }                    try { localStorage.setItem('bpr_theme', theme); } catch (e) { }                    document.documentElement.setAttribute('data-bs-theme', theme);                    this.updateUi(theme);                    try {                        fetch('/api/theme/' + encodeURIComponent(theme), { method: 'POST' }).catch(function() { });                    } catch (e) { }                },                toggleTheme: function() {                    var current = this.getTheme();                    var next = current === 'dark' ? 'light' : 'dark';                    this.setTheme(next);                },                updateUi: function(theme) {                    if (!theme) theme = this.getTheme();                    var isDark = theme === 'dark';                    var icon = document.getElementById('theme-toggle-icon');                    var labelLight = document.getElementById('theme-label-light');                    var labelDark = document.getElementById('theme-label-dark');                    if (icon) {                        icon.className = isDark ? 'bi bi-sun-fill text-warning' : 'bi bi-moon-stars-fill';                    }                    if (labelLight && labelDark) {                        labelLight.style.display = isDark ? 'inline' : 'none';                        labelDark.style.display = isDark ? 'none' : 'inline';                    }                    var themeSelect = document.getElementById('app-theme-select');                    if (themeSelect && themeSelect.value !== theme) {                        themeSelect.value = theme;                        try { themeSelect.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) { }                    }                },                initTheme: function() {                    var theme = this.getTheme();                    document.documentElement.setAttribute('data-bs-theme', theme);                    this.updateUi(theme);                }            };            window.themeManager.initTheme();            if (document.readyState === 'loading') {                document.addEventListener('DOMContentLoaded', function() { window.themeManager.initTheme(); });            }            document.addEventListener('blazor:enhancedload', function() {                window.themeManager.initTheme();            });
+            window.copyTextToClipboard = async function(text) {                if (navigator.clipboard && window.isSecureContext) {                    try {                        await navigator.clipboard.writeText(text);                        return true;                    } catch (e) { }                }                try {                    var textArea = document.createElement("textarea");                    textArea.value = text;                    textArea.style.position = "fixed";                    textArea.style.left = "-999999px";                    textArea.style.top = "-999999px";                    document.body.appendChild(textArea);                    textArea.focus();                    textArea.select();                    var success = document.execCommand('copy');                    document.body.removeChild(textArea);                    return success;                } catch (err) {                    return false;                }            };
+            window.downloadTextFile = function(filename, textContent) {                try {                    var blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });                    var url = URL.createObjectURL(blob);                    var a = document.createElement('a');                    a.href = url;                    a.download = filename;                    document.body.appendChild(a);                    a.click();                    document.body.removeChild(a);                    URL.revokeObjectURL(url);                    return true;                } catch (err) {                    console.error("Download failed:", err);                    return false;                }            };
+            window.downloadBase64File = function(filename, base64Content, contentType) {                try {                    contentType = contentType || 'application/zip';                    var byteCharacters = atob(base64Content);                    var byteArrays = [];                    for (var offset = 0; offset < byteCharacters.length; offset += 512) {                        var slice = byteCharacters.slice(offset, offset + 512);                        var byteNumbers = new Array(slice.length);                        for (var i = 0; i < slice.length; i++) {                            byteNumbers[i] = slice.charCodeAt(i);                        }                        var byteArray = new Uint8Array(byteNumbers);                        byteArrays.push(byteArray);                    }                    var blob = new Blob(byteArrays, { type: contentType });                    var url = URL.createObjectURL(blob);                    var a = document.createElement('a');                    a.href = url;                    a.download = filename;                    document.body.appendChild(a);                    a.click();                    document.body.removeChild(a);                    URL.revokeObjectURL(url);                    return true;                } catch (err) {                    console.error("Binary download failed:", err);                    return false;                }            };    </script></body>
+</html>
