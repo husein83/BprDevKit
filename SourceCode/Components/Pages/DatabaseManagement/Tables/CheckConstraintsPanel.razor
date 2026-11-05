@@ -44,7 +44,7 @@
                     else
                     {
                         <input id="ck-name-input" class="form-control form-control-sm font-monospace" 
-                               maxlength="128" 
+                               maxlength="@(ServerConfig?.Database?.MaxIndexNameLength > 0 ? Math.Min(ServerConfig.Database.MaxIndexNameLength, Constants.MaxIndexNameLength) : Constants.MaxIndexNameLength)" 
                                placeholder="@ComputedConstraintName" 
                                @bind="_customConstraintName" @bind:event="oninput" />
                     }
@@ -175,6 +175,10 @@ else
     {
         get
         {
+            var maxLen = ServerConfig?.Database?.MaxIndexNameLength > 0
+                ? Math.Min(ServerConfig.Database.MaxIndexNameLength, Constants.MaxIndexNameLength)
+                : Constants.MaxIndexNameLength;
+
             var cleanExpr = Regex.Replace(_form.CheckExpression ?? string.Empty, @"[^a-zA-Z0-9_]", "_");
             while (cleanExpr.Contains("__")) cleanExpr = cleanExpr.Replace("__", "_");
             cleanExpr = cleanExpr.Trim('_');
@@ -183,7 +187,8 @@ else
             if (cleanExpr.Length > 25)
                 cleanExpr = cleanExpr[..25].TrimEnd('_');
 
-            return $"CK_{Table.TableName}_{cleanExpr}";
+            var name = $"CK_{Table.SchemaName}_{Table.TableName}_{cleanExpr}";
+            return name.Length > maxLen ? name[..maxLen].TrimEnd('_') : name;
         }
     }
 

@@ -43,7 +43,7 @@
                     else
                     {
                         <input id="fk-name-input" class="form-control form-control-sm font-monospace" 
-                               maxlength="@(ServerConfig?.Database?.MaxForeignKeyNameLength ?? Constants.MaxForeignKeyNameLength)" 
+                               maxlength="@(ServerConfig?.Database?.MaxForeignKeyNameLength > 0 ? Math.Min(ServerConfig.Database.MaxForeignKeyNameLength, Constants.MaxForeignKeyNameLength) : Constants.MaxForeignKeyNameLength)" 
                                placeholder="@ComputedFKName" 
                                @bind="_customFkName" @bind:event="oninput" />
                     }
@@ -287,7 +287,7 @@ else
         _form.RefSchemaName = reference.SchemaName;
         _form.RefTableName = reference.TableName;
         _form.FKName = _autoGenerateName || string.IsNullOrWhiteSpace(_customFkName)
-            ? null
+            ? ComputedFKName
             : _customFkName.Trim();
 
         await Run(() => Manager.CreateForeignKey(_form));
@@ -297,16 +297,21 @@ else
     {
         get
         {
+            var maxLen = ServerConfig?.Database?.MaxForeignKeyNameLength > 0
+                ? Math.Min(ServerConfig.Database.MaxForeignKeyNameLength, Constants.MaxForeignKeyNameLength)
+                : Constants.MaxForeignKeyNameLength;
+
             var reference = Tables.FirstOrDefault(table => table.FullName == _referenceKey);
-            var destSchema = Table.SchemaName;
-            var destTable = Table.TableName;
-            var srcSchema = reference?.SchemaName ?? "SrcSchema";
-            var srcTable = reference?.TableName ?? "SrcTable";
-            var destCols = string.Join("_", _form.Columns.Select(c => c.ColumnName).Where(c => !string.IsNullOrWhiteSpace(c)));
-            var srcCols = string.Join("_", _form.Columns.Select(c => c.RefColumnName).Where(c => !string.IsNullOrWhiteSpace(c)));
-            if (string.IsNullOrWhiteSpace(destCols)) destCols = "Col";
-            if (string.IsNullOrWhiteSpace(srcCols)) srcCols = "RefCol";
-            return $"FK_{destSchema}_{destTable}_{destCols}_2_{srcSchema}_{srcTable}_{srcCols}";
+            var childSchema = Table.SchemaName;
+            var childTable = Table.TableName;
+            var parentSchema = reference?.SchemaName ?? "RefSchema";
+            var parentTable = reference?.TableName ?? "RefTable";
+            var childCols = string.Join("_", _form.Columns.Select(c => c.ColumnName).Where(c => !string.IsNullOrWhiteSpace(c)));
+            var parentCols = string.Join("_", _form.Columns.Select(c => c.RefColumnName).Where(c => !string.IsNullOrWhiteSpace(c)));
+            if (string.IsNullOrWhiteSpace(childCols)) childCols = "Col";
+            if (string.IsNullOrWhiteSpace(parentCols)) parentCols = "RefCol";
+            var name = $"FK_{childSchema}_{childTable}_{childCols}_2_{parentSchema}_{parentTable}_{parentCols}";
+            return name.Length > maxLen ? name[..maxLen].TrimEnd('_') : name;
         }
     }
 

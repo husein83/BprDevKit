@@ -28,7 +28,7 @@
             <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label small fw-semibold" for="column-name">@t[TranslationKeys.ColumnName]</label>
-                    <input id="column-name" class="form-control form-control-sm font-monospace" maxlength="@(ServerConfig?.Database?.MaxColumnNameLength ?? Constants.MaxColumnNameLength)" @bind="_form.ColumnName" @bind:event="oninput" />
+                    <input id="column-name" class="form-control form-control-sm font-monospace" maxlength="@(ServerConfig?.Database?.MaxColumnNameLength > 0 ? Math.Min(ServerConfig.Database.MaxColumnNameLength, Constants.MaxColumnNameLength) : Constants.MaxColumnNameLength)" @bind="_form.ColumnName" @bind:event="oninput" />
                 </div>
                 <div class="col-md-8">
                     @if (CanEditType)

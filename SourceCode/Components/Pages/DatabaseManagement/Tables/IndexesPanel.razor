@@ -43,7 +43,7 @@
                     else
                     {
                         <input id="index-name" class="form-control form-control-sm font-monospace" 
-                               maxlength="@(ServerConfig?.Database?.MaxIndexNameLength ?? Constants.MaxIndexNameLength)" 
+                               maxlength="@(ServerConfig?.Database?.MaxIndexNameLength > 0 ? Math.Min(ServerConfig.Database.MaxIndexNameLength, Constants.MaxIndexNameLength) : Constants.MaxIndexNameLength)" 
                                placeholder="@ComputedIndexName" 
                                @bind="_customIndexName" @bind:event="oninput" />
                     }
@@ -164,7 +164,7 @@
     <div class="card border-secondary mb-3">
         <div class="card-header py-2 fw-semibold">@t.Get(TranslationKeys.IdxPanelRenameTitle, _selected.IndexName)</div>
         <div class="card-body">
-            <input class="form-control form-control-sm font-monospace mb-3" maxlength="@(ServerConfig?.Database?.MaxIndexNameLength ?? Constants.MaxIndexNameLength)" aria-label="@t[TranslationKeys.IdxPanelNewName]" @bind="_newName" @bind:event="oninput" />
+            <input class="form-control form-control-sm font-monospace mb-3" maxlength="@(ServerConfig?.Database?.MaxIndexNameLength > 0 ? Math.Min(ServerConfig.Database.MaxIndexNameLength, Constants.MaxIndexNameLength) : Constants.MaxIndexNameLength)" aria-label="@t[TranslationKeys.IdxPanelNewName]" @bind="_newName" @bind:event="oninput" />
             <div class="d-flex justify-content-end gap-2">
                 <button class="btn btn-sm btn-light" type="button" @onclick="Close">@t[TranslationKeys.Cancel]</button>
                 <button class="btn btn-sm btn-primary" type="button" @onclick="RenameIndex"
@@ -335,7 +335,7 @@ else
         _form.SchemaName = Table.SchemaName;
         _form.TableName = Table.TableName;
         _form.IndexName = _autoGenerateName || string.IsNullOrWhiteSpace(_customIndexName)
-            ? null
+            ? ComputedIndexName
             : _customIndexName.Trim();
         _form.FilterPredicate = string.IsNullOrWhiteSpace(_form.FilterPredicate) ? null : _form.FilterPredicate.Trim();
 
@@ -349,12 +349,21 @@ else
     {
         get
         {
+            var maxLen = ServerConfig?.Database?.MaxIndexNameLength > 0
+                ? Math.Min(ServerConfig.Database.MaxIndexNameLength, Constants.MaxIndexNameLength)
+                : Constants.MaxIndexNameLength;
+
             var cols = string.Join("_", _form.Columns.Select(c => c.ColumnName).Where(c => !string.IsNullOrWhiteSpace(c)));
             if (string.IsNullOrWhiteSpace(cols)) cols = "Columns";
+            string name;
             if (_form.IsPrimaryKey)
-                return $"PK_{Table.SchemaName}_{Table.TableName}_{cols}";
-            var prefix = _form.IsUnique ? "UIX" : "IX";
-            return $"{prefix}_{Table.SchemaName}_{Table.TableName}_{cols}";
+                name = $"PK_{Table.SchemaName}_{Table.TableName}_{cols}";
+            else
+            {
+                var prefix = _form.IsUnique ? "UIX" : "IX";
+                name = $"{prefix}_{Table.SchemaName}_{Table.TableName}_{cols}";
+            }
+            return name.Length > maxLen ? name[..maxLen].TrimEnd('_') : name;
         }
     }
 

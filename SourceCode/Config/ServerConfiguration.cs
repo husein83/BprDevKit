@@ -301,16 +301,53 @@ namespace BprDevKit.Config
     /// </summary>
     public class DatabaseSettings
     {
-        public int MaxDatabaseNameLength { get; set; } = BprDevKit.Utility.Constants.MaxDatabaseNameLength;
-        public int MaxSchemaNameLength { get; set; } = BprDevKit.Utility.Constants.MaxSchemaNameLength;
-        public int MaxTableNameLength { get; set; } = BprDevKit.Utility.Constants.MaxTableNameLength;
-        public int MaxColumnNameLength { get; set; } = BprDevKit.Utility.Constants.MaxColumnNameLength;
-        public int MaxIndexNameLength { get; set; } = BprDevKit.Utility.Constants.MaxIndexNameLength;
-        public int MaxForeignKeyNameLength { get; set; } = BprDevKit.Utility.Constants.MaxForeignKeyNameLength;
-        public int DefaultDataFileSizeMB { get; set; } = BprDevKit.Utility.Constants.DefaultInitialDataSizeMB;
-        public int DefaultLogFileSizeMB { get; set; } = BprDevKit.Utility.Constants.DefaultInitialLogSizeMB;
-        public int DefaultFileGrowthMB { get; set; } = BprDevKit.Utility.Constants.DefaultFileGrowthMB;
-        public int DefaultLogFileGrowthMB { get; set; } = BprDevKit.Utility.Constants.DefaultLogFileGrowthMB;
+        private int _maxDatabaseNameLength = Constants.MaxDatabaseNameLength;
+        private int _maxSchemaNameLength = Constants.MaxSchemaNameLength;
+        private int _maxTableNameLength = Constants.MaxTableNameLength;
+        private int _maxColumnNameLength = Constants.MaxColumnNameLength;
+        private int _maxIndexNameLength = Constants.MaxIndexNameLength;
+        private int _maxForeignKeyNameLength = Constants.MaxForeignKeyNameLength;
+
+        public int MaxDatabaseNameLength
+        {
+            get => _maxDatabaseNameLength;
+            set => _maxDatabaseNameLength = Math.Clamp(value, 1, Constants.MaxDatabaseNameLength);
+        }
+
+        public int MaxSchemaNameLength
+        {
+            get => _maxSchemaNameLength;
+            set => _maxSchemaNameLength = Math.Clamp(value, 1, Constants.MaxSchemaNameLength);
+        }
+
+        public int MaxTableNameLength
+        {
+            get => _maxTableNameLength;
+            set => _maxTableNameLength = Math.Clamp(value, 1, Constants.MaxTableNameLength);
+        }
+
+        public int MaxColumnNameLength
+        {
+            get => _maxColumnNameLength;
+            set => _maxColumnNameLength = Math.Clamp(value, 1, Constants.MaxColumnNameLength);
+        }
+
+        public int MaxIndexNameLength
+        {
+            get => _maxIndexNameLength;
+            set => _maxIndexNameLength = Math.Clamp(value, 1, Constants.MaxIndexNameLength);
+        }
+
+        public int MaxForeignKeyNameLength
+        {
+            get => _maxForeignKeyNameLength;
+            set => _maxForeignKeyNameLength = Math.Clamp(value, 1, Constants.MaxForeignKeyNameLength);
+        }
+
+        public int DefaultDataFileSizeMB { get; set; } = Constants.DefaultInitialDataSizeMB;
+        public int DefaultLogFileSizeMB { get; set; } = Constants.DefaultInitialLogSizeMB;
+        public int DefaultFileGrowthMB { get; set; } = Constants.DefaultFileGrowthMB;
+        public int DefaultLogFileGrowthMB { get; set; } = Constants.DefaultLogFileGrowthMB;
     }
     #endregion
 }

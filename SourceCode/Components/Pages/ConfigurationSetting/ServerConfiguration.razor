@@ -297,24 +297,28 @@
                     <!-- Tab 2: Database Defaults -->
                     <div class="row g-3">
                         <div class="col-md-3">
-                            <label class="form-label">@t[TranslationKeys.ServerMaxSchemaName]</label>
-                            <input type="number" class="form-control" @bind="_currentConfig.Database.MaxSchemaNameLength" />
+                            <label class="form-label">@t[TranslationKeys.ServerMaxDatabaseName] <span class="text-muted small font-monospace">(Max: @Constants.MaxDatabaseNameLength)</span></label>
+                            <input type="number" class="form-control" min="1" max="@Constants.MaxDatabaseNameLength" @bind="_currentConfig.Database.MaxDatabaseNameLength" />
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">@t[TranslationKeys.ServerMaxTableName]</label>
-                            <input type="number" class="form-control" @bind="_currentConfig.Database.MaxTableNameLength" />
+                            <label class="form-label">@t[TranslationKeys.ServerMaxSchemaName] <span class="text-muted small font-monospace">(Max: @Constants.MaxSchemaNameLength)</span></label>
+                            <input type="number" class="form-control" min="1" max="@Constants.MaxSchemaNameLength" @bind="_currentConfig.Database.MaxSchemaNameLength" />
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">@t[TranslationKeys.ServerMaxColumnName]</label>
-                            <input type="number" class="form-control" @bind="_currentConfig.Database.MaxColumnNameLength" />
+                            <label class="form-label">@t[TranslationKeys.ServerMaxTableName] <span class="text-muted small font-monospace">(Max: @Constants.MaxTableNameLength)</span></label>
+                            <input type="number" class="form-control" min="1" max="@Constants.MaxTableNameLength" @bind="_currentConfig.Database.MaxTableNameLength" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">@t[TranslationKeys.ServerMaxColumnName] <span class="text-muted small font-monospace">(Max: @Constants.MaxColumnNameLength)</span></label>
+                            <input type="number" class="form-control" min="1" max="@Constants.MaxColumnNameLength" @bind="_currentConfig.Database.MaxColumnNameLength" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">@t[TranslationKeys.ServerMaxIndexName]</label>
-                            <input type="number" class="form-control" @bind="_currentConfig.Database.MaxIndexNameLength" />
+                            <label class="form-label">@t[TranslationKeys.ServerMaxIndexName] <span class="text-muted small font-monospace">(Max: @Constants.MaxIndexNameLength)</span></label>
+                            <input type="number" class="form-control" min="1" max="@Constants.MaxIndexNameLength" @bind="_currentConfig.Database.MaxIndexNameLength" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">@t[TranslationKeys.ServerMaxForeignKeyName]</label>
-                            <input type="number" class="form-control" @bind="_currentConfig.Database.MaxForeignKeyNameLength" />
+                            <label class="form-label">@t[TranslationKeys.ServerMaxForeignKeyName] <span class="text-muted small font-monospace">(Max: @Constants.MaxForeignKeyNameLength)</span></label>
+                            <input type="number" class="form-control" min="1" max="@Constants.MaxForeignKeyNameLength" @bind="_currentConfig.Database.MaxForeignKeyNameLength" />
                         </div>
 
                         <h6 class="mt-4 text-secondary"><i class="bi bi-file-earmark-binary"></i> @t[TranslationKeys.ServerFileManagementDefaults]</h6>
@@ -575,6 +579,17 @@
             if (string.IsNullOrWhiteSpace(_currentConfig.Server.ServerName))
             {
                 _bprMessage = BprMessage.Warning(TranslationFactory.Current[TranslationKeys.ServerNameRequired]);
+                return;
+            }
+
+            if (_currentConfig.Database.MaxDatabaseNameLength > Constants.MaxDatabaseNameLength ||
+                _currentConfig.Database.MaxSchemaNameLength > Constants.MaxSchemaNameLength ||
+                _currentConfig.Database.MaxTableNameLength > Constants.MaxTableNameLength ||
+                _currentConfig.Database.MaxColumnNameLength > Constants.MaxColumnNameLength ||
+                _currentConfig.Database.MaxIndexNameLength > Constants.MaxIndexNameLength ||
+                _currentConfig.Database.MaxForeignKeyNameLength > Constants.MaxForeignKeyNameLength)
+            {
+                _bprMessage = BprMessage.Warning(TranslationFactory.Current[TranslationKeys.ServerMaxNameLengthExceeded]);
                 return;
             }
 

@@ -341,8 +341,8 @@ ORDER BY dp.name;";
                 var keyList = string.Join(", ", keyColumns.Select(column => QUOTENAME(column.ColumnName)));
                 var pkColNames = string.Join("_", keyColumns.Select(column => column.ColumnName));
                 var pkName = $"PK_{config.SchemaName}_{config.TableName}_{pkColNames}";
-                if (pkName.Length > 128)
-                    throw new InvalidOperationException("[BprDevKit] The generated primary key constraint name is longer than 128 characters; use a shorter schema/table/column name.");
+                if (pkName.Length > Constants.MaxIndexNameLength)
+                    pkName = pkName[..Constants.MaxIndexNameLength].TrimEnd('_');
                 definitions.Add($"CONSTRAINT {QUOTENAME(pkName)} PRIMARY KEY CLUSTERED ({keyList})");
             }
 
@@ -739,6 +739,8 @@ END");
                 if (newDefault is not null)
                 {
                     var dfName = $"DF_{config.SchemaName}_{config.TableName}_{currentColumnName}";
+                    if (dfName.Length > Constants.MaxColumnNameLength)
+                        dfName = dfName[..Constants.MaxColumnNameLength].TrimEnd('_');
                     builder.AppendLine($"ALTER TABLE {table} ADD CONSTRAINT {QUOTENAME(dfName)} DEFAULT ({newDefault}) FOR {QUOTENAME(currentColumnName)};");
                 }
                 else if (!config.ChangesDefault)
@@ -989,10 +991,10 @@ ORDER BY i.name;";
             var onUpdate = NormalizeReferentialAction(config.OnUpdate, "ON UPDATE");
 
             var foreignKeyName = string.IsNullOrWhiteSpace(config.FKName)
-                ? $"FK_{config.RefSchemaName}_{config.RefTableName}_{string.Join("_", mappings.Select(mapping => mapping.RefColumnName))}_2_{config.SchemaName}_{config.TableName}_{string.Join("_", mappings.Select(mapping => mapping.ColumnName))}"
+                ? $"FK_{config.SchemaName}_{config.TableName}_{string.Join("_", mappings.Select(mapping => mapping.ColumnName))}_2_{config.RefSchemaName}_{config.RefTableName}_{string.Join("_", mappings.Select(mapping => mapping.RefColumnName))}"
                 : config.FKName;
-            if (foreignKeyName.Length > 128)
-                throw new InvalidOperationException("[BprDevKit] The generated foreign key name is longer than 128 characters; specify a shorter name.");
+            if (foreignKeyName.Length > Constants.MaxForeignKeyNameLength)
+                foreignKeyName = foreignKeyName[..Constants.MaxForeignKeyNameLength].TrimEnd('_');
 
             var table = $"{QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)}";
             var builder = new StringBuilder();
@@ -1109,11 +1111,11 @@ ORDER BY cc.name;";
                 expr = $"({expr})";
 
             var constraintName = string.IsNullOrWhiteSpace(config.ConstraintName)
-                ? $"CK_{config.TableName}_{Math.Abs(config.CheckExpression.GetHashCode()):X}"
+                ? $"CK_{config.SchemaName}_{config.TableName}_{Math.Abs(config.CheckExpression.GetHashCode()):X}"
                 : config.ConstraintName;
 
-            if (constraintName.Length > 128)
-                throw new InvalidOperationException("[BprDevKit] The check constraint name cannot exceed 128 characters.");
+            if (constraintName.Length > Constants.MaxIndexNameLength)
+                constraintName = constraintName[..Constants.MaxIndexNameLength].TrimEnd('_');
 
             var table = $"{QUOTENAME(config.SchemaName)}.{QUOTENAME(config.TableName)}";
             var builder = new StringBuilder();
@@ -1778,8 +1780,8 @@ ORDER BY s.name, o.name, t.name;";
                 name = $"{prefix}_{config.SchemaName}_{config.TableName}_{string.Join("_", keys.Select(key => key.ColumnName))}";
             }
 
-            if (name.Length > 128)
-                throw new InvalidOperationException("[BprDevKit] The generated index name is longer than 128 characters; specify a shorter name.");
+            if (name.Length > Constants.MaxIndexNameLength)
+                name = name[..Constants.MaxIndexNameLength].TrimEnd('_');
 
             return name;
         }
@@ -1907,6 +1909,8 @@ ELSE
             if (!string.IsNullOrWhiteSpace(column.DefaultValue))
             {
                 var dfName = $"DF_{schemaName}_{tableName}_{column.ColumnName}";
+                if (dfName.Length > Constants.MaxColumnNameLength)
+                    dfName = dfName[..Constants.MaxColumnNameLength].TrimEnd('_');
                 definition.Append($" CONSTRAINT {QUOTENAME(dfName)} DEFAULT ({column.DefaultValue!.Trim()})");
             }
 
@@ -2079,8 +2083,8 @@ EXEC (@sql);");
             if (string.IsNullOrWhiteSpace(name))
                 throw new InvalidOperationException($"[BprDevKit] {label} cannot be empty.");
 
-            if (name.Length > 128)
-                throw new InvalidOperationException($"[BprDevKit] {label} cannot exceed 128 characters.");
+            if (name.Length > Constants.MaxTableNameLength)
+                throw new InvalidOperationException($"[BprDevKit] {label} cannot exceed {Constants.MaxTableNameLength} characters.");
 
             if (!string.Equals(name, name.Trim(), StringComparison.Ordinal))
                 throw new InvalidOperationException($"[BprDevKit] {label} cannot start or end with whitespace.");
@@ -2133,8 +2137,8 @@ EXEC (@sql);");
             ValidateSizes(config.InitialSizeMB, config.MaxSizeMB, config.FileGrowthMB, config.LogInitialSizeMB, config.LogMaxSizeMB, config.LogFileGrowthMB);
             ValidateDatabaseOptions(config.RecoveryModel, config.PageVerify, config.CompatibilityLevel, config.Collation);
 
-            if (!string.IsNullOrWhiteSpace(config.FileGroup) && config.FileGroup.Length > 128)
-                throw new InvalidOperationException("[BprDevKit] FileGroup cannot exceed 128 characters.");
+            if (!string.IsNullOrWhiteSpace(config.FileGroup) && config.FileGroup.Length > Constants.MaxTableNameLength)
+                throw new InvalidOperationException($"[BprDevKit] FileGroup cannot exceed {Constants.MaxTableNameLength} characters.");
         }
 
         private static void ValidateAlterConfiguration(DatabaseOperation.Alter config)
@@ -2148,8 +2152,8 @@ EXEC (@sql);");
             if (string.IsNullOrWhiteSpace(databaseName))
                 throw new InvalidOperationException("[BprDevKit] Database name cannot be empty.");
 
-            if (databaseName.Length > 128)
-                throw new InvalidOperationException("[BprDevKit] Database name cannot exceed 128 characters.");
+            if (databaseName.Length > Constants.MaxDatabaseNameLength)
+                throw new InvalidOperationException($"[BprDevKit] Database name cannot exceed {Constants.MaxDatabaseNameLength} characters.");
         }
 
         private static void ValidateSizes(int initialSize, int? maxSize, int fileGrowth, int logInitialSize, int? logMaxSize, int logFileGrowth)

@@ -124,11 +124,13 @@ namespace BprDevKit.Localization
         public const string ServerDatabaseDefaultsTab = "Server.DatabaseDefaultsTab";
         public const string ServerEditTitle = "Server.EditTitle";
         public const string ServerNewTitle = "Server.NewTitle";
+        public const string ServerMaxDatabaseName = "Server.MaxDatabaseName";
         public const string ServerMaxSchemaName = "Server.MaxSchemaName";
         public const string ServerMaxTableName = "Server.MaxTableName";
         public const string ServerMaxColumnName = "Server.MaxColumnName";
         public const string ServerMaxIndexName = "Server.MaxIndexName";
         public const string ServerMaxForeignKeyName = "Server.MaxForeignKeyName";
+        public const string ServerMaxNameLengthExceeded = "Server.MaxNameLengthExceeded";
         public const string ServerFileManagementDefaults = "Server.FileManagementDefaults";
         public const string ServerDataFileSize = "Server.DataFileSize";
         public const string ServerLogFileSize = "Server.LogFileSize";
