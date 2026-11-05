@@ -61,7 +61,7 @@
 
                     <div class="mb-4">
                         <label class="form-label fw-semibold" for="backup-file-input">@t[TranslationKeys.ConfigBackupSelectFile]</label>
-                        <InputFile id="backup-file-input" class="form-control" OnChange="HandleFileSelected" accept=".json" />
+                        <InputFile id="backup-file-input" class="form-control" OnChange="HandleFileSelected" accept=".enc.json" />
                     </div>
 
                     @if (_isReadingFile)
@@ -173,10 +173,10 @@
     {
         try
         {
-            var json = ConfigurationBackupService.ExportToJson();
-            var filename = $"BprDevKit_ConfigBackup_{DevFunctions.GetReadableTimestamp()}.json";
-            await JSRuntime.InvokeVoidAsync("window.downloadTextFile", filename, json);
-            _bprMessage = BprMessage.Success($"Backup exported successfully: {filename}");
+            var encryptedContent = ConfigurationBackupService.ExportToEncrypted();
+            var filename = $"BprDevKit_ConfigBackup_{DevFunctions.GetReadableTimestamp()}.enc.json";
+            await JSRuntime.InvokeVoidAsync("window.downloadTextFile", filename, encryptedContent);
+            _bprMessage = BprMessage.Success($"Backup exported successfully (Encrypted): {filename}");
         }
         catch (Exception ex)
         {
@@ -191,6 +191,12 @@
         var file = e.File;
         if (file == null) return;
 
+        if (!file.Name.EndsWith(".enc.json", StringComparison.OrdinalIgnoreCase))
+        {
+            _bprMessage = BprMessage.Error(TranslationFactory.Current[TranslationKeys.ConfigBackupOnlyEncJsonAllowed]);
+            return;
+        }
+
         _isReadingFile = true;
         try
         {
@@ -198,7 +204,7 @@
             using var reader = new StreamReader(stream);
             var content = await reader.ReadToEndAsync();
 
-            var result = ConfigurationBackupService.ImportFromJson(content);
+            var result = ConfigurationBackupService.ImportPackage(content);
             if (result.Success && result.Package != null)
             {
                 _importedPackage = result.Package;

@@ -48,18 +48,38 @@ namespace BprDevKit.Config
             };
         }
 
-        public static string ExportToJson(ConfigurationBackupPackage? package = null)
+        public static string ExportToEncrypted(ConfigurationBackupPackage? package = null)
         {
             package ??= CreateBackupPackage();
-            return JsonSerializer.Serialize(package, JsonOptions);
+            var json = JsonSerializer.Serialize(package, JsonOptions);
+            return json.EncryptContent();
         }
 
-        public static (bool Success, string Message, ConfigurationBackupPackage? Package) ImportFromJson(string json)
+        public static (bool Success, string Message, ConfigurationBackupPackage? Package) ImportPackage(string content)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(json))
+                if (string.IsNullOrWhiteSpace(content))
                     return (false, "Backup content is empty", null);
+
+                var trimmed = content.Trim();
+
+                // Reject raw unencrypted JSON files
+                if (trimmed.StartsWith("{") || trimmed.StartsWith("["))
+                {
+                    return (false, "Unencrypted JSON files are not supported. Only encrypted (.enc.json) backup files are allowed.", null);
+                }
+
+                // Decrypt AES cipher text
+                string json;
+                try
+                {
+                    json = trimmed.DecryptContent();
+                }
+                catch (Exception ex)
+                {
+                    return (false, $"Error decrypting backup file: {ex.Message}", null);
+                }
 
                 var package = JsonSerializer.Deserialize<ConfigurationBackupPackage>(json, JsonOptions);
                 if (package == null)

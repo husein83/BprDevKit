@@ -272,6 +272,13 @@ namespace BprDevKit.DataModelGenerator.Generators
                 }
 
                 var csharpType = SqlTypeMapper.MapToCSharp(col.DataType, col.IsNullable, options.NullableReferenceTypes);
+
+                // Force nullable type for Primary Key columns if the option is enabled
+                if (options.NullablePrimaryKeys && col.IsPrimaryKey && !csharpType.EndsWith("?"))
+                {
+                    csharpType += "?";
+                }
+
                 var isFk = fkColumnNames.Contains(col.ColumnName);
 
                 // Find any matching transform rule
@@ -573,7 +580,8 @@ namespace BprDevKit.DataModelGenerator.Generators
                     var accessor = options.PropertyAccessor == "get_init" ? "{ get; init; }" : "{ get; set; }";
 
                     var defaultValue = "";
-                    if (!col.IsNullable && options.NullableReferenceTypes)
+                    bool isEffectivelyNullable = col.IsNullable || (options.NullablePrimaryKeys && col.IsPrimaryKey);
+                    if (!isEffectivelyNullable && options.NullableReferenceTypes)
                     {
                         if (options.StringInitialization == "NullForgiving")
                         {
@@ -728,7 +736,13 @@ namespace BprDevKit.DataModelGenerator.Generators
                             : "";
 
                         var navTypeName = $"{targetNamespacePrefix}{refClassName}";
-                        var targetInversePropName = $"{className}Set{localPropName}";
+
+                        // Build the inverse collection property name exactly as it will appear on the referenced (parent) side
+                        var targetInversePropName = options.NavigationStyle == "Enterprise"
+                            ? (options.IncludeSchemaInRelationName && !string.IsNullOrWhiteSpace(table.SchemaName)
+                                ? $"{table.SchemaName}_{className}Set{localPropName}"
+                                : $"{className}Set{localPropName}")
+                            : (className == refClassName ? "Child" + className + "s" : className + "s");
 
                         // Only output InverseProperty if the target schema also has permission to access this schema
                         bool canTargetAccessCurrent = globalOptions.IsSchemaAccessAllowed(refSchema, table.SchemaName);
@@ -762,13 +776,9 @@ namespace BprDevKit.DataModelGenerator.Generators
 
                         if (canTargetAccessCurrent)
                         {
-                            if (options.NavigationStyle == "Enterprise")
+                            if (options.NavigationStyle == "Enterprise" || options.IncludeEfCoreTableAttributes)
                             {
                                 sb.AppendLine($"{indent}    [InverseProperty(nameof({navTypeName}.{targetInversePropName}))]");
-                            }
-                            else if (options.IncludeEfCoreTableAttributes)
-                            {
-                                sb.AppendLine($"{indent}    [InverseProperty(nameof({navTypeName}.{className}))]");
                             }
                         }
 
@@ -856,7 +866,11 @@ namespace BprDevKit.DataModelGenerator.Generators
                             : "";
 
                         var childFullTypeName = $"{targetNamespacePrefix}{childClassName}";
-                        var childInversePropName = $"{className}Ref{childFkPropName}";
+
+                        // Build the reference property name exactly as it will appear on the child side
+                        var childRefPropName = options.NavigationStyle == "Enterprise"
+                            ? $"{className}Ref{childFkPropName}"
+                            : (className == childClassName ? "Parent" + className : className);
 
                         // Only output InverseProperty if child schema has permission to access current schema
                         bool canChildAccessCurrent = globalOptions.IsSchemaAccessAllowed(child.ChildTable.SchemaName, table.SchemaName);
@@ -877,7 +891,7 @@ namespace BprDevKit.DataModelGenerator.Generators
                         {
                             var customInv = options.CustomNavInversePropertyAttribute
                                 .Replace("{InverseType}", childFullTypeName, StringComparison.OrdinalIgnoreCase)
-                                .Replace("{InverseProperty}", childInversePropName, StringComparison.OrdinalIgnoreCase)
+                                .Replace("{InverseProperty}", childRefPropName, StringComparison.OrdinalIgnoreCase)
                                 .Replace("{ChildClass}", childClassName, StringComparison.OrdinalIgnoreCase)
                                 .Replace("{ChildFk}", childFkPropName, StringComparison.OrdinalIgnoreCase)
                                 .Replace("{OtherKey}", childFkPropName, StringComparison.OrdinalIgnoreCase);
@@ -887,13 +901,9 @@ namespace BprDevKit.DataModelGenerator.Generators
                         }
                         else if (canChildAccessCurrent)
                         {
-                            if (options.NavigationStyle == "Enterprise")
+                            if (options.NavigationStyle == "Enterprise" || (options.IncludeEfCoreTableAttributes && !string.IsNullOrWhiteSpace(child.Fk.ColumnName)))
                             {
-                                sb.AppendLine($"{indent}    [InverseProperty(nameof({childFullTypeName}.{childInversePropName}))]");
-                            }
-                            else if (options.IncludeEfCoreTableAttributes && !string.IsNullOrWhiteSpace(child.Fk.ColumnName))
-                            {
-                                sb.AppendLine($"{indent}    [InverseProperty(nameof({childFullTypeName}.{className}))]");
+                                sb.AppendLine($"{indent}    [InverseProperty(nameof({childFullTypeName}.{childRefPropName}))]");
                             }
                         }
 
@@ -1557,7 +1567,7 @@ namespace BprDevKit.DataModelGenerator.Generators
                 {
                     propCalls.Append($".HasColumnType(\"{col.DataType}\")");
                 }
-                if (!col.IsNullable)
+                if (!col.IsNullable && !(options.NullablePrimaryKeys && col.IsPrimaryKey))
                 {
                     propCalls.Append(".IsRequired()");
                 }
@@ -1583,9 +1593,21 @@ namespace BprDevKit.DataModelGenerator.Generators
                     var localProp = DataModelNamingHelper.FormatPropertyName(fk.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                     var refClass = DataModelNamingHelper.FormatClassName(fk.RefTableName, globalOptions.RemoveTablePrefixes, globalOptions.TablePrefixes, globalOptions.SingularizeClassNames, globalOptions.PropertyNaming, Constants.ObjectTypes.Table);
 
+                    // Build reference property name matching the model generator logic
+                    var refNavPropName = options.NavigationStyle == "Enterprise"
+                        ? $"{refClass}Ref{localProp}"
+                        : (refClass == className ? "Parent" + refClass : refClass);
+
+                    // Build inverse collection property name matching the model generator logic
+                    var inverseCollectionName = options.NavigationStyle == "Enterprise"
+                        ? (options.IncludeSchemaInRelationName && !string.IsNullOrWhiteSpace(table.SchemaName)
+                            ? $"{table.SchemaName}_{className}Set{localProp}"
+                            : $"{className}Set{localProp}")
+                        : (className == refClass ? "Child" + className + "s" : className + "s");
+
                     var fkName = string.IsNullOrWhiteSpace(fk.FKName) ? "" : $".HasConstraintName(\"{fk.FKName}\")";
-                    sb.AppendLine($"            builder.HasOne(d => d.{refClass})");
-                    sb.AppendLine($"                .WithMany(p => p.{className}Set{localProp})");
+                    sb.AppendLine($"            builder.HasOne(d => d.{refNavPropName})");
+                    sb.AppendLine($"                .WithMany(p => p.{inverseCollectionName})");
                     sb.AppendLine($"                .HasForeignKey(d => d.{localProp}){fkName};");
                 }
             }
@@ -1611,6 +1633,7 @@ namespace BprDevKit.DataModelGenerator.Generators
         private static bool ShouldIncludeRequired(ColumnOperation.Information col, string csharpType, CSharpOptions options)
         {
             if (col.IsNullable) return false;
+            if (options.NullablePrimaryKeys && col.IsPrimaryKey) return false;
             if (string.Equals(col.DataType, "rowversion", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(col.DataType, "timestamp", StringComparison.OrdinalIgnoreCase))
                 return false;

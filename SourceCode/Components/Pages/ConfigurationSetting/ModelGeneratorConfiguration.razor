@@ -991,6 +991,10 @@
                                             <label class="form-check-label small" for="cs-p-key">@t[TranslationKeys.DataModelCsKeyAttribute]</label>
                                         </div>
                                         <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="cs-p-null-pk" @bind="_editingProfile.Options.CSharp.NullablePrimaryKeys" />
+                                            <label class="form-check-label small" for="cs-p-null-pk">@t[TranslationKeys.DataModelCsNullablePrimaryKeys]</label>
+                                        </div>
+                                        <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" id="cs-p-dbgen" @bind="_editingProfile.Options.CSharp.IncludeDatabaseGeneratedAttribute" />
                                             <label class="form-check-label small" for="cs-p-dbgen">@t[TranslationKeys.DataModelCsDatabaseGeneratedAttribute]</label>
                                         </div>

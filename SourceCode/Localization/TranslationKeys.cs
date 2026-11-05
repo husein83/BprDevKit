@@ -690,6 +690,7 @@ namespace BprDevKit.Localization
         public const string DataModelCsAnnotationsManagement = "DataModel.CsAnnotationsManagement";
         public const string DataModelCsAnnotationsManagementDesc = "DataModel.CsAnnotationsManagementDesc";
         public const string DataModelCsKeyAttribute = "DataModel.CsKeyAttribute";
+        public const string DataModelCsNullablePrimaryKeys = "DataModel.CsNullablePrimaryKeys";
         public const string DataModelCsDatabaseGeneratedAttribute = "DataModel.CsDatabaseGeneratedAttribute";
         public const string DataModelCsRequiredAttribute = "DataModel.CsRequiredAttribute";
         public const string DataModelCsRequiredScope = "DataModel.CsRequiredScope";
@@ -844,6 +845,7 @@ namespace BprDevKit.Localization
         public const string ConfigBackupReplaceOption = "Config.BackupReplaceOption";
         public const string ConfigBackupApplyBtn = "Config.BackupApplyBtn";
         public const string ConfigBackupInvalidFile = "Config.BackupInvalidFile";
+        public const string ConfigBackupOnlyEncJsonAllowed = "Config.BackupOnlyEncJsonAllowed";
         public const string ConfigBackupSuccess = "Config.BackupSuccess";
 
         // Data Model ZIP Packaging

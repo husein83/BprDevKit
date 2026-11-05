@@ -183,6 +183,7 @@ namespace BprDevKit.DataModelGenerator.Models
 
         // Fine-grained Data Annotations Control
         public bool IncludeKeyAttribute { get; set; } = true;
+        public bool NullablePrimaryKeys { get; set; } = false;
         public bool IncludeRequiredAttribute { get; set; } = true;
         public string RequiredAttributeScope { get; set; } = "AllNonNullable"; // AllNonNullable, StringsAndByteArrays, NonIdentity
         public bool RequiredIncludePrimaryKeys { get; set; } = false;
