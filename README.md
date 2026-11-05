@@ -145,6 +145,7 @@ BprDevKit از طیف گسترده‌ای از محبوب‌ترین پایگا�
 - **Partial Class:** تولید کلاس به صورت `public partial class`.
 - **Organize Class with #region Blocks:** تفکیک منظم پراپرتی‌ها، کلیدها، فیلدهای پشتیبان و رفرنس‌ها در بلوک‌های `#region`. ریجن‌های References و Relations حتی برای کلاس‌های فاقد کلید خارجی جهت یکدستی سورس‌کد همیشه ایجاد می‌شوند.
 - **Class Constants Definition:** تعریف ثابت‌های اختصاصی برای هر کلاس با توکن‌های `{TableName}`، `{SchemaName}`، `{ClassName}` و `{Database}`.
+- **Nullable Primary Key Properties:** قابلیت تعریف فیلدهای کلید اصلی (PK) به صورت نال‌پذیر (`int?`، `Guid?` و ...) جهت استفاده در DTOها، سناریوهای CQRS و مدل‌های ثبت داده قبل از تخصیص شناسه دیتابیس.
 
 ##### ۲. تولید خودکار DbContext و Fluent API Configurations:
 - **Generate DbContext:** تولید خودکار کلاس متنی `DbContext` شامل تمام `DbSet<T>`های جداول و ویوها، متدهای کانفیگ و تنظیمات پیشرفته.
@@ -230,7 +231,7 @@ BprDevKit از طیف گسترده‌ای از محبوب‌ترین پایگا�
 
 <a name="fa-config-backup"></a>
 #### ۴.۹. پشتیبان‌گیری و بازگردانی تنظیمات (Config Backup & Restore)
-- خروجی گرفتن از تمام سرورهای متصل، پروفایل‌های مدل‌ساز و تنظیمات در قالب یک فایل رمزنگاری‌شده `.json`.
+- خروجی گرفتن و بارگذاری تنظیمات تمام سرورها، پروفایل‌های مدل‌ساز و پیکربندی‌های برنامه منحصراً در قالب فایل‌های امن و رمزنگاری‌شده `.enc.json` با کلید محافظت‌شده و بدون افشای متن خام JSON جهت بالاترین سطح امنیت اطلاعات حساس.
 - امکان بازگردانی سریع در کامپیوتر یا محیط‌های دیگر با پیش‌نمایش تعداد سرورها و پروفایل‌ها پیش از اعمال نهایی.
 
 ---
@@ -289,7 +290,7 @@ dotnet run --project SourceCode/BprDevKit.csproj
 
 #### ساخت نسخه پرتابل مستقل (Self-Contained Single-File برای ویندوز بدون نیاز به نصب بودن .NET روی سیستم مقصد):
 ```bash
-dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.2.0-Standalone
+dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.3.0-Standalone
 ```
 فایل خروجی `BprDevKit.exe` یک نسخه کاملاً مستقل و خودکفا است که بدون نیاز به پیش‌نیاز ران‌تایم، بر روی هر سیستم ویندوز ۶۴ بیتی با دو بار کلیک اجرا می‌شود.
 
@@ -422,6 +423,7 @@ Comprehensive options accessible via profile management:
 - **Partial Class:** Adds `partial` modifier to class signatures.
 - **#region Blocks:** Segregates fields, properties, foreign keys, and constructors cleanly. Empty navigation regions are safely preserved.
 - **Class Constants Definition:** Define compile-time constants per entity with token helpers (`{TableName}`, `{SchemaName}`, `{ClassName}`, `{Database}`).
+- **Nullable Primary Key Properties:** Option to generate primary key fields as nullable types (`int?`, `Guid?`, etc.) for DTOs, CQRS commands, and insertion payloads prior to key assignment.
 
 ##### 2. DbContext & Fluent API Generator:
 - **Generate DbContext:** Automatically creates an EF Core `DbContext` class containing all `DbSet<T>` properties for selected tables and views.
@@ -506,7 +508,7 @@ Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven De
 
 <a name="en-config-backup"></a>
 #### 4.9. Configuration Backup & Restore
-- Export all server connection details, generator profiles, and app settings into an encrypted `.json` configuration file.
+- Export and import all server connections, generator profiles, and app preferences exclusively via secured `.enc.json` files protected with AES-256 encryption, preventing any raw plaintext credential exposure.
 - Restore onto other developer workstations or environments with a pre-import summary verification.
 
 ---
@@ -565,7 +567,7 @@ Open your browser and navigate to `http://localhost:5000` or `https://localhost:
 
 #### Build Self-Contained Standalone Executable (Windows x64 - Zero .NET installation required on target machine):
 ```bash
-dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.2.0-Standalone
+dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.3.0-Standalone
 ```
 The output `BprDevKit.exe` is completely self-contained and ready to execute on any 64-bit Windows machine by double-clicking.
 
