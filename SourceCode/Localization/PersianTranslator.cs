@@ -298,7 +298,9 @@ namespace BprDevKit.Localization
             [TranslationKeys.ColPanelExtras] = "ویژگی‌ها",
             [TranslationKeys.ColPanelDefaultFormula] = "پیش‌فرض / فرمول",
             [TranslationKeys.ColPanelComputed] = "محاسباتی",
-            [TranslationKeys.ColPanelPersisted] = "ذخیره‌شده",
+            [TranslationKeys.ColPanelPersisted] = "ذخیره‌شده (Persisted)",
+            [TranslationKeys.ColPanelFormula] = "فرمول محاسباتی",
+            [TranslationKeys.ColPanelFormulaPlaceholder] = "مثال: [Price] * [Quantity]",
 
             [TranslationKeys.IdxPanelIndexes] = "شاخص‌ها (Indexes)",
             [TranslationKeys.IdxPanelCreateIndex] = "ایجاد ایندکس جدید",

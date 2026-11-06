@@ -299,6 +299,8 @@ namespace BprDevKit.Localization
             [TranslationKeys.ColPanelDefaultFormula] = "Default / formula",
             [TranslationKeys.ColPanelComputed] = "Computed",
             [TranslationKeys.ColPanelPersisted] = "Persisted",
+            [TranslationKeys.ColPanelFormula] = "Computed Formula",
+            [TranslationKeys.ColPanelFormulaPlaceholder] = "e.g. [Price] * [Quantity]",
 
             [TranslationKeys.IdxPanelIndexes] = "Indexes",
             [TranslationKeys.IdxPanelCreateIndex] = "Create index",

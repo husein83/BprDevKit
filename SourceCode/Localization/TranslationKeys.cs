@@ -290,6 +290,8 @@ namespace BprDevKit.Localization
         public const string ColPanelDefaultFormula = "ColPanel.DefaultFormula";
         public const string ColPanelComputed = "ColPanel.Computed";
         public const string ColPanelPersisted = "ColPanel.Persisted";
+        public const string ColPanelFormula = "ColPanel.Formula";
+        public const string ColPanelFormulaPlaceholder = "ColPanel.FormulaPlaceholder";
 
         public const string IdxPanelIndexes = "IdxPanel.Indexes";
         public const string IdxPanelCreateIndex = "IdxPanel.CreateIndex";

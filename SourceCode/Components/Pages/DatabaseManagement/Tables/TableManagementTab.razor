@@ -127,7 +127,8 @@
                                 <th class="text-center">@t[TranslationKeys.AllowNull]</th>
                                 <th class="text-center">@t[TranslationKeys.PrimaryKey]</th>
                                 <th class="text-center">@t[TranslationKeys.IsIdentity]</th>
-                                <th style="min-width: 11rem;">@t[TranslationKeys.DefaultValue]</th>
+                                <th class="text-center">@t[TranslationKeys.ColPanelComputed]</th>
+                                <th style="min-width: 13rem;">@t[TranslationKeys.ColPanelDefaultFormula]</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -138,15 +139,26 @@
                                 <tr>
                                     <td><input class="form-control form-control-sm font-monospace" maxlength="@(ServerConfig?.Database?.MaxColumnNameLength ?? Constants.MaxColumnNameLength)" @bind="column.ColumnName" @bind:event="oninput" /></td>
                                     <td>
-                                        <select class="form-select form-select-sm" value="@column.DataType" @onchange="e => column.ApplyDataType(e.Value?.ToString())">
-                                            @foreach (var option in ColumnDataType.All)
-                                            {
-                                                <option value="@option.Name">@option.Name</option>
-                                            }
-                                        </select>
+                                        @if (column.IsComputed)
+                                        {
+                                            <span class="badge text-bg-secondary">@t[TranslationKeys.ColPanelComputed]</span>
+                                        }
+                                        else
+                                        {
+                                            <select class="form-select form-select-sm" value="@column.DataType" @onchange="e => column.ApplyDataType(e.Value?.ToString())">
+                                                @foreach (var option in ColumnDataType.All)
+                                                {
+                                                    <option value="@option.Name">@option.Name</option>
+                                                }
+                                            </select>
+                                        }
                                     </td>
                                     <td>
-                                        @if (type?.Kind == ColumnDataTypeKind.Length)
+                                        @if (column.IsComputed)
+                                        {
+                                            <span class="text-muted small">—</span>
+                                        }
+                                        else if (type?.Kind == ColumnDataTypeKind.Length)
                                         {
                                             <div class="input-group input-group-sm flex-nowrap">
                                                 <input type="number" class="form-control font-monospace" min="1" max="@(type!.MaxLength)" disabled="@(column.Length == -1)"
@@ -182,19 +194,40 @@
                                     </td>
                                     <td class="text-center">
                                         <input class="form-check-input" type="checkbox" checked="@(column.IsNullable && !column.IsPrimaryKey && !column.IsIdentity)"
-                                               disabled="@(column.IsPrimaryKey || column.IsIdentity)" @onchange="e => column.IsNullable = (bool)e.Value!" />
+                                               disabled="@(column.IsPrimaryKey || column.IsIdentity || (column.IsComputed && !column.IsPersisted))" @onchange="e => column.IsNullable = (bool)e.Value!" />
                                     </td>
                                     <td class="text-center">
-                                        <input class="form-check-input" type="checkbox" checked="@column.IsPrimaryKey" @onchange="e => column.SetPrimaryKey((bool)e.Value!)" />
+                                        <input class="form-check-input" type="checkbox" checked="@column.IsPrimaryKey"
+                                               disabled="@column.IsComputed"
+                                               @onchange="e => column.SetPrimaryKey((bool)e.Value!)" />
                                     </td>
                                     <td class="text-center">
                                         <input class="form-check-input" type="checkbox" checked="@column.IsIdentity"
-                                               disabled="@(type?.SupportsIdentity != true || (!column.IsIdentity && HasIdentityColumn))"
+                                               disabled="@(column.IsComputed || type?.SupportsIdentity != true || (!column.IsIdentity && HasIdentityColumn))"
                                                @onchange="e => column.SetIdentity((bool)e.Value!)" />
                                     </td>
+                                    <td class="text-center">
+                                        <input class="form-check-input" type="checkbox" checked="@column.IsComputed"
+                                               disabled="@(column.IsPrimaryKey || column.IsIdentity)"
+                                               @onchange="e => column.SetComputed((bool)e.Value!)" />
+                                    </td>
                                     <td>
-                                        <input class="form-control form-control-sm font-monospace" placeholder="0, 'N/A', SYSUTCDATETIME()" disabled="@column.IsIdentity"
-                                               @bind="column.DefaultValue" />
+                                        @if (column.IsComputed)
+                                        {
+                                            <div class="input-group input-group-sm">
+                                                <input class="form-control form-control-sm font-monospace" placeholder="@t[TranslationKeys.ColPanelFormulaPlaceholder]"
+                                                       @bind="column.ComputedFormula" />
+                                                <span class="input-group-text d-inline-flex align-items-center gap-1">
+                                                    <input class="form-check-input m-0" type="checkbox" id="@($"persisted-{column.GetHashCode()}")" checked="@column.IsPersisted" @onchange="e => column.IsPersisted = (bool)e.Value!" />
+                                                    <label class="form-check-label small mb-0 user-select-none" for="@($"persisted-{column.GetHashCode()}")">@t[TranslationKeys.ColPanelPersisted]</label>
+                                                </span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <input class="form-control form-control-sm font-monospace" placeholder="0, 'N/A', SYSUTCDATETIME()" disabled="@column.IsIdentity"
+                                                   @bind="column.DefaultValue" />
+                                        }
                                     </td>
                                     <td class="text-end">
                                         <button class="btn btn-sm btn-outline-danger" type="button" title="@t[TranslationKeys.Delete]" disabled="@(_createConfiguration.Columns.Count == 1)"

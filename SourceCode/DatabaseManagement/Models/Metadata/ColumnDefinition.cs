@@ -23,6 +23,10 @@ namespace BprDevKit.DatabaseManagement.Models.Metadata
         public int IdentityIncrement { get; set; } = 1;
         public bool IsPrimaryKey { get; set; }
 
+        public bool IsComputed { get; set; }
+        public string? ComputedFormula { get; set; }
+        public bool IsPersisted { get; set; }
+
         /// <summary>T-SQL expression, e.g. <c>0</c>, <c>'N/A'</c> or <c>SYSUTCDATETIME()</c>.</summary>
         public string? DefaultValue { get; set; }
 
@@ -54,7 +58,12 @@ namespace BprDevKit.DatabaseManagement.Models.Metadata
         {
             IsPrimaryKey = isPrimaryKey;
             if (isPrimaryKey)
+            {
                 IsNullable = false;
+                IsComputed = false;
+                ComputedFormula = null;
+                IsPersisted = false;
+            }
         }
 
         public void SetIdentity(bool isIdentity)
@@ -64,6 +73,25 @@ namespace BprDevKit.DatabaseManagement.Models.Metadata
             {
                 IsNullable = false;
                 DefaultValue = null;
+                IsComputed = false;
+                ComputedFormula = null;
+                IsPersisted = false;
+            }
+        }
+
+        public void SetComputed(bool isComputed)
+        {
+            IsComputed = isComputed;
+            if (isComputed)
+            {
+                IsIdentity = false;
+                IsPrimaryKey = false;
+                DefaultValue = null;
+            }
+            else
+            {
+                ComputedFormula = null;
+                IsPersisted = false;
             }
         }
     }

@@ -7,7 +7,7 @@ namespace BprDevKit.Utility
     {
         #region Application
         /// <summary>Default version for the database kit</summary>
-        public const string Version = "1.3.0";
+        public const string Version = "1.4.0";
 
         /// <summary>Copyright notice</summary>
         public const string Copyright = "© 2026 BprDevKit";

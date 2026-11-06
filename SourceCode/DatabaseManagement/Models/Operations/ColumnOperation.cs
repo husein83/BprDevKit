@@ -74,6 +74,7 @@ namespace BprDevKit.DatabaseManagement.Models.Operations
             public string? Collation { get; set; }
             public string? ComputedFormula { get; set; }
             public bool IsPersisted { get; set; }
+            public bool IsComputed => !string.IsNullOrWhiteSpace(ComputedFormula);
             public string? Description { get; set; }
         }
     }

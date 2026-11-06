@@ -209,6 +209,13 @@ ORDER BY con.constraint_name, c.position;";
             var schema = (config.SchemaName ?? "").ToUpperInvariant();
             var table = config.TableName.ToUpperInvariant();
             var col = config.Column.ColumnName.ToUpperInvariant();
+            if (config.Column.IsComputed || !string.IsNullOrWhiteSpace(config.Column.ComputedFormula))
+            {
+                var formula = (config.Column.ComputedFormula ?? "").Trim();
+                if (!formula.StartsWith('(') || !formula.EndsWith(')'))
+                    formula = $"({formula})";
+                return $"ALTER TABLE \"{schema}\".\"{table}\" ADD \"{col}\" AS {formula};";
+            }
             var nullability = config.Column.IsNullable ? "" : " NOT NULL";
             return $"ALTER TABLE \"{schema}\".\"{table}\" ADD \"{col}\" {MapToOracleType(config.Column)}{nullability};";
         }

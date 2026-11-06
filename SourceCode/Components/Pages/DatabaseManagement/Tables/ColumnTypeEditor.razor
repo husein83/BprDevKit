@@ -11,7 +11,7 @@
 <div class="row g-2">
     <div class="col-sm-6">
         <label class="form-label small fw-semibold">@t[TranslationKeys.DataType]</label>
-        <select class="form-select form-select-sm" value="@Column.DataType" @onchange="e => Column.ApplyDataType(e.Value?.ToString())">
+        <select class="form-select form-select-sm" value="@Column.DataType" @onchange="OnDataTypeChanged">
             @foreach (var option in ColumnDataType.All)
             {
                 <option value="@option.Name">@option.Name</option>
@@ -25,11 +25,11 @@
             <div class="input-group input-group-sm flex-nowrap">
                 <input type="number" class="form-control font-monospace" min="1" max="@(type.MaxLength)" disabled="@(Column.Length == -1)"
                        value="@(Column.Length is > 0 ? Column.Length.Value.ToString(CultureInfo.InvariantCulture) : string.Empty)"
-                       @onchange="e => Column.Length = ParseInt(e.Value)" />
+                       @onchange="OnLengthChanged" />
                 @if (type.SupportsMax)
                 {
                     <span class="input-group-text d-inline-flex align-items-center gap-1">
-                        <input class="form-check-input m-0" type="checkbox" id="col-editor-max" checked="@(Column.Length == -1)" @onchange="e => Column.Length = (bool)e.Value! ? -1 : Math.Min(50, type.MaxLength)" />
+                        <input class="form-check-input m-0" type="checkbox" id="col-editor-max" checked="@(Column.Length == -1)" @onchange="e => OnMaxChanged(type, (bool)e.Value!)" />
                         <label class="form-check-label small mb-0 user-select-none" for="col-editor-max">MAX</label>
                     </span>
                 }
@@ -39,22 +39,22 @@
         {
             <div class="input-group input-group-sm">
                 <input type="number" class="form-control" min="1" max="38" title="@t[TranslationKeys.Precision]" placeholder="p"
-                       value="@(Column.Precision?.ToString(CultureInfo.InvariantCulture))" @onchange="e => Column.Precision = ParseInt(e.Value)" />
+                       value="@(Column.Precision?.ToString(CultureInfo.InvariantCulture))" @onchange="OnPrecisionChanged" />
                 <input type="number" class="form-control" min="0" max="38" title="@t[TranslationKeys.Scale]" placeholder="s"
-                       value="@(Column.Scale?.ToString(CultureInfo.InvariantCulture))" @onchange="e => Column.Scale = ParseInt(e.Value)" />
+                       value="@(Column.Scale?.ToString(CultureInfo.InvariantCulture))" @onchange="OnScaleChanged" />
             </div>
         }
         else if (type?.Kind == ColumnDataTypeKind.FractionalSeconds)
         {
             <input type="number" class="form-control form-control-sm" min="0" max="7" title="@t[TranslationKeys.ColFractionalPrecision]" placeholder="@t[TranslationKeys.CommonDefault]"
-                   value="@(Column.Scale?.ToString(CultureInfo.InvariantCulture))" @onchange="e => Column.Scale = ParseInt(e.Value)" />
+                   value="@(Column.Scale?.ToString(CultureInfo.InvariantCulture))" @onchange="OnScaleChanged" />
         }
         else if (type?.Kind == ColumnDataTypeKind.VectorDimensions)
         {
             <div class="input-group input-group-sm">
                 <input type="number" class="form-control" min="1" max="1998" title="@t[TranslationKeys.ColVectorDimensions]" placeholder="1536"
                        value="@(Column.Length is > 0 ? Column.Length.Value.ToString(CultureInfo.InvariantCulture) : "1536")"
-                       @onchange="e => Column.Length = ParseInt(e.Value)" />
+                       @onchange="OnLengthChanged" />
                 <span class="input-group-text text-muted small">dim</span>
             </div>
         }
@@ -67,6 +67,37 @@
 
 @code {
     [Parameter, EditorRequired] public ColumnDefinition Column { get; set; } = null!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private async Task OnDataTypeChanged(ChangeEventArgs e)
+    {
+        Column.ApplyDataType(e.Value?.ToString());
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnLengthChanged(ChangeEventArgs e)
+    {
+        Column.Length = ParseInt(e.Value);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnMaxChanged(ColumnDataType type, bool isMax)
+    {
+        Column.Length = isMax ? -1 : Math.Min(50, type.MaxLength);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnPrecisionChanged(ChangeEventArgs e)
+    {
+        Column.Precision = ParseInt(e.Value);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnScaleChanged(ChangeEventArgs e)
+    {
+        Column.Scale = ParseInt(e.Value);
+        await OnChanged.InvokeAsync();
+    }
 
     private static int? ParseInt(object? value) =>
         int.TryParse(value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) ? number : null;

@@ -31,9 +31,14 @@
                     <input id="column-name" class="form-control form-control-sm font-monospace" maxlength="@(ServerConfig?.Database?.MaxColumnNameLength > 0 ? Math.Min(ServerConfig.Database.MaxColumnNameLength, Constants.MaxColumnNameLength) : Constants.MaxColumnNameLength)" @bind="_form.ColumnName" @bind:event="oninput" />
                 </div>
                 <div class="col-md-8">
-                    @if (CanEditType)
+                    @if (_form.IsComputed)
                     {
-                        <ColumnTypeEditor Column="_form" />
+                        <label class="form-label small fw-semibold" for="column-formula">@t[TranslationKeys.ColPanelFormula]</label>
+                        <input id="column-formula" class="form-control form-control-sm font-monospace" placeholder="@t[TranslationKeys.ColPanelFormulaPlaceholder]" @bind="_form.ComputedFormula" @bind:event="oninput" />
+                    }
+                    else if (CanEditType)
+                    {
+                        <ColumnTypeEditor Column="_form" OnChanged="StateHasChanged" />
                     }
                     else
                     {
@@ -42,9 +47,9 @@
                     }
                 </div>
 
-                @if (CanEditType)
-                {
-                    <div class="col-12 d-flex flex-wrap gap-4">
+                <div class="col-12 d-flex flex-wrap gap-4">
+                    @if (!_form.IsComputed && CanEditType)
+                    {
                         <div class="form-check">
                             <input id="column-nullable" class="form-check-input" type="checkbox" checked="@_form.IsNullable"
                                    disabled="@(_form.IsIdentity || (_original?.IsPrimaryKey ?? false))" @onchange="e => _form.IsNullable = (bool)e.Value!" />
@@ -59,17 +64,42 @@
                                 <label class="form-check-label small" for="column-identity">@t[TranslationKeys.IsIdentity]</label>
                             </div>
                         }
-                    </div>
-                }
+                    }
+                    @if (_mode == PanelMode.Add || (_original is not null && !_original.IsPrimaryKey && !_original.IsIdentity))
+                    {
+                        <div class="form-check">
+                            <input id="column-computed" class="form-check-input" type="checkbox" checked="@_form.IsComputed"
+                                   disabled="@(_form.IsIdentity || (_original?.IsPrimaryKey ?? false))"
+                                   @onchange="e => ToggleComputed((bool)e.Value!)" />
+                            <label class="form-check-label small" for="column-computed">@t[TranslationKeys.ColPanelComputed]</label>
+                        </div>
+                    }
+                    @if (_form.IsComputed)
+                    {
+                        <div class="form-check">
+                            <input id="column-persisted" class="form-check-input" type="checkbox" checked="@_form.IsPersisted"
+                                   @onchange="e => _form.IsPersisted = (bool)e.Value!" />
+                            <label class="form-check-label small" for="column-persisted">@t[TranslationKeys.ColPanelPersisted]</label>
+                        </div>
+                        @if (_form.IsPersisted)
+                        {
+                            <div class="form-check">
+                                <input id="column-computed-nullable" class="form-check-input" type="checkbox" checked="@_form.IsNullable"
+                                       @onchange="e => _form.IsNullable = (bool)e.Value!" />
+                                <label class="form-check-label small" for="column-computed-nullable">@t[TranslationKeys.AllowNull]</label>
+                            </div>
+                        }
+                    }
+                </div>
 
-                @if (!_form.IsIdentity && !IsComputed)
+                @if (!_form.IsIdentity && !_form.IsComputed)
                 {
                     <div class="col-md-6">
                         <label class="form-label small fw-semibold" for="column-default">@t[TranslationKeys.ColPanelDefaultExpr]</label>
                         <input id="column-default" class="form-control form-control-sm font-monospace" placeholder="0, 'N/A', SYSUTCDATETIME()" @bind="_formDefault" @bind:event="oninput" />
                     </div>
                 }
-                <div class="col-md-6">
+                <div class="@(_form.IsComputed ? "col-12" : "col-md-6")">
                     <label class="form-label small fw-semibold" for="column-description">@t[TranslationKeys.Description]</label>
                     <input id="column-description" class="form-control form-control-sm" maxlength="3000" @bind="_formDescription" @bind:event="oninput" />
                 </div>
@@ -178,35 +208,53 @@
     private BprMessage? _bprMessage;
 
     private bool HasIdentityColumn => Table.Columns.Any(column => column.IsIdentity);
-    private bool IsComputed => _original is not null && !string.IsNullOrWhiteSpace(_original.ComputedFormula);
+    private bool IsComputed => _original is not null && _original.IsComputed;
 
-    /// <summary>Identity, computed and unsupported-type columns can only be renamed or get a new default/description.</summary>
+    /// <summary>Identity and unsupported-type columns can only be renamed or get a new default/description.</summary>
     private bool CanEditType => _mode == PanelMode.Add
-        || (_original is not null && ColumnDataType.Find(_original.DataType) is not null && !_original.IsIdentity && !IsComputed);
+        || (_original is not null && ColumnDataType.Find(_original.DataType) is not null && !_original.IsIdentity);
 
     private bool RenameRequested => _mode == PanelMode.Edit && _original is not null
         && !string.IsNullOrWhiteSpace(_form.ColumnName) && !string.Equals(_form.ColumnName.Trim(), _original.ColumnName, StringComparison.Ordinal);
 
-    private bool DefinitionChanged => _mode == PanelMode.Edit && _original is not null && CanEditType
-        && (!string.Equals(_form.DataType, _original.DataType, StringComparison.OrdinalIgnoreCase)
-            || _form.Length != _original.Length || _form.Precision != _original.Precision || _form.Scale != _original.Scale
-            || _form.IsNullable != _original.IsNullable);
+    private bool DefinitionChanged => _mode == PanelMode.Edit && _original is not null
+        && (_form.IsComputed != _original.IsComputed
+            || (_form.IsComputed && (!string.Equals((_form.ComputedFormula ?? string.Empty).Trim(), StripOuterParentheses(_original.ComputedFormula), StringComparison.Ordinal)
+                || _form.IsPersisted != _original.IsPersisted
+                || (_form.IsPersisted && _form.IsNullable != _original.IsNullable)))
+            || (!_form.IsComputed && CanEditType && (!string.Equals(_form.DataType, _original.DataType, StringComparison.OrdinalIgnoreCase)
+                || _form.Length != _original.Length || _form.Precision != _original.Precision || _form.Scale != _original.Scale
+                || _form.IsNullable != _original.IsNullable)));
 
-    private bool DefaultChanged => _mode == PanelMode.Edit && _original is not null && !_original.IsIdentity && !IsComputed
+    private bool DefaultChanged => _mode == PanelMode.Edit && _original is not null && !_original.IsIdentity && !IsComputed && !_form.IsComputed
         && !string.Equals((_formDefault ?? string.Empty).Trim(), StripOuterParentheses(_original.DefaultValue), StringComparison.Ordinal);
 
     private bool DescriptionChanged => _mode == PanelMode.Edit && _original is not null
         && !string.Equals((_formDescription ?? string.Empty).Trim(), (_original.Description ?? string.Empty).Trim(), StringComparison.Ordinal);
 
     private bool CanSave => _mode == PanelMode.Add
-        ? !string.IsNullOrWhiteSpace(_form.ColumnName)
-        : RenameRequested || DefinitionChanged || DefaultChanged || DescriptionChanged;
+        ? (!string.IsNullOrWhiteSpace(_form.ColumnName) && (!_form.IsComputed || !string.IsNullOrWhiteSpace(_form.ComputedFormula)))
+        : ((RenameRequested || DefinitionChanged || DefaultChanged || DescriptionChanged) && (!_form.IsComputed || !string.IsNullOrWhiteSpace(_form.ComputedFormula)));
+
+    private void ToggleComputed(bool isComputed)
+    {
+        _form.SetComputed(isComputed);
+        if (!isComputed)
+        {
+            _form.DataType = _original?.DataType ?? "nvarchar";
+            _form.Length = _original?.Length ?? 50;
+            _form.Precision = _original?.Precision;
+            _form.Scale = _original?.Scale;
+            _form.IsNullable = _original?.IsNullable ?? true;
+        }
+        StateHasChanged();
+    }
 
     private void OpenAdd()
     {
         Close();
         _original = null;
-        _form = new ColumnDefinition { DataType = "nvarchar", Length = 50 };
+        _form = new ColumnDefinition { DataType = "nvarchar", Length = 50, IsComputed = false };
         _formDefault = string.Empty;
         _formDescription = string.Empty;
         _mode = PanelMode.Add;
@@ -224,7 +272,10 @@
             Precision = column.Precision,
             Scale = column.Scale,
             IsNullable = column.IsNullable,
-            Collation = column.Collation
+            Collation = column.Collation,
+            IsComputed = column.IsComputed,
+            ComputedFormula = StripOuterParentheses(column.ComputedFormula),
+            IsPersisted = column.IsPersisted
         };
         _formDefault = StripOuterParentheses(column.DefaultValue);
         _formDescription = column.Description ?? string.Empty;
@@ -262,7 +313,8 @@
     private ColumnOperation.Create BuildCreate()
     {
         _form.ColumnName = (_form.ColumnName ?? string.Empty).Trim();
-        _form.DefaultValue = string.IsNullOrWhiteSpace(_formDefault) ? null : _formDefault.Trim();
+        _form.DefaultValue = _form.IsComputed || string.IsNullOrWhiteSpace(_formDefault) ? null : _formDefault.Trim();
+        _form.ComputedFormula = _form.IsComputed && !string.IsNullOrWhiteSpace(_form.ComputedFormula) ? _form.ComputedFormula.Trim() : null;
         _form.Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription.Trim();
 
         return new ColumnOperation.Create
@@ -276,6 +328,12 @@
 
     private ColumnOperation.Alter BuildAlter()
     {
+        if (_form.IsComputed)
+        {
+            _form.ComputedFormula = string.IsNullOrWhiteSpace(_form.ComputedFormula) ? null : _form.ComputedFormula.Trim();
+            _form.DefaultValue = null;
+        }
+
         return new ColumnOperation.Alter
         {
             DatabaseName = Table.DatabaseName,

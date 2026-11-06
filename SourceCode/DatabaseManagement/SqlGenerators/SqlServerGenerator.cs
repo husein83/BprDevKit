@@ -697,7 +697,10 @@ ORDER BY fg.is_default DESC, fg.name;";
                         Precision = requested.Precision,
                         Scale = requested.Scale,
                         IsNullable = requested.IsNullable,
-                        Collation = requested.Collation
+                        Collation = requested.Collation,
+                        IsComputed = requested.IsComputed,
+                        ComputedFormula = requested.ComputedFormula,
+                        IsPersisted = requested.IsPersisted
                     }
                 })[0];
             }
@@ -732,8 +735,33 @@ END");
 
                 if (definition is not null)
                 {
-                    var collation = BuildCollationClause(definition);
-                    builder.AppendLine($"ALTER TABLE {table} ALTER COLUMN {QUOTENAME(definition.ColumnName)} {FormatColumnDataType(definition, ColumnDataType.Find(definition.DataType)!)}{collation} {(definition.IsNullable ? "NULL" : "NOT NULL")};");
+                    if (definition.IsComputed)
+                    {
+                        builder.AppendLine($@"DECLARE @colName sysname = {SQLLiteral(currentColumnName)};
+DECLARE @dropAndAdd nvarchar(max) = N'ALTER TABLE ' + @table + N' DROP COLUMN ' + QUOTENAME(@colName) + N';';
+EXEC (@dropAndAdd);
+SET @dropAndAdd = N'ALTER TABLE ' + @table + N' ADD ' + {SQLLiteral(BuildColumnDefinition(definition, config.SchemaName, config.TableName))} + N';';
+EXEC (@dropAndAdd);");
+                    }
+                    else
+                    {
+                        var collation = BuildCollationClause(definition);
+                        var alterSql = $"ALTER TABLE {table} ALTER COLUMN {QUOTENAME(definition.ColumnName)} {FormatColumnDataType(definition, ColumnDataType.Find(definition.DataType)!)}{collation} {(definition.IsNullable ? "NULL" : "NOT NULL")};";
+                        builder.AppendLine($@"DECLARE @colName sysname = {SQLLiteral(currentColumnName)};
+DECLARE @isComp bit = 0;
+SELECT @isComp = is_computed FROM sys.columns WHERE object_id = OBJECT_ID(@table) AND name = @colName;
+IF @isComp = 1
+BEGIN
+    DECLARE @dropAdd nvarchar(max) = N'ALTER TABLE ' + @table + N' DROP COLUMN ' + QUOTENAME(@colName) + N';';
+    EXEC (@dropAdd);
+    SET @dropAdd = N'ALTER TABLE ' + @table + N' ADD ' + {SQLLiteral(BuildColumnDefinition(definition, config.SchemaName, config.TableName))} + N';';
+    EXEC (@dropAdd);
+END
+ELSE
+BEGIN
+    EXEC ({SQLLiteral(alterSql)});
+END");
+                    }
                 }
 
                 if (newDefault is not null)
@@ -1861,6 +1889,24 @@ ELSE
                 if (!names.Add(column.ColumnName))
                     throw new InvalidOperationException($"[BprDevKit] Column name [{column.ColumnName}] is used more than once.");
 
+                if (column.IsComputed || !string.IsNullOrWhiteSpace(column.ComputedFormula))
+                {
+                    if (string.IsNullOrWhiteSpace(column.ComputedFormula))
+                        throw new InvalidOperationException($"[BprDevKit] Computed column [{column.ColumnName}] must have a formula expression.");
+
+                    ValidateExpression(column.ComputedFormula, $"computed formula of column [{column.ColumnName}]");
+                    ValidateDescription(column.Description);
+
+                    if (column.IsIdentity)
+                        throw new InvalidOperationException($"[BprDevKit] Computed column [{column.ColumnName}] cannot be an identity column.");
+
+                    if (!string.IsNullOrWhiteSpace(column.DefaultValue))
+                        throw new InvalidOperationException($"[BprDevKit] Computed column [{column.ColumnName}] cannot have a default value.");
+
+                    result.Add(column);
+                    continue;
+                }
+
                 var type = ColumnDataType.Find(column.DataType)
                     ?? throw new InvalidOperationException($"[BprDevKit] Column [{column.ColumnName}] uses an unsupported data type '{column.DataType}'.");
 
@@ -1894,6 +1940,17 @@ ELSE
 
         private static string BuildColumnDefinition(ColumnDefinition column, string schemaName, string tableName)
         {
+            if (column.IsComputed || !string.IsNullOrWhiteSpace(column.ComputedFormula))
+            {
+                var formula = (column.ComputedFormula ?? string.Empty).Trim();
+                if (!formula.StartsWith('(') || !formula.EndsWith(')'))
+                    formula = $"({formula})";
+
+                var persistedClause = column.IsPersisted ? " PERSISTED" : string.Empty;
+                var nullClause = (column.IsPersisted && !column.IsNullable) ? " NOT NULL" : string.Empty;
+                return $"{QUOTENAME(column.ColumnName)} AS {formula}{persistedClause}{nullClause}";
+            }
+
             var type = ColumnDataType.Find(column.DataType)!;
             var nullable = column.IsNullable && !column.IsPrimaryKey && !column.IsIdentity;
 
