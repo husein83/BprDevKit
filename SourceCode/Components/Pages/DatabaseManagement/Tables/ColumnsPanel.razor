@@ -57,7 +57,7 @@
                         </div>
                         @if (_mode == PanelMode.Add)
                         {
-                            <div class="form-check">
+                            <div class="form-check" title="@(HasIdentityColumn ? t[TranslationKeys.TableAlreadyHasIdentity] : (ColumnDataType.Find(_form.DataType)?.SupportsIdentity != true ? t[TranslationKeys.TypeDoesNotSupportIdentity] : null))">
                                 <input id="column-identity" class="form-check-input" type="checkbox" checked="@_form.IsIdentity"
                                        disabled="@(ColumnDataType.Find(_form.DataType)?.SupportsIdentity != true || (!_form.IsIdentity && HasIdentityColumn))"
                                        @onchange="e => _form.SetIdentity((bool)e.Value!)" />
@@ -254,7 +254,7 @@
     {
         Close();
         _original = null;
-        _form = new ColumnDefinition { DataType = "nvarchar", Length = 50, IsComputed = false };
+        _form = new ColumnDefinition { DataType = HasIdentityColumn ? "nvarchar" : "int", Length = HasIdentityColumn ? 50 : null, IsComputed = false };
         _formDefault = string.Empty;
         _formDescription = string.Empty;
         _mode = PanelMode.Add;

@@ -615,6 +615,26 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelExcludedColumnPatterns] = "Excluded Column Patterns",
             [TranslationKeys.DataModelExcludedColumnPatternsHelp] = "Comma-separated glob patterns to exclude from model (e.g. sys_*, *_Audit)",
 
+            [TranslationKeys.TableAlreadyHasIdentity] = "This table already has an identity column (only one identity column allowed per table).",
+            [TranslationKeys.TypeDoesNotSupportIdentity] = "This data type does not support identity.",
+
+            [TranslationKeys.DataModelCsIncludeCustomProperties] = "Custom Class Properties",
+            [TranslationKeys.DataModelAddCustomProperty] = "Add Property",
+            [TranslationKeys.DataModelDuplicateProperty] = "Duplicate Property",
+            [TranslationKeys.DataModelCustomPropertiesHelp] = "Define custom properties at the top or bottom of model classes, filterable by target object type (Table, View, Procedure, Function). Multiple attributes are supported (e.g. [NotMapped], [JsonIgnore]).",
+            [TranslationKeys.DataModelTargetObjectType] = "Target Object",
+            [TranslationKeys.DataModelPropertyPosition] = "Position",
+            [TranslationKeys.DataModelPropertyName] = "Property Name",
+            [TranslationKeys.DataModelPropertyAccessor] = "Accessor",
+            [TranslationKeys.DataModelPropertyAttributes] = "Attributes (e.g. [NotMapped], [JsonIgnore])",
+            [TranslationKeys.DataModelTargetAll] = "All Objects",
+            [TranslationKeys.DataModelTargetTable] = "Tables Only",
+            [TranslationKeys.DataModelTargetView] = "Views Only",
+            [TranslationKeys.DataModelTargetProcedure] = "Procedures Only",
+            [TranslationKeys.DataModelTargetFunction] = "Functions Only",
+            [TranslationKeys.DataModelPositionTop] = "Top of Class",
+            [TranslationKeys.DataModelPositionBottom] = "Bottom of Class",
+
             // C# Options
             [TranslationKeys.DataModelCsTypeKind] = "C# Type Kind",
             [TranslationKeys.DataModelCsClass] = "Class",

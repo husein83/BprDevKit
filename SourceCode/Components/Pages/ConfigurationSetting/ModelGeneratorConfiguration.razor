@@ -533,6 +533,115 @@
                                 }
                             </div>
                         </div>
+
+                        <!-- User-defined Custom Class Properties -->
+                        <div class="col-12 mt-3">
+                            <div class="card p-3 border shadow-sm bg-white rounded-3">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" type="checkbox" id="cs-p-customprops" @bind="_editingProfile.Options.CSharp.IncludeCustomProperties" @bind:after="EnsureInitialCustomProperties" />
+                                        <label class="form-check-label small fw-bold" for="cs-p-customprops">@t[TranslationKeys.DataModelCsIncludeCustomProperties]</label>
+                                    </div>
+                                    @if (_editingProfile.Options.CSharp.IncludeCustomProperties)
+                                    {
+                                        <button class="btn btn-xs btn-outline-primary" type="button" @onclick="AddCustomProperty">
+                                            <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.DataModelAddCustomProperty]
+                                        </button>
+                                    }
+                                </div>
+                                @if (_editingProfile.Options.CSharp.IncludeCustomProperties)
+                                {
+                                    <div class="small text-muted mb-2">
+                                        @t[TranslationKeys.DataModelCustomPropertiesHelp]
+                                        <span class="ms-2">Available tokens: <code>{TableName}</code>, <code>{SchemaName}</code>, <code>{ClassName}</code></span>
+                                    </div>
+
+                                    @if (_editingProfile.Options.CSharp.CustomProperties.Count > 0)
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered align-middle small mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th style="width: 40px;" class="text-center" title="@t[TranslationKeys.FkPanelEnabled]">✓</th>
+                                                        <th style="width: 140px;">@t[TranslationKeys.DataModelTargetObjectType]</th>
+                                                        <th style="width: 100px;">@t[TranslationKeys.DataModelPropertyPosition]</th>
+                                                        <th style="width: 90px;">@t[TranslationKeys.DataModelConstantModifier]</th>
+                                                        <th style="width: 100px;">@t[TranslationKeys.DataType]</th>
+                                                        <th style="width: 140px;">@t[TranslationKeys.DataModelPropertyName]</th>
+                                                        <th style="width: 110px;">@t[TranslationKeys.DataModelPropertyAccessor]</th>
+                                                        <th style="width: 130px;">@t[TranslationKeys.DefaultValue]</th>
+                                                        <th style="width: 150px;">@t[TranslationKeys.DataModelPropertyAttributes]</th>
+                                                        <th style="width: 65px;"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var prop in _editingProfile.Options.CSharp.CustomProperties)
+                                                    {
+                                                        var item = prop;
+                                                        <tr>
+                                                            <td class="text-center">
+                                                                <input class="form-check-input" type="checkbox" @bind="item.IsEnabled" />
+                                                            </td>
+                                                            <td>
+                                                                <select class="form-select form-select-sm" @bind="item.TargetObjectType">
+                                                                    <option value="All">@t[TranslationKeys.DataModelTargetAll]</option>
+                                                                    <option value="Table">@t[TranslationKeys.DataModelTargetTable]</option>
+                                                                    <option value="View">@t[TranslationKeys.DataModelTargetView]</option>
+                                                                    <option value="Procedure">@t[TranslationKeys.DataModelTargetProcedure]</option>
+                                                                    <option value="Function">@t[TranslationKeys.DataModelTargetFunction]</option>
+                                                                </select>
+                                                            </td>
+                                                            <td>
+                                                                <select class="form-select form-select-sm" @bind="item.Position">
+                                                                    <option value="Top">@t[TranslationKeys.DataModelPositionTop]</option>
+                                                                    <option value="Bottom">@t[TranslationKeys.DataModelPositionBottom]</option>
+                                                                </select>
+                                                            </td>
+                                                            <td>
+                                                                <select class="form-select form-select-sm" @bind="item.AccessModifier">
+                                                                    <option value="public">public</option>
+                                                                    <option value="protected">protected</option>
+                                                                    <option value="internal">internal</option>
+                                                                    <option value="private">private</option>
+                                                                </select>
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="int" @bind="item.Type" />
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="PropertyName" @bind="item.Name" />
+                                                            </td>
+                                                            <td>
+                                                                <select class="form-select form-select-sm" @bind="item.Accessor">
+                                                                    <option value="get_set">{ get; set; }</option>
+                                                                    <option value="get_init">{ get; init; }</option>
+                                                                    <option value="get_only">{ get; }</option>
+                                                                    <option value="expression">=> expr</option>
+                                                                </select>
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="0, null" @bind="item.DefaultValue" />
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="[NotMapped], [JsonIgnore]" @bind="item.Attributes" />
+                                                            </td>
+                                                            <td class="text-center text-nowrap">
+                                                                <button class="btn btn-link btn-sm text-secondary p-0 me-2" type="button" title="@t[TranslationKeys.DataModelDuplicateProperty]" @onclick="() => DuplicateCustomProperty(item)">
+                                                                    <i class="bi bi-copy"></i>
+                                                                </button>
+                                                                <button class="btn btn-link btn-sm text-danger p-0" type="button" title="@t[TranslationKeys.Delete]" @onclick="() => RemoveCustomProperty(item)">
+                                                                    <i class="bi bi-trash3"></i>
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
                     </div>
                 }
                 else if (_csActiveTab == "schemaAccess")
@@ -2275,5 +2384,68 @@
     private void RemoveOverride(ClassOverrideDefinition item)
     {
         _editingProfile.Options.CSharp.Overrides.Remove(item);
+    }
+
+    private void EnsureInitialCustomProperties()
+    {
+        if (_editingProfile.Options.CSharp.IncludeCustomProperties && _editingProfile.Options.CSharp.CustomProperties.Count == 0)
+        {
+            _editingProfile.Options.CSharp.CustomProperties.Add(new ClassPropertyDefinition
+            {
+                Name = "RowNumber",
+                Type = "int",
+                AccessModifier = "public",
+                Accessor = "get_set",
+                DefaultValue = "0",
+                Attributes = "[NotMapped]",
+                TargetObjectType = "View",
+                Position = "Top"
+            });
+        }
+    }
+
+    private void AddCustomProperty()
+    {
+        _editingProfile.Options.CSharp.CustomProperties.Add(new ClassPropertyDefinition
+        {
+            Name = "NewProperty",
+            Type = "string?",
+            AccessModifier = "public",
+            Accessor = "get_set",
+            TargetObjectType = "All",
+            Position = "Top"
+        });
+    }
+
+    private void DuplicateCustomProperty(ClassPropertyDefinition source)
+    {
+        var copy = new ClassPropertyDefinition
+        {
+            Id = Guid.NewGuid(),
+            IsEnabled = source.IsEnabled,
+            AccessModifier = source.AccessModifier,
+            Type = source.Type,
+            Name = source.Name,
+            Accessor = source.Accessor,
+            DefaultValue = source.DefaultValue,
+            Attributes = source.Attributes,
+            Summary = source.Summary,
+            TargetObjectType = source.TargetObjectType,
+            Position = source.Position
+        };
+        var index = _editingProfile.Options.CSharp.CustomProperties.IndexOf(source);
+        if (index >= 0)
+        {
+            _editingProfile.Options.CSharp.CustomProperties.Insert(index + 1, copy);
+        }
+        else
+        {
+            _editingProfile.Options.CSharp.CustomProperties.Add(copy);
+        }
+    }
+
+    private void RemoveCustomProperty(ClassPropertyDefinition item)
+    {
+        _editingProfile.Options.CSharp.CustomProperties.Remove(item);
     }
 }

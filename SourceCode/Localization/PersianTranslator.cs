@@ -616,6 +616,26 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelExcludedColumnPatterns] = "الگوهای نام ستون‌های مستثنی",
             [TranslationKeys.DataModelExcludedColumnPatternsHelp] = "الگوهای جداشده با کاما برای عدم ایجاد در مدل (مانند: sys_*, *_Audit)",
 
+            [TranslationKeys.TableAlreadyHasIdentity] = "این جدول در حال حاضر ستون Identity دارد (هر جدول حداکثر می‌تواند ۱ ستون Identity داشته باشد)",
+            [TranslationKeys.TypeDoesNotSupportIdentity] = "این نوع داده از خاصیت Identity پشتیبانی نمی‌کند",
+
+            [TranslationKeys.DataModelCsIncludeCustomProperties] = "پراپرتی‌های اختصاصی در سطح کلاس (Custom Class Properties)",
+            [TranslationKeys.DataModelAddCustomProperty] = "افزودن پراپرتی جدید",
+            [TranslationKeys.DataModelDuplicateProperty] = "تکثیر پراپرتی",
+            [TranslationKeys.DataModelCustomPropertiesHelp] = "تعریف پراپرتی‌های سفارشی در بالای کلاس یا پایین آن با امکان تعیین نوع آبجکت مقصد (جدول، ویو، پروسیجر یا تابع). امکان درج چندین اتریبیوت نیز فراهم است (مانند [NotMapped], [JsonIgnore]).",
+            [TranslationKeys.DataModelTargetObjectType] = "نوع آبجکت مقصد",
+            [TranslationKeys.DataModelPropertyPosition] = "موقعیت در کلاس",
+            [TranslationKeys.DataModelPropertyName] = "نام پراپرتی",
+            [TranslationKeys.DataModelPropertyAccessor] = "نوع دسترسی (Accessor)",
+            [TranslationKeys.DataModelPropertyAttributes] = "اتریبیوت‌ها (مانند [NotMapped], [JsonIgnore])",
+            [TranslationKeys.DataModelTargetAll] = "همه (All)",
+            [TranslationKeys.DataModelTargetTable] = "فقط جداول",
+            [TranslationKeys.DataModelTargetView] = "فقط ویوها",
+            [TranslationKeys.DataModelTargetProcedure] = "فقط پروسیجرها",
+            [TranslationKeys.DataModelTargetFunction] = "فقط توابع",
+            [TranslationKeys.DataModelPositionTop] = "بالای کلاس (Top)",
+            [TranslationKeys.DataModelPositionBottom] = "پایین کلاس (Bottom)",
+
             // C# Options
             [TranslationKeys.DataModelCsTypeKind] = "نوع ساختار سی‌شارپ",
             [TranslationKeys.DataModelCsClass] = "کلاس (Class)",

@@ -606,6 +606,26 @@ namespace BprDevKit.Localization
         public const string DataModelExcludedColumnPatterns = "DataModel.ExcludedColumnPatterns";
         public const string DataModelExcludedColumnPatternsHelp = "DataModel.ExcludedColumnPatternsHelp";
 
+        public const string TableAlreadyHasIdentity = "Table.AlreadyHasIdentity";
+        public const string TypeDoesNotSupportIdentity = "Table.TypeDoesNotSupportIdentity";
+
+        public const string DataModelCsIncludeCustomProperties = "DataModel.CsIncludeCustomProperties";
+        public const string DataModelAddCustomProperty = "DataModel.AddCustomProperty";
+        public const string DataModelDuplicateProperty = "DataModel.DuplicateProperty";
+        public const string DataModelCustomPropertiesHelp = "DataModel.CustomPropertiesHelp";
+        public const string DataModelTargetObjectType = "DataModel.TargetObjectType";
+        public const string DataModelPropertyPosition = "DataModel.PropertyPosition";
+        public const string DataModelPropertyName = "DataModel.PropertyName";
+        public const string DataModelPropertyAccessor = "DataModel.PropertyAccessor";
+        public const string DataModelPropertyAttributes = "DataModel.PropertyAttributes";
+        public const string DataModelTargetAll = "DataModel.TargetAll";
+        public const string DataModelTargetTable = "DataModel.TargetTable";
+        public const string DataModelTargetView = "DataModel.TargetView";
+        public const string DataModelTargetProcedure = "DataModel.TargetProcedure";
+        public const string DataModelTargetFunction = "DataModel.TargetFunction";
+        public const string DataModelPositionTop = "DataModel.PositionTop";
+        public const string DataModelPositionBottom = "DataModel.PositionBottom";
+
         // C# Options
         public const string DataModelCsTypeKind = "DataModel.CsTypeKind";
         public const string DataModelCsClass = "DataModel.CsClass";

@@ -203,8 +203,8 @@
                                     </td>
                                     <td class="text-center">
                                         <input class="form-check-input" type="checkbox" checked="@column.IsIdentity"
-                                               disabled="@(column.IsComputed || type?.SupportsIdentity != true || (!column.IsIdentity && HasIdentityColumn))"
-                                               @onchange="e => column.SetIdentity((bool)e.Value!)" />
+                                               disabled="@(column.IsComputed || type?.SupportsIdentity != true)"
+                                               @onchange="e => ToggleIdentity(column, (bool)e.Value!)" />
                                     </td>
                                     <td class="text-center">
                                         <input class="form-check-input" type="checkbox" checked="@column.IsComputed"
@@ -619,6 +619,21 @@
     private void AddColumn()
     {
         _createConfiguration.Columns.Add(new ColumnDefinition { DataType = "nvarchar", Length = 50 });
+    }
+
+    private void ToggleIdentity(ColumnDefinition column, bool isIdentity)
+    {
+        if (isIdentity)
+        {
+            foreach (var col in _createConfiguration.Columns)
+            {
+                if (col != column)
+                {
+                    col.IsIdentity = false;
+                }
+            }
+        }
+        column.SetIdentity(isIdentity);
     }
 
     private void RemoveColumn(ColumnDefinition column)
