@@ -27,6 +27,13 @@ namespace BprDevKit.DataModelGenerator.Models
         ByNamespace = 2
     }
 
+    public enum ComputedColumnHandling
+    {
+        IncludeReadOnly = 0,
+        IncludeWithGetterAndSetter = 1,
+        Exclude = 2
+    }
+
     public class DataModelOptions
     {
         public DataModelLanguage Language { get; set; } = DataModelLanguage.CSharp;
@@ -39,6 +46,12 @@ namespace BprDevKit.DataModelGenerator.Models
         public bool SingularizeClassNames { get; set; } = false;
         public bool IncludeNavigationProperties { get; set; } = true;
         public bool IncludeDocumentationComments { get; set; } = true;
+
+        // Computed and Special Column Handling
+        public ComputedColumnHandling ComputedColumnMode { get; set; } = ComputedColumnHandling.IncludeReadOnly;
+        public bool IncludeRowVersionColumns { get; set; } = true;
+        public bool IncludeHierarchyIdColumns { get; set; } = true;
+        public string ExcludedColumnPatterns { get; set; } = string.Empty;
 
         // Language-specific option bags
         public CSharpOptions CSharp { get; set; } = new();

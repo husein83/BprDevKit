@@ -71,6 +71,11 @@ namespace BprDevKit.DataModelGenerator.Generators
             // Fields / Properties
             foreach (var col in table.Columns)
             {
+                if (!DataModelFilterHelper.ShouldIncludeColumn(col, globalOptions))
+                {
+                    continue;
+                }
+
                 var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 var tsType = SqlTypeMapper.MapToTypeScript(col.DataType, col.IsNullable, options.DateTypeAsDate);
 
@@ -79,7 +84,10 @@ namespace BprDevKit.DataModelGenerator.Generators
                     sb.AppendLine($"  /** {col.Description.Replace("\r", "").Replace("\n", " ")} */");
                 }
 
-                var readonlyModifier = (options.IncludeReadonlyId && col.IsPrimaryKey) ? "readonly " : "";
+                var isComputed = DataModelFilterHelper.IsComputed(col);
+                var isReadOnly = (options.IncludeReadonlyId && col.IsPrimaryKey)
+                    || (isComputed && globalOptions.ComputedColumnMode == ComputedColumnHandling.IncludeReadOnly);
+                var readonlyModifier = isReadOnly ? "readonly " : "";
                 var optionalMarker = col.IsNullable ? "?" : "";
 
                 if (options.TypeKind == "class")

@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using BprDevKit.DatabaseManagement.Models.Metadata;
 using BprDevKit.DatabaseManagement.Models.Operations;
 
 namespace BprDevKit.DatabaseManagement.SqlGenerators
@@ -156,10 +157,58 @@ FROM pragma_foreign_key_list('{Escape(config.TableName)}');";
             return "SELECT '' AS SchemaName, '' AS TableName, '' AS ConstraintName, '' AS CheckExpression, 0 AS IsDisabled, 0 AS IsNotForReplication WHERE 1 = 0;";
         }
 
+        public override string GenerateCreateTableScript(TableOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var sb = new StringBuilder();
+            sb.AppendLine($"CREATE TABLE \"{Escape(config.TableName)}\" (");
+            for (int i = 0; i < config.Columns.Count; i++)
+            {
+                var col = config.Columns[i];
+                var comma = (i < config.Columns.Count - 1) ? "," : "";
+                sb.AppendLine($"    {BuildSqliteColumnDefinition(col)}{comma}");
+            }
+            sb.AppendLine(");");
+            return sb.ToString();
+        }
+
         public override string GenerateDropTableScript(TableOperation.Drop config)
         {
             ArgumentNullException.ThrowIfNull(config);
             return $"DROP TABLE IF EXISTS \"{Escape(config.TableName)}\";";
+        }
+        #endregion
+
+        #region Column Operations
+        public override string GenerateCreateColumnScript(ColumnOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            return $"ALTER TABLE \"{Escape(config.TableName)}\" ADD COLUMN {BuildSqliteColumnDefinition(config.Column)};";
+        }
+
+        public override string GenerateDropColumnScript(ColumnOperation.Drop config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            return $"ALTER TABLE \"{Escape(config.TableName)}\" DROP COLUMN \"{Escape(config.ColumnName)}\";";
+        }
+
+        private static string BuildSqliteColumnDefinition(ColumnDefinition col)
+        {
+            var colName = $"\"{Escape(col.ColumnName)}\"";
+            if (col.IsComputed || !string.IsNullOrWhiteSpace(col.ComputedFormula))
+            {
+                var formula = (col.ComputedFormula ?? "").Trim();
+                if (!formula.StartsWith('(') || !formula.EndsWith(')'))
+                    formula = $"({formula})";
+                var storage = col.IsPersisted ? "STORED" : "VIRTUAL";
+                return $"{colName} AS {formula} {storage}";
+            }
+
+            var type = (col.DataType ?? "TEXT").ToUpperInvariant();
+            var identity = col.IsIdentity && col.IsPrimaryKey ? " PRIMARY KEY AUTOINCREMENT" : (col.IsPrimaryKey ? " PRIMARY KEY" : "");
+            var nullability = (col.IsNullable || col.IsPrimaryKey) ? "" : " NOT NULL";
+            var defVal = !string.IsNullOrWhiteSpace(col.DefaultValue) && !col.IsIdentity ? $" DEFAULT ({col.DefaultValue.Trim()})" : "";
+            return $"{colName} {type}{identity}{nullability}{defVal}";
         }
         #endregion
 

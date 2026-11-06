@@ -1556,6 +1556,36 @@
                         </div>
                     </div>
                 </div>
+
+                <hr class="my-3" />
+                <h5 class="h6 fw-semibold mb-2 text-secondary">
+                    <i class="bi bi-calculator me-1"></i>@t[TranslationKeys.DataModelComputedColumnMode]
+                </h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1">@t[TranslationKeys.DataModelComputedColumnMode]</label>
+                        <select class="form-select form-select-sm" @bind="_editingProfile.Options.ComputedColumnMode">
+                            <option value="@ComputedColumnHandling.IncludeReadOnly">@t[TranslationKeys.DataModelComputedReadOnly]</option>
+                            <option value="@ComputedColumnHandling.IncludeWithGetterAndSetter">@t[TranslationKeys.DataModelComputedGetSet]</option>
+                            <option value="@ComputedColumnHandling.Exclude">@t[TranslationKeys.DataModelComputedExclude]</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="p-inc-rowver" @bind="_editingProfile.Options.IncludeRowVersionColumns" />
+                            <label class="form-check-label small" for="p-inc-rowver">@t[TranslationKeys.DataModelIncludeRowVersion]</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="p-inc-hier" @bind="_editingProfile.Options.IncludeHierarchyIdColumns" />
+                            <label class="form-check-label small" for="p-inc-hier">@t[TranslationKeys.DataModelIncludeHierarchyId]</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1">@t[TranslationKeys.DataModelExcludedColumnPatterns]</label>
+                        <input type="text" class="form-control form-control-sm" placeholder="sys_*, *_Audit" @bind="_editingProfile.Options.ExcludedColumnPatterns" />
+                        <div class="form-text small text-muted" style="font-size: 0.75rem;">@t[TranslationKeys.DataModelExcludedColumnPatternsHelp]</div>
+                    </div>
+                </div>
             </div>
 
         </div>

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using BprDevKit.DatabaseManagement.Models.Operations;
+using BprDevKit.DataModelGenerator.Models;
+using BprDevKit.DataModelGenerator.Services;
 
 namespace BprDevKit.DataModelGenerator.Generators
 {
@@ -83,6 +85,11 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
+                if (!DataModelFilterHelper.ShouldIncludeColumn(col, globalOptions))
+                {
+                    continue;
+                }
+
                 var fieldName = options.UseSnakeCaseProperties
                     ? DataModelNamingHelper.FormatPropertyName(col.ColumnName, NamingConvention.SnakeCase, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes)
                     : DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
@@ -93,6 +100,11 @@ namespace BprDevKit.DataModelGenerator.Generators
                 if (fieldName != col.ColumnName)
                 {
                     fieldArgs.Add($"alias=\"{col.ColumnName}\"");
+                }
+
+                if (DataModelFilterHelper.IsComputed(col) && globalOptions.ComputedColumnMode == ComputedColumnHandling.IncludeReadOnly)
+                {
+                    fieldArgs.Add("frozen=True");
                 }
 
                 if (col.IsNullable)
@@ -145,6 +157,11 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
+                if (!DataModelFilterHelper.ShouldIncludeColumn(col, globalOptions))
+                {
+                    continue;
+                }
+
                 var fieldName = options.UseSnakeCaseProperties
                     ? DataModelNamingHelper.FormatPropertyName(col.ColumnName, NamingConvention.SnakeCase, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes)
                     : DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
@@ -193,6 +210,11 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
+                if (!DataModelFilterHelper.ShouldIncludeColumn(col, globalOptions))
+                {
+                    continue;
+                }
+
                 var fieldName = options.UseSnakeCaseProperties
                     ? DataModelNamingHelper.FormatPropertyName(col.ColumnName, NamingConvention.SnakeCase, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes)
                     : DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
@@ -265,6 +287,11 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
+                if (!DataModelFilterHelper.ShouldIncludeColumn(col, globalOptions))
+                {
+                    continue;
+                }
+
                 var fieldName = options.UseSnakeCaseProperties
                     ? DataModelNamingHelper.FormatPropertyName(col.ColumnName, NamingConvention.SnakeCase, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes)
                     : DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);

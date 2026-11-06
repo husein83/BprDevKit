@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using BprDevKit.DatabaseManagement.Models.Operations;
+using BprDevKit.DataModelGenerator.Models;
+using BprDevKit.DataModelGenerator.Services;
 
 namespace BprDevKit.DataModelGenerator.Generators
 {
@@ -73,6 +75,11 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
+                if (!DataModelFilterHelper.ShouldIncludeColumn(col, globalOptions))
+                {
+                    continue;
+                }
+
                 var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 var dartType = SqlTypeMapper.MapToDart(col.DataType, col.IsNullable, options.NullSafety);
                 fields.Add((fieldName, dartType, col.ColumnName, col.IsNullable));
@@ -194,6 +201,11 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
+                if (!DataModelFilterHelper.ShouldIncludeColumn(col, globalOptions))
+                {
+                    continue;
+                }
+
                 var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 var dartType = SqlTypeMapper.MapToDart(col.DataType, col.IsNullable, options.NullSafety);
                 fields.Add((fieldName, dartType, col.ColumnName, col.IsNullable));
@@ -250,6 +262,11 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
+                if (!DataModelFilterHelper.ShouldIncludeColumn(col, globalOptions))
+                {
+                    continue;
+                }
+
                 var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 var dartType = SqlTypeMapper.MapToDart(col.DataType, col.IsNullable, options.NullSafety);
 

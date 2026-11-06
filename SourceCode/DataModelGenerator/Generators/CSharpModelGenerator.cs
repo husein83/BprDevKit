@@ -265,6 +265,11 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
+                if (!DataModelFilterHelper.ShouldIncludeColumn(col, globalOptions))
+                {
+                    continue;
+                }
+
                 var propName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 if (propName == className)
                 {
@@ -341,9 +346,16 @@ namespace BprDevKit.DataModelGenerator.Generators
                         sb.AppendLine($"{indent}    [Key]");
                     }
 
-                    if (options.IncludeDatabaseGeneratedAttribute && col.IsIdentity)
+                    if (options.IncludeDatabaseGeneratedAttribute)
                     {
-                        sb.AppendLine($"{indent}    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
+                        if (col.IsIdentity)
+                        {
+                            sb.AppendLine($"{indent}    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
+                        }
+                        else if (DataModelFilterHelper.IsComputed(col))
+                        {
+                            sb.AppendLine($"{indent}    [DatabaseGenerated(DatabaseGeneratedOption.Computed)]");
+                        }
                     }
 
                     if (options.IncludeTimestampAttribute && (string.Equals(col.DataType, "rowversion", StringComparison.OrdinalIgnoreCase) || string.Equals(col.DataType, "timestamp", StringComparison.OrdinalIgnoreCase)))
@@ -556,7 +568,10 @@ namespace BprDevKit.DataModelGenerator.Generators
                     sb.AppendLine($"{indent}    {modifier}{csharpType} {propName}");
                     sb.AppendLine($"{indent}    {{");
                     sb.AppendLine($"{indent}        get => {getterCode};");
-                    sb.AppendLine($"{indent}        set => {setterCode};");
+                    if (!(DataModelFilterHelper.IsComputed(col) && globalOptions.ComputedColumnMode == ComputedColumnHandling.IncludeReadOnly))
+                    {
+                        sb.AppendLine($"{indent}        set => {setterCode};");
+                    }
                     sb.AppendLine($"{indent}    }}");
                     sb.AppendLine();
                 }
@@ -568,16 +583,28 @@ namespace BprDevKit.DataModelGenerator.Generators
                     sb.AppendLine($"{indent}        {{");
                     sb.AppendLine($"{indent}            return {backingFieldName};");
                     sb.AppendLine($"{indent}        }}");
-                    sb.AppendLine($"{indent}        set");
-                    sb.AppendLine($"{indent}        {{");
-                    sb.AppendLine($"{indent}            {backingFieldName} = value;");
-                    sb.AppendLine($"{indent}        }}");
+                    if (!(DataModelFilterHelper.IsComputed(col) && globalOptions.ComputedColumnMode == ComputedColumnHandling.IncludeReadOnly))
+                    {
+                        sb.AppendLine($"{indent}        set");
+                        sb.AppendLine($"{indent}        {{");
+                        sb.AppendLine($"{indent}            {backingFieldName} = value;");
+                        sb.AppendLine($"{indent}        }}");
+                    }
                     sb.AppendLine($"{indent}    }}");
                     sb.AppendLine();
                 }
                 else
                 {
-                    var accessor = options.PropertyAccessor == "get_init" ? "{ get; init; }" : "{ get; set; }";
+                    bool isComputedCol = DataModelFilterHelper.IsComputed(col);
+                    string accessor;
+                    if (isComputedCol && globalOptions.ComputedColumnMode == ComputedColumnHandling.IncludeReadOnly)
+                    {
+                        accessor = options.PropertyAccessor == "get_init" ? "{ get; init; }" : "{ get; }";
+                    }
+                    else
+                    {
+                        accessor = options.PropertyAccessor == "get_init" ? "{ get; init; }" : "{ get; set; }";
+                    }
 
                     var defaultValue = "";
                     bool isEffectivelyNullable = col.IsNullable || (options.NullablePrimaryKeys && col.IsPrimaryKey);
@@ -1556,6 +1583,11 @@ namespace BprDevKit.DataModelGenerator.Generators
             // Property Configurations
             foreach (var col in table.Columns)
             {
+                if (!DataModelFilterHelper.ShouldIncludeColumn(col, globalOptions))
+                {
+                    continue;
+                }
+
                 var propName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 var propCalls = new StringBuilder($"            builder.Property(e => e.{propName})");
 
@@ -1575,9 +1607,28 @@ namespace BprDevKit.DataModelGenerator.Generators
                 {
                     propCalls.Append($".HasMaxLength({col.Length.Value})");
                 }
-                if (col.IsIdentity)
+                if (DataModelFilterHelper.IsComputed(col))
+                {
+                    if (!string.IsNullOrWhiteSpace(col.ComputedFormula))
+                    {
+                        var escapedFormula = col.ComputedFormula.Replace("\"", "\\\"");
+                        if (col.IsPersisted)
+                            propCalls.Append($".HasComputedColumnSql(\"{escapedFormula}\", stored: true)");
+                        else
+                            propCalls.Append($".HasComputedColumnSql(\"{escapedFormula}\")");
+                    }
+                    else
+                    {
+                        propCalls.Append(".ValueGeneratedOnAddOrUpdate()");
+                    }
+                }
+                else if (col.IsIdentity)
                 {
                     propCalls.Append(".ValueGeneratedOnAdd()");
+                }
+                else if (DataModelFilterHelper.IsRowVersion(col))
+                {
+                    propCalls.Append(".IsRowVersion()");
                 }
                 propCalls.Append(";");
                 sb.AppendLine(propCalls.ToString());

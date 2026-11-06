@@ -597,6 +597,14 @@ namespace BprDevKit.Localization
         public const string DataModelNamingPascal = "DataModel.NamingPascal";
         public const string DataModelNamingCamel = "DataModel.NamingCamel";
         public const string DataModelNamingSnake = "DataModel.NamingSnake";
+        public const string DataModelComputedColumnMode = "DataModel.ComputedColumnMode";
+        public const string DataModelComputedReadOnly = "DataModel.ComputedReadOnly";
+        public const string DataModelComputedGetSet = "DataModel.ComputedGetSet";
+        public const string DataModelComputedExclude = "DataModel.ComputedExclude";
+        public const string DataModelIncludeRowVersion = "DataModel.IncludeRowVersion";
+        public const string DataModelIncludeHierarchyId = "DataModel.IncludeHierarchyId";
+        public const string DataModelExcludedColumnPatterns = "DataModel.ExcludedColumnPatterns";
+        public const string DataModelExcludedColumnPatternsHelp = "DataModel.ExcludedColumnPatternsHelp";
 
         // C# Options
         public const string DataModelCsTypeKind = "DataModel.CsTypeKind";

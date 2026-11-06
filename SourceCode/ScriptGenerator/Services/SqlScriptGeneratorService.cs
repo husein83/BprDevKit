@@ -394,7 +394,8 @@ namespace BprDevKit.ScriptGenerator.Services
 
                 // Identify insertable columns: exclude computed columns and timestamp/rowversion
                 var insertableColumns = details.Columns
-                    .Where(c => string.IsNullOrWhiteSpace(c.ComputedFormula)
+                    .Where(c => !c.IsComputed
+                             && string.IsNullOrWhiteSpace(c.ComputedFormula)
                              && !string.Equals(c.DataType, "timestamp", StringComparison.OrdinalIgnoreCase)
                              && !string.Equals(c.DataType, "rowversion", StringComparison.OrdinalIgnoreCase))
                     .OrderBy(c => c.OrdinalPosition)
@@ -680,7 +681,7 @@ namespace BprDevKit.ScriptGenerator.Services
             if (!string.IsNullOrWhiteSpace(col.ComputedFormula))
             {
                 var formula = col.ComputedFormula.Trim();
-                var persisted = col.IsPersisted ? " PERSISTED" : "";
+                var persisted = col.IsPersisted ? (col.IsNullable ? " PERSISTED" : " PERSISTED NOT NULL") : "";
                 return $"[{col.ColumnName}] AS {formula}{persisted}";
             }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using BprDevKit.DatabaseManagement.Models.Metadata;
 using BprDevKit.DatabaseManagement.Models.Operations;
 
 namespace BprDevKit.DatabaseManagement.SqlGenerators
@@ -192,11 +193,130 @@ FROM information_schema.check_constraints
 WHERE CONSTRAINT_SCHEMA = '{Escape(db)}' AND TABLE_NAME = '{Escape(config.TableName)}';";
         }
 
+        public override string GenerateCreateTableScript(TableOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var db = !string.IsNullOrWhiteSpace(config.SchemaName) ? config.SchemaName : config.DatabaseName;
+            var sb = new StringBuilder();
+            sb.AppendLine($"CREATE TABLE `{Escape(db)}`.`{Escape(config.TableName)}` (");
+            for (int i = 0; i < config.Columns.Count; i++)
+            {
+                var col = config.Columns[i];
+                var comma = (i < config.Columns.Count - 1 || config.Columns.Exists(c => c.IsPrimaryKey)) ? "," : "";
+                sb.AppendLine($"    {BuildMySqlColumnDefinition(col)}{comma}");
+            }
+
+            var pkCols = config.Columns.FindAll(c => c.IsPrimaryKey);
+            if (pkCols.Count > 0)
+            {
+                var pkNames = string.Join(", ", pkCols.ConvertAll(c => $"`{Escape(c.ColumnName)}`"));
+                sb.AppendLine($"    PRIMARY KEY ({pkNames})");
+            }
+            sb.AppendLine(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+            return sb.ToString();
+        }
+
         public override string GenerateDropTableScript(TableOperation.Drop config)
         {
             ArgumentNullException.ThrowIfNull(config);
             var db = !string.IsNullOrWhiteSpace(config.SchemaName) ? config.SchemaName : config.DatabaseName;
             return $"DROP TABLE IF EXISTS `{Escape(db)}`.`{Escape(config.TableName)}`;";
+        }
+        #endregion
+
+        #region Column Operations
+        public override string GenerateCreateColumnScript(ColumnOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var db = !string.IsNullOrWhiteSpace(config.SchemaName) ? config.SchemaName : config.DatabaseName;
+            return $"ALTER TABLE `{Escape(db)}`.`{Escape(config.TableName)}` ADD COLUMN {BuildMySqlColumnDefinition(config.Column)};";
+        }
+
+        public override string GenerateDropColumnScript(ColumnOperation.Drop config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var db = !string.IsNullOrWhiteSpace(config.SchemaName) ? config.SchemaName : config.DatabaseName;
+            return $"ALTER TABLE `{Escape(db)}`.`{Escape(config.TableName)}` DROP COLUMN `{Escape(config.ColumnName)}`;";
+        }
+
+        public override string GenerateAlterColumnScript(ColumnOperation.Alter config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var db = !string.IsNullOrWhiteSpace(config.SchemaName) ? config.SchemaName : config.DatabaseName;
+            var table = $"`{Escape(db)}`.`{Escape(config.TableName)}`";
+            var sb = new StringBuilder();
+
+            if (config.IsRename)
+            {
+                sb.AppendLine($"ALTER TABLE {table} RENAME COLUMN `{Escape(config.ColumnName)}` TO `{Escape(config.NewColumnName!)}`;");
+            }
+
+            var currentCol = config.IsRename ? config.NewColumnName! : config.ColumnName;
+
+            if (config.ChangesDefinition && config.Definition != null)
+            {
+                config.Definition.ColumnName = currentCol;
+                sb.AppendLine($"ALTER TABLE {table} MODIFY COLUMN {BuildMySqlColumnDefinition(config.Definition)};");
+            }
+            else if (config.ChangesDefault)
+            {
+                if (string.IsNullOrWhiteSpace(config.DefaultValue))
+                    sb.AppendLine($"ALTER TABLE {table} ALTER COLUMN `{Escape(currentCol)}` DROP DEFAULT;");
+                else
+                    sb.AppendLine($"ALTER TABLE {table} ALTER COLUMN `{Escape(currentCol)}` SET DEFAULT {config.DefaultValue.Trim()};");
+            }
+
+            return sb.ToString();
+        }
+
+        private static string MapToMySqlType(ColumnDefinition col)
+        {
+            var dt = (col.DataType ?? "varchar").ToLowerInvariant();
+            return dt switch
+            {
+                "int" => "INT",
+                "bigint" => "BIGINT",
+                "smallint" => "SMALLINT",
+                "tinyint" => "TINYINT",
+                "bit" => "BIT",
+                "boolean" => "TINYINT(1)",
+                "decimal" => $"DECIMAL({col.Precision ?? 18},{col.Scale ?? 0})",
+                "numeric" => $"DECIMAL({col.Precision ?? 18},{col.Scale ?? 0})",
+                "float" => "DOUBLE",
+                "real" => "FLOAT",
+                "datetime" or "datetime2" => "DATETIME",
+                "datetimeoffset" => "TIMESTAMP",
+                "date" => "DATE",
+                "time" => "TIME",
+                "char" or "nchar" => $"CHAR({(col.Length > 0 ? col.Length : 1)})",
+                "varchar" or "nvarchar" => col.Length == -1 ? "LONGTEXT" : $"VARCHAR({(col.Length > 0 ? col.Length : 255)})",
+                "text" or "ntext" => "LONGTEXT",
+                "binary" or "varbinary" or "image" => "LONGBLOB",
+                "uniqueidentifier" or "uuid" => "CHAR(36)",
+                "json" => "JSON",
+                _ => dt.ToUpperInvariant()
+            };
+        }
+
+        private static string BuildMySqlColumnDefinition(ColumnDefinition col)
+        {
+            var colName = $"`{Escape(col.ColumnName)}`";
+            if (col.IsComputed || !string.IsNullOrWhiteSpace(col.ComputedFormula))
+            {
+                var formula = (col.ComputedFormula ?? "").Trim();
+                if (!formula.StartsWith('(') || !formula.EndsWith(')'))
+                    formula = $"({formula})";
+                var type = MapToMySqlType(col);
+                var storage = col.IsPersisted ? "STORED" : "VIRTUAL";
+                return $"{colName} {type} AS {formula} {storage}";
+            }
+
+            var typeStr = MapToMySqlType(col);
+            var identity = col.IsIdentity ? " AUTO_INCREMENT" : "";
+            var nullability = (col.IsNullable && !col.IsPrimaryKey && !col.IsIdentity) ? " NULL" : " NOT NULL";
+            var defVal = !string.IsNullOrWhiteSpace(col.DefaultValue) && !col.IsIdentity ? $" DEFAULT {col.DefaultValue.Trim()}" : "";
+            return $"{colName} {typeStr}{identity}{nullability}{defVal}";
         }
         #endregion
 

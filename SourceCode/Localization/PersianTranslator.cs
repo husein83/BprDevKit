@@ -607,6 +607,14 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelNamingPascal] = "PascalCase",
             [TranslationKeys.DataModelNamingCamel] = "camelCase",
             [TranslationKeys.DataModelNamingSnake] = "snake_case",
+            [TranslationKeys.DataModelComputedColumnMode] = "نحوه رفتار با ستون‌های محاسباتی / پایدار (Computed / Persisted)",
+            [TranslationKeys.DataModelComputedReadOnly] = "فقط خواندنی (بدون Setter، فقط { get; })",
+            [TranslationKeys.DataModelComputedGetSet] = "خواندنی و نوشتنی ({ get; set; })",
+            [TranslationKeys.DataModelComputedExclude] = "عدم ایجاد در دیتامدل (Exclude)",
+            [TranslationKeys.DataModelIncludeRowVersion] = "ایجاد ستون‌های RowVersion / Timestamp (توکن همزمانی)",
+            [TranslationKeys.DataModelIncludeHierarchyId] = "ایجاد ستون‌های درختی و سلسله‌مراتبی (Tree-Node / HierarchyId)",
+            [TranslationKeys.DataModelExcludedColumnPatterns] = "الگوهای نام ستون‌های مستثنی",
+            [TranslationKeys.DataModelExcludedColumnPatternsHelp] = "الگوهای جداشده با کاما برای عدم ایجاد در مدل (مانند: sys_*, *_Audit)",
 
             // C# Options
             [TranslationKeys.DataModelCsTypeKind] = "نوع ساختار سی‌شارپ",

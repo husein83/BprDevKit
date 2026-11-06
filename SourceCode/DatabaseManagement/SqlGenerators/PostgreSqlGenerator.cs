@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using BprDevKit.DatabaseManagement.Models.Metadata;
 using BprDevKit.DatabaseManagement.Models.Operations;
 
 namespace BprDevKit.DatabaseManagement.SqlGenerators
@@ -215,11 +216,145 @@ WHERE tc.constraint_type = 'CHECK'
   AND tc.table_name = '{Escape(config.TableName)}';";
         }
 
+        public override string GenerateCreateTableScript(TableOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var schema = string.IsNullOrWhiteSpace(config.SchemaName) ? "public" : config.SchemaName;
+            var sb = new StringBuilder();
+            sb.AppendLine($"CREATE TABLE \"{Escape(schema)}\".\"{Escape(config.TableName)}\" (");
+            for (int i = 0; i < config.Columns.Count; i++)
+            {
+                var col = config.Columns[i];
+                var comma = (i < config.Columns.Count - 1) ? "," : "";
+                sb.AppendLine($"    {BuildPostgreSqlColumnDefinition(col)}{comma}");
+            }
+            sb.AppendLine(");");
+
+            var pkCols = config.Columns.FindAll(c => c.IsPrimaryKey);
+            if (pkCols.Count > 0)
+            {
+                var pkNames = string.Join(", ", pkCols.ConvertAll(c => $"\"{Escape(c.ColumnName)}\""));
+                sb.AppendLine($"ALTER TABLE \"{Escape(schema)}\".\"{Escape(config.TableName)}\" ADD CONSTRAINT \"PK_{Escape(config.TableName)}\" PRIMARY KEY ({pkNames});");
+            }
+
+            return sb.ToString();
+        }
+
         public override string GenerateDropTableScript(TableOperation.Drop config)
         {
             ArgumentNullException.ThrowIfNull(config);
             var schema = string.IsNullOrWhiteSpace(config.SchemaName) ? "public" : config.SchemaName;
             return $"DROP TABLE IF EXISTS \"{Escape(schema)}\".\"{Escape(config.TableName)}\" CASCADE;";
+        }
+        #endregion
+
+        #region Column Operations
+        public override string GenerateCreateColumnScript(ColumnOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var schema = string.IsNullOrWhiteSpace(config.SchemaName) ? "public" : config.SchemaName;
+            var table = $"\"{Escape(schema)}\".\"{Escape(config.TableName)}\"";
+            return $"ALTER TABLE {table} ADD COLUMN {BuildPostgreSqlColumnDefinition(config.Column)};";
+        }
+
+        public override string GenerateDropColumnScript(ColumnOperation.Drop config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var schema = string.IsNullOrWhiteSpace(config.SchemaName) ? "public" : config.SchemaName;
+            return $"ALTER TABLE \"{Escape(schema)}\".\"{Escape(config.TableName)}\" DROP COLUMN IF EXISTS \"{Escape(config.ColumnName)}\" CASCADE;";
+        }
+
+        public override string GenerateAlterColumnScript(ColumnOperation.Alter config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var schema = string.IsNullOrWhiteSpace(config.SchemaName) ? "public" : config.SchemaName;
+            var table = $"\"{Escape(schema)}\".\"{Escape(config.TableName)}\"";
+            var sb = new StringBuilder();
+
+            if (config.IsRename)
+            {
+                sb.AppendLine($"ALTER TABLE {table} RENAME COLUMN \"{Escape(config.ColumnName)}\" TO \"{Escape(config.NewColumnName!)}\";");
+            }
+
+            var currentCol = config.IsRename ? config.NewColumnName! : config.ColumnName;
+
+            if (config.ChangesDefinition && config.Definition != null)
+            {
+                if (config.Definition.IsComputed || !string.IsNullOrWhiteSpace(config.Definition.ComputedFormula))
+                {
+                    sb.AppendLine($"ALTER TABLE {table} DROP COLUMN IF EXISTS \"{Escape(currentCol)}\";");
+                    sb.AppendLine($"ALTER TABLE {table} ADD COLUMN {BuildPostgreSqlColumnDefinition(config.Definition)};");
+                }
+                else
+                {
+                    var newType = MapToPostgreSqlType(config.Definition);
+                    sb.AppendLine($"ALTER TABLE {table} ALTER COLUMN \"{Escape(currentCol)}\" TYPE {newType};");
+                    if (config.Definition.IsNullable)
+                        sb.AppendLine($"ALTER TABLE {table} ALTER COLUMN \"{Escape(currentCol)}\" DROP NOT NULL;");
+                    else
+                        sb.AppendLine($"ALTER TABLE {table} ALTER COLUMN \"{Escape(currentCol)}\" SET NOT NULL;");
+                }
+            }
+
+            if (config.ChangesDefault)
+            {
+                if (string.IsNullOrWhiteSpace(config.DefaultValue))
+                    sb.AppendLine($"ALTER TABLE {table} ALTER COLUMN \"{Escape(currentCol)}\" DROP DEFAULT;");
+                else
+                    sb.AppendLine($"ALTER TABLE {table} ALTER COLUMN \"{Escape(currentCol)}\" SET DEFAULT {config.DefaultValue.Trim()};");
+            }
+
+            return sb.ToString();
+        }
+
+        private static string MapToPostgreSqlType(ColumnDefinition col)
+        {
+            var dt = (col.DataType ?? "varchar").ToLowerInvariant();
+            return dt switch
+            {
+                "int" => "integer",
+                "bigint" => "bigint",
+                "smallint" => "smallint",
+                "tinyint" => "smallint",
+                "bit" => "boolean",
+                "boolean" => "boolean",
+                "decimal" => $"numeric({col.Precision ?? 18},{col.Scale ?? 0})",
+                "numeric" => $"numeric({col.Precision ?? 18},{col.Scale ?? 0})",
+                "money" or "smallmoney" => "numeric(19,4)",
+                "float" => "double precision",
+                "real" => "real",
+                "datetime" or "datetime2" => "timestamp",
+                "datetimeoffset" => "timestamp with time zone",
+                "date" => "date",
+                "time" => "time",
+                "char" or "nchar" => $"char({(col.Length > 0 ? col.Length : 1)})",
+                "varchar" or "nvarchar" => col.Length == -1 ? "text" : $"varchar({(col.Length > 0 ? col.Length : 255)})",
+                "text" or "ntext" => "text",
+                "binary" or "varbinary" or "image" => "bytea",
+                "uniqueidentifier" or "uuid" => "uuid",
+                "json" => "jsonb",
+                "xml" => "xml",
+                _ => dt
+            };
+        }
+
+        private static string BuildPostgreSqlColumnDefinition(ColumnDefinition col)
+        {
+            var colName = $"\"{Escape(col.ColumnName)}\"";
+            if (col.IsComputed || !string.IsNullOrWhiteSpace(col.ComputedFormula))
+            {
+                var formula = (col.ComputedFormula ?? "").Trim();
+                if (!formula.StartsWith('(') || !formula.EndsWith(')'))
+                    formula = $"({formula})";
+                var type = MapToPostgreSqlType(col);
+                return $"{colName} {type} GENERATED ALWAYS AS {formula} STORED";
+            }
+
+            var typeStr = MapToPostgreSqlType(col);
+            var identity = col.IsIdentity ? " GENERATED ALWAYS AS IDENTITY" : "";
+            var nullability = (col.IsNullable && !col.IsPrimaryKey && !col.IsIdentity) ? "" : " NOT NULL";
+            var defVal = !string.IsNullOrWhiteSpace(col.DefaultValue) && !col.IsIdentity ? $" DEFAULT {col.DefaultValue.Trim()}" : "";
+            return $"{colName} {typeStr}{identity}{nullability}{defVal}";
         }
         #endregion
 

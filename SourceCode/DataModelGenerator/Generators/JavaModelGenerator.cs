@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using BprDevKit.DatabaseManagement.Models.Operations;
+using BprDevKit.DataModelGenerator.Models;
+using BprDevKit.DataModelGenerator.Services;
 
 namespace BprDevKit.DataModelGenerator.Generators
 {
@@ -107,12 +109,13 @@ namespace BprDevKit.DataModelGenerator.Generators
             var implementsClause = options.ImplementSerializable ? " implements Serializable" : "";
             sb.AppendLine($"public record {className}(");
 
-            for (int i = 0; i < table.Columns.Count; i++)
+            var cols = table.Columns.Where(c => DataModelFilterHelper.ShouldIncludeColumn(c, globalOptions)).ToList();
+            for (int i = 0; i < cols.Count; i++)
             {
-                var col = table.Columns[i];
+                var col = cols[i];
                 var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 var javaType = SqlTypeMapper.MapToJava(col.DataType, col.IsNullable);
-                var comma = (i < table.Columns.Count - 1) ? "," : "";
+                var comma = (i < cols.Count - 1) ? "," : "";
 
                 if (options.IncludeJacksonAnnotations && fieldName != col.ColumnName)
                 {
@@ -175,6 +178,11 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             foreach (var col in table.Columns)
             {
+                if (!DataModelFilterHelper.ShouldIncludeColumn(col, globalOptions))
+                {
+                    continue;
+                }
+
                 var fieldName = DataModelNamingHelper.FormatPropertyName(col.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
                 var javaType = SqlTypeMapper.MapToJava(col.DataType, col.IsNullable);
                 fields.Add((fieldName, javaType, col.ColumnName, col));
@@ -256,6 +264,9 @@ namespace BprDevKit.DataModelGenerator.Generators
                 // Getters & Setters
                 foreach (var field in fields)
                 {
+                    var isComputed = DataModelFilterHelper.IsComputed(field.Col);
+                    var isReadOnly = isComputed && globalOptions.ComputedColumnMode == ComputedColumnHandling.IncludeReadOnly;
+
                     var propPascal = DataModelNamingHelper.ToPascalCase(field.Name);
                     // Getter
                     var getterPrefix = field.Type == "boolean" || field.Type == "Boolean" ? "is" : "get";
@@ -265,10 +276,13 @@ namespace BprDevKit.DataModelGenerator.Generators
                     sb.AppendLine();
 
                     // Setter
-                    sb.AppendLine($"    public void set{propPascal}({field.Type} {field.Name}) {{");
-                    sb.AppendLine($"        this.{field.Name} = {field.Name};");
-                    sb.AppendLine("    }");
-                    sb.AppendLine();
+                    if (!isReadOnly)
+                    {
+                        sb.AppendLine($"    public void set{propPascal}({field.Type} {field.Name}) {{");
+                        sb.AppendLine($"        this.{field.Name} = {field.Name};");
+                        sb.AppendLine("    }");
+                        sb.AppendLine();
+                    }
                 }
 
                 // toString

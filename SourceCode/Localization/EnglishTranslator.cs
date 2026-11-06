@@ -606,6 +606,14 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelNamingPascal] = "PascalCase",
             [TranslationKeys.DataModelNamingCamel] = "camelCase",
             [TranslationKeys.DataModelNamingSnake] = "snake_case",
+            [TranslationKeys.DataModelComputedColumnMode] = "Computed / Persisted Columns",
+            [TranslationKeys.DataModelComputedReadOnly] = "Read-only property (Getter only { get; })",
+            [TranslationKeys.DataModelComputedGetSet] = "Read/Write property ({ get; set; })",
+            [TranslationKeys.DataModelComputedExclude] = "Exclude from Data Model",
+            [TranslationKeys.DataModelIncludeRowVersion] = "Include RowVersion / Concurrency Token columns",
+            [TranslationKeys.DataModelIncludeHierarchyId] = "Include HierarchyId / Tree-Node columns",
+            [TranslationKeys.DataModelExcludedColumnPatterns] = "Excluded Column Patterns",
+            [TranslationKeys.DataModelExcludedColumnPatternsHelp] = "Comma-separated glob patterns to exclude from model (e.g. sys_*, *_Audit)",
 
             // C# Options
             [TranslationKeys.DataModelCsTypeKind] = "C# Type Kind",
