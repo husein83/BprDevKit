@@ -52,6 +52,43 @@ namespace BprDevKit.Config
                     string decrypted = encrypted.DecryptContent();
                     if (decrypted.TryDevDeserialize<List<DataModelProfile>>(out var list) && list != null)
                     {
+                        foreach (var p in list)
+                        {
+                            var cs = p.Options?.CSharp;
+                            if (cs != null)
+                            {
+                                if (cs.CustomSnippets == null) cs.CustomSnippets = new();
+                                if (cs.CustomSnippets.Count == 0 && !string.IsNullOrWhiteSpace(cs.CustomClassBodySnippet))
+                                {
+                                    cs.CustomSnippets.Add(new CustomCodeSnippetDefinition
+                                    {
+                                        TargetObjectType = "All",
+                                        Title = "Custom Code",
+                                        Code = cs.CustomClassBodySnippet,
+                                        IsEnabled = true
+                                    });
+                                    cs.CustomClassBodySnippet = string.Empty;
+                                }
+
+                                if (cs.ClassAttributes == null) cs.ClassAttributes = new();
+                                if (cs.ClassAttributes.Count == 0 && !string.IsNullOrWhiteSpace(cs.CustomClassAttributes))
+                                {
+                                    var lines = cs.CustomClassAttributes.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                                    foreach (var line in lines)
+                                    {
+                                        var clean = line.Trim();
+                                        if (string.IsNullOrWhiteSpace(clean)) continue;
+                                        cs.ClassAttributes.Add(new ClassAttributeDefinition
+                                        {
+                                            TargetObjectType = "All",
+                                            Attribute = clean.StartsWith("[") ? clean : $"[{clean}]",
+                                            IsEnabled = true
+                                        });
+                                    }
+                                    cs.CustomClassAttributes = string.Empty;
+                                }
+                            }
+                        }
                         return list;
                     }
                 }

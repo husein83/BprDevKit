@@ -45,15 +45,29 @@ namespace BprDevKit.DataModelGenerator.Generators
                 }
             }
 
-            if (options.IncludeCustomProperties && options.CustomProperties != null)
+            if (options.ClassAttributes != null && options.ClassAttributes.Count > 0)
             {
-                if (options.CustomProperties.Any(p => p.IsEnabled && (p.Attributes?.Contains("NotMapped") ?? false)))
+                foreach (var ca in options.ClassAttributes.Where(a => a.IsEnabled && !string.IsNullOrWhiteSpace(a.Attribute)))
                 {
-                    usings.Add("System.ComponentModel.DataAnnotations.Schema");
-                }
-                if (options.CustomProperties.Any(p => p.IsEnabled && (p.Attributes?.Contains("Json") ?? false)))
-                {
-                    usings.Add("System.Text.Json.Serialization");
+                    if (ca.Attribute.Contains("Keyless", StringComparison.OrdinalIgnoreCase) ||
+                        ca.Attribute.Contains("Index", StringComparison.OrdinalIgnoreCase))
+                    {
+                        usings.Add("Microsoft.EntityFrameworkCore");
+                    }
+                    if (ca.Attribute.Contains("DataContract", StringComparison.OrdinalIgnoreCase) ||
+                        ca.Attribute.Contains("DataMember", StringComparison.OrdinalIgnoreCase))
+                    {
+                        usings.Add("System.Runtime.Serialization");
+                    }
+                    if (ca.Attribute.Contains("NotMapped", StringComparison.OrdinalIgnoreCase) ||
+                        ca.Attribute.Contains("Table", StringComparison.OrdinalIgnoreCase))
+                    {
+                        usings.Add("System.ComponentModel.DataAnnotations.Schema");
+                    }
+                    if (ca.Attribute.Contains("Json", StringComparison.OrdinalIgnoreCase))
+                    {
+                        usings.Add("System.Text.Json.Serialization");
+                    }
                 }
             }
 
@@ -200,9 +214,30 @@ namespace BprDevKit.DataModelGenerator.Generators
                 }
             }
 
-            // Class-level custom attributes
-            if (!string.IsNullOrWhiteSpace(options.CustomClassAttributes))
+            // Class-level custom attributes (filtered by target database object type)
+            if (options.ClassAttributes != null && options.ClassAttributes.Count > 0)
             {
+                var matchingAttrs = options.ClassAttributes
+                    .Where(a => a.IsEnabled && !string.IsNullOrWhiteSpace(a.Attribute) && MatchesTargetObjectType(a.TargetObjectType, table.ObjectType));
+
+                foreach (var item in matchingAttrs)
+                {
+                    var interpolated = item.Attribute
+                        .Replace("{ClassName}", className, StringComparison.OrdinalIgnoreCase)
+                        .Replace("{TableName}", table.TableName, StringComparison.OrdinalIgnoreCase)
+                        .Replace("{SchemaName}", table.SchemaName, StringComparison.OrdinalIgnoreCase)
+                        .Replace("{Database}", table.DatabaseName ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+
+                    var attrs = ParseClassAttributeString(interpolated);
+                    foreach (var attr in attrs)
+                    {
+                        sb.AppendLine($"{indent}{attr}");
+                    }
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(options.CustomClassAttributes))
+            {
+                // Fallback for legacy profiles without structured ClassAttributes
                 var customAttrs = options.CustomClassAttributes
                     .Replace("{ClassName}", className, StringComparison.OrdinalIgnoreCase)
                     .Replace("{TableName}", table.TableName, StringComparison.OrdinalIgnoreCase)
@@ -265,13 +300,6 @@ namespace BprDevKit.DataModelGenerator.Generators
             {
                 var opList = options.OverrideProperties.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 foreach (var op in opList) overridePropNames.Add(op);
-            }
-
-            // Top-positioned Custom Class Properties
-            if (options.IncludeCustomProperties && options.CustomProperties != null && options.CustomProperties.Count > 0)
-            {
-                var topProps = options.CustomProperties.Where(p => p.IsEnabled && (string.IsNullOrWhiteSpace(p.Position) || string.Equals(p.Position, "Top", StringComparison.OrdinalIgnoreCase)) && MatchesTargetObjectType(p.TargetObjectType, table.ObjectType));
-                GenerateCustomProperties(sb, indent, topProps, className, table, options);
             }
 
             // #region Columns
@@ -1138,13 +1166,44 @@ namespace BprDevKit.DataModelGenerator.Generators
                 }
             }
 
-            // Custom Class Body Snippet
-            if (!string.IsNullOrWhiteSpace(options.CustomClassBodySnippet))
+            // Custom Code Snippets (structured & filtered by target database object type, placed at bottom of class)
+            if (options.CustomSnippets != null && options.CustomSnippets.Count > 0)
             {
+                var matchingSnippets = options.CustomSnippets
+                    .Where(s => s.IsEnabled && !string.IsNullOrWhiteSpace(s.Code) && MatchesTargetObjectType(s.TargetObjectType, table.ObjectType));
+
+                foreach (var snippet in matchingSnippets)
+                {
+                    var customSnippet = snippet.Code
+                        .Replace("{ClassName}", className, StringComparison.OrdinalIgnoreCase)
+                        .Replace("{TableName}", table.TableName, StringComparison.OrdinalIgnoreCase)
+                        .Replace("{SchemaName}", table.SchemaName, StringComparison.OrdinalIgnoreCase)
+                        .Replace("{Database}", table.DatabaseName ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+
+                    var regionTitle = !string.IsNullOrWhiteSpace(snippet.Title) ? snippet.Title.Trim() : "Custom Code";
+                    if (options.UseRegions)
+                    {
+                        sb.AppendLine($"{indent}    #region {regionTitle}");
+                    }
+                    foreach (var line in customSnippet.Split(new[] { '\r', '\n' }, StringSplitOptions.None))
+                    {
+                        sb.AppendLine($"{indent}    {line}");
+                    }
+                    if (options.UseRegions)
+                    {
+                        sb.AppendLine($"{indent}    #endregion");
+                    }
+                    sb.AppendLine();
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(options.CustomClassBodySnippet))
+            {
+                // Fallback for legacy configuration
                 var customSnippet = options.CustomClassBodySnippet
                     .Replace("{ClassName}", className, StringComparison.OrdinalIgnoreCase)
                     .Replace("{TableName}", table.TableName, StringComparison.OrdinalIgnoreCase)
-                    .Replace("{SchemaName}", table.SchemaName, StringComparison.OrdinalIgnoreCase);
+                    .Replace("{SchemaName}", table.SchemaName, StringComparison.OrdinalIgnoreCase)
+                    .Replace("{Database}", table.DatabaseName ?? string.Empty, StringComparison.OrdinalIgnoreCase);
 
                 if (options.UseRegions)
                 {
@@ -1159,13 +1218,6 @@ namespace BprDevKit.DataModelGenerator.Generators
                     sb.AppendLine($"{indent}    #endregion");
                 }
                 sb.AppendLine();
-            }
-
-            // Bottom-positioned Custom Class Properties
-            if (options.IncludeCustomProperties && options.CustomProperties != null && options.CustomProperties.Count > 0)
-            {
-                var bottomProps = options.CustomProperties.Where(p => p.IsEnabled && string.Equals(p.Position, "Bottom", StringComparison.OrdinalIgnoreCase) && MatchesTargetObjectType(p.TargetObjectType, table.ObjectType));
-                GenerateCustomProperties(sb, indent, bottomProps, className, table, options);
             }
 
             if (options.UseRegions && !string.IsNullOrWhiteSpace(options.OuterRegionName))
@@ -1732,150 +1784,71 @@ namespace BprDevKit.DataModelGenerator.Generators
                 return true;
             }
 
-            var actual = actualObjectType ?? Constants.ObjectTypes.Table;
+            var actual = NormalizeObjectType(actualObjectType);
 
             var targets = targetObjectType.Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             foreach (var target in targets)
             {
-                if (target.Equals("All", StringComparison.OrdinalIgnoreCase)) return true;
-                if (target.Equals(actual, StringComparison.OrdinalIgnoreCase)) return true;
+                var normalizedTarget = NormalizeObjectType(target);
+                if (normalizedTarget.Equals("All", StringComparison.OrdinalIgnoreCase)) return true;
+                if (normalizedTarget.Equals(actual, StringComparison.OrdinalIgnoreCase)) return true;
             }
             return false;
         }
 
-        private static List<string> ParseAttributeList(string rawAttributes, string className, string tableName, string schemaName, string propName)
+        public static string NormalizeObjectType(string? objectType)
+        {
+            if (string.IsNullOrWhiteSpace(objectType)) return Constants.ObjectTypes.Table;
+            var clean = objectType.Trim();
+            if (clean.Equals("All", StringComparison.OrdinalIgnoreCase)) return "All";
+            if (clean.Equals(Constants.ObjectTypes.View, StringComparison.OrdinalIgnoreCase)) return Constants.ObjectTypes.View;
+            if (clean.Equals(Constants.ObjectTypes.Procedure, StringComparison.OrdinalIgnoreCase) ||
+                clean.Equals(Constants.ObjectTypes.StoredProcedure, StringComparison.OrdinalIgnoreCase) ||
+                clean.Equals(Constants.ObjectTypes.ProcedureParameters, StringComparison.OrdinalIgnoreCase))
+                return Constants.ObjectTypes.Procedure;
+            if (clean.Equals(Constants.ObjectTypes.Function, StringComparison.OrdinalIgnoreCase) ||
+                clean.Equals(Constants.ObjectTypes.FunctionParameters, StringComparison.OrdinalIgnoreCase))
+                return Constants.ObjectTypes.Function;
+            if (clean.Equals(Constants.ObjectTypes.Table, StringComparison.OrdinalIgnoreCase)) return Constants.ObjectTypes.Table;
+            return clean;
+        }
+
+        private static List<string> ParseClassAttributeString(string input)
         {
             var result = new List<string>();
-            if (string.IsNullOrWhiteSpace(rawAttributes)) return result;
+            if (string.IsNullOrWhiteSpace(input)) return result;
 
-            var interpolated = rawAttributes
-                .Replace("{ClassName}", className, StringComparison.OrdinalIgnoreCase)
-                .Replace("{TableName}", tableName, StringComparison.OrdinalIgnoreCase)
-                .Replace("{SchemaName}", schemaName, StringComparison.OrdinalIgnoreCase)
-                .Replace("{PropertyName}", propName, StringComparison.OrdinalIgnoreCase)
-                .Trim();
+            var trimmed = input.Trim();
 
             // If it contains brackets, extract bracketed blocks: [Attr1], [Attr2(args)]
-            if (interpolated.Contains("[") && interpolated.Contains("]"))
+            if (trimmed.Contains("[") && trimmed.Contains("]"))
             {
-                var matches = System.Text.RegularExpressions.Regex.Matches(interpolated, @"\[(.*?)\]");
+                var matches = System.Text.RegularExpressions.Regex.Matches(trimmed, @"\[(.*?)\]");
                 if (matches.Count > 0)
                 {
                     foreach (System.Text.RegularExpressions.Match match in matches)
                     {
-                        var inner = match.Groups[1].Value.Trim();
-                        if (!string.IsNullOrWhiteSpace(inner))
+                        var content = match.Groups[1].Value.Trim();
+                        if (!string.IsNullOrWhiteSpace(content))
                         {
-                            result.Add($"[{inner}]");
+                            result.Add($"[{content}]");
                         }
                     }
                     return result;
                 }
             }
 
-            // Otherwise, split by newline, comma, or semicolon
-            var items = interpolated.Split(new[] { '\r', '\n', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            foreach (var item in items)
+            // Otherwise line-separated or comma-separated
+            var parts = trimmed.Split(new[] { '\r', '\n', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var part in parts)
             {
-                var clean = item.Trim();
+                var clean = part.Trim();
                 if (string.IsNullOrWhiteSpace(clean)) continue;
                 if (!clean.StartsWith("[")) clean = $"[{clean}]";
                 result.Add(clean);
             }
 
             return result;
-        }
-
-        private static void GenerateCustomProperties(
-            StringBuilder sb,
-            string indent,
-            IEnumerable<ClassPropertyDefinition> props,
-            string className,
-            TableOperation.Information table,
-            CSharpOptions options)
-        {
-            var propList = props.ToList();
-            if (propList.Count == 0) return;
-
-            if (options.UseRegions)
-            {
-                sb.AppendLine($"{indent}    #region Custom Properties");
-            }
-
-            foreach (var prop in propList)
-            {
-                if (string.IsNullOrWhiteSpace(prop.Name)) continue;
-
-                var mod = string.IsNullOrWhiteSpace(prop.AccessModifier) ? "public" : prop.AccessModifier;
-                var type = string.IsNullOrWhiteSpace(prop.Type) ? "int" : prop.Type;
-
-                var name = prop.Name
-                    .Replace("{ClassName}", className, StringComparison.OrdinalIgnoreCase)
-                    .Replace("{TableName}", table.TableName, StringComparison.OrdinalIgnoreCase)
-                    .Replace("{SchemaName}", table.SchemaName, StringComparison.OrdinalIgnoreCase);
-
-                // Summary / Documentation comment
-                if (!string.IsNullOrWhiteSpace(prop.Summary))
-                {
-                    var summary = prop.Summary
-                        .Replace("{ClassName}", className, StringComparison.OrdinalIgnoreCase)
-                        .Replace("{TableName}", table.TableName, StringComparison.OrdinalIgnoreCase)
-                        .Replace("{SchemaName}", table.SchemaName, StringComparison.OrdinalIgnoreCase);
-                    sb.AppendLine($"{indent}    /// <summary>");
-                    sb.AppendLine($"{indent}    /// {summary.Replace("\r", "").Replace("\n", $" \n{indent}    /// ")}");
-                    sb.AppendLine($"{indent}    /// </summary>");
-                }
-
-                // Attributes (supports multiple attributes e.g. [NotMapped], [JsonIgnore])
-                if (!string.IsNullOrWhiteSpace(prop.Attributes))
-                {
-                    var attrs = ParseAttributeList(prop.Attributes, className, table.TableName, table.SchemaName, name);
-                    foreach (var attr in attrs)
-                    {
-                        sb.AppendLine($"{indent}    {attr}");
-                    }
-                }
-
-                // Property signature
-                if (prop.Accessor == "expression")
-                {
-                    var exprBody = (prop.DefaultValue ?? string.Empty)
-                        .Replace("{ClassName}", className, StringComparison.OrdinalIgnoreCase)
-                        .Replace("{TableName}", table.TableName, StringComparison.OrdinalIgnoreCase)
-                        .Replace("{SchemaName}", table.SchemaName, StringComparison.OrdinalIgnoreCase)
-                        .TrimEnd(';').Trim();
-                    sb.AppendLine($"{indent}    {mod} {type} {name} => {exprBody};");
-                }
-                else
-                {
-                    var accessor = prop.Accessor switch
-                    {
-                        "get_init" => "{ get; init; }",
-                        "get_only" => "{ get; }",
-                        _ => "{ get; set; }"
-                    };
-
-                    var defaultVal = "";
-                    if (!string.IsNullOrWhiteSpace(prop.DefaultValue))
-                    {
-                        var val = prop.DefaultValue
-                            .Replace("{ClassName}", className, StringComparison.OrdinalIgnoreCase)
-                            .Replace("{TableName}", table.TableName, StringComparison.OrdinalIgnoreCase)
-                            .Replace("{SchemaName}", table.SchemaName, StringComparison.OrdinalIgnoreCase)
-                            .TrimEnd(';').Trim();
-                        defaultVal = $" = {val};";
-                    }
-
-                    sb.AppendLine($"{indent}    {mod} {type} {name} {accessor}{defaultVal}");
-                }
-                sb.AppendLine();
-            }
-
-            if (options.UseRegions)
-            {
-                sb.AppendLine($"{indent}    #endregion");
-                sb.AppendLine();
-            }
         }
     }
 }

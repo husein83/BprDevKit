@@ -83,6 +83,7 @@ BprDevKit از طیف گسترده‌ای از محبوب‌ترین پایگا�
 #### ۴.۱. مدیریت پایگاه‌داده و کنسول اجرای کوئری (Database Management & Query Runner)
 این ماژول امکانات جامعی را برای مدیریت اشیاء، داده‌ها و کوئری‌زدن مستقیم فراهم می‌کند:
 - **مدیریت کامل اشیاء:** مرور، مشاهده ساختار و تغییرات در جداول (Tables)، ستون‌ها، کلیدهای اصلی (PK)، کلیدهای خارجی (FK)، ایندکس‌ها، قیود چک (Check Constraints)، تریگرها (Triggers)، ویوها (Views)، توابع (Functions) و پروسیجرها (Stored Procedures).
+- **ستون‌های محاسباتی و ذخیره‌شده (Computed & Persisted Columns):** امکان تعریف ستون‌های محاسباتی مجازی و فیزیکی ذخیره‌شده روی دیسک (Persisted / Stored) در ساخت جدول و افزودن ستون در تمام پایگاه‌های داده تحت پشتیبانی (SQL Server, Oracle, PostgreSQL, MySQL, MariaDB, SQLite) همراه با فرمول‌نویسی داینامیک، ویرایش آنلاین و اعتبارسنجی خودکار.
 - **کنسول اجرای سریع کوئری (Quick SQL Query Runner):** 
   - تب اختصاصی در صفحه مدیریت دیتابیس جهت نوشتن و اجرای سریع دستورات و کوئری‌های SQL بدون نیاز به باز کردن ابزارهای خارجی.
   - نمایش داده‌ها به صورت جدول ساخت‌یافته و پویا، نمایش زمان اجرای کوئری، تعداد رکوردهای تحت تاثیر، و پیام‌های خطا یا وضعیت به همراه قابلیت پاکسازی سریع.
@@ -123,6 +124,14 @@ BprDevKit از طیف گسترده‌ای از محبوب‌ترین پایگا�
 - **Singularize Class Names:** مفردسازی هوشمند نام کلاس‌ها (مثلاً تبدیل جدول `Users` به کلاس `User`) — پیش‌فرض: غیرفعال (`false`).
 - **Generate Navigation Properties:** تولید خودکار رفرنس‌ها و کالکشن‌های ارتباطی کلید خارجی (FK). در تمام کلاس‌ها، ریجن‌های `#region References` و `#region Relations` حتی در صورت عدم وجود کلید خارجی برای حفظ ساختار یکنواخت درج می‌شوند.
 - **Include XML / Docstring Comments:** استخراج اتوماتیک توضیحات ستون‌ها (Extended Properties) از دیتابیس و قرار دادن آن به عنوان کامنت بالای هر پراپرتی.
+- **رفتار و مدیریت ستون‌های محاسباتی و پایدار (Computed / Persisted Columns):** کنترل انتخابی کامل بر نحوه ایجاد فیلدهای محاسباتی در مدل:
+  - `فقط خواندنی (IncludeReadOnly)`: تولید فیلد صرفاً با Getter و بدون Setter (در C# به شکل `{ get; }` همراه با انوتیشن `[DatabaseGenerated(DatabaseGeneratedOption.Computed)]` و کانفیگ Fluent API `.HasComputedColumnSql(...)`، در TypeScript به صورت `readonly`، در Python با `Field(frozen=True)` و در Java بدون متد Setter).
+  - `خواندنی و نوشتنی (IncludeWithGetterAndSetter)`: تولید فیلد به صورت متداول با Getter و Setter.
+  - `عدم ایجاد در دیتامدل (Exclude)`: حذف کامل ستون‌های محاسباتی از کلاس‌های خروجی.
+- **مدیریت ستون‌های خاص (Special Columns):**
+  - **Include RowVersion Columns:** سوییچ فعال/غیرفعال‌سازی ایجاد ستون‌های توکن همزمانی (`rowversion` / `timestamp`).
+  - **Include HierarchyId / Tree-Node Columns:** سوییچ فعال/غیرفعال‌سازی ایجاد ستون‌های داده درختی و سلسله‌مراتبی (`hierarchyid` و الگوهای TreeNode).
+  - **Excluded Column Patterns:** فیلتر الگوهای وایلدکارت جداشده با کاما جهت نادیده گرفتن ستون‌های خاص (مانند `sys_*` یا `*_Audit`).
 
 ##### خروجی و دانلود:
 - پیش‌نمایش آنی کد با هایلایت سینتکس، شمارنده خطوط و تعداد کاراکترها.
@@ -145,6 +154,7 @@ BprDevKit از طیف گسترده‌ای از محبوب‌ترین پایگا�
 - **Partial Class:** تولید کلاس به صورت `public partial class`.
 - **Organize Class with #region Blocks:** تفکیک منظم پراپرتی‌ها، کلیدها، فیلدهای پشتیبان و رفرنس‌ها در بلوک‌های `#region`. ریجن‌های References و Relations حتی برای کلاس‌های فاقد کلید خارجی جهت یکدستی سورس‌کد همیشه ایجاد می‌شوند.
 - **Class Constants Definition:** تعریف ثابت‌های اختصاصی برای هر کلاس با توکن‌های `{TableName}`، `{SchemaName}`، `{ClassName}` و `{Database}`.
+- **تکه کدهای سفارشی بدنه کلاس (Custom Code Snippets):** امکان تعریف متدها، توابع کمکی، لاجیک‌های اختصاصی و پراپرتی‌ها در انتهای کلاس‌ها (`Bottom of class`) با ویرایشگر چندخطی (Multiline Textarea)، قابلیت فیلتر بر اساس نوع دیتامدل (`All`، `Table`، `View`، `Procedure`، `Function`)، دکمه تکثیر سریع (Duplicate) و پشتیبانی از توکن‌های `{ClassName}`، `{TableName}`، `{SchemaName}` و `{Database}`.
 - **Nullable Primary Key Properties:** قابلیت تعریف فیلدهای کلید اصلی (PK) به صورت نال‌پذیر (`int?`، `Guid?` و ...) جهت استفاده در DTOها، سناریوهای CQRS و مدل‌های ثبت داده قبل از تخصیص شناسه دیتابیس.
 
 ##### ۲. تولید خودکار DbContext و Fluent API Configurations:
@@ -171,7 +181,8 @@ BprDevKit از طیف گسترده‌ای از محبوب‌ترین پایگا�
 | **`[Timestamp]`** | تولید اتریبیوت `[Timestamp]` برای ستون‌های همزمانی (RowVersion / Concurrency). |
 | **`[Keyless]` و Viewها** | تولید خودکار `[Keyless]` و `.HasNoKey()` در EF Core برای ویوها و پروسیجرهای بدون کلید اصلی تا در زمان اجرا خطایی رخ ندهد. |
 | **`[Display]` و `[Description]`** | تولید خودکار `[Display(Name = "...")]` با عناوین خوانا و انسانی، و `[Description]` از روی توضیحات دیتابیس. |
-| **اتریبیوت‌های سفارشی و قوانین شرطی** | اعمال قوانین شرطی بر اساس الگو (مثلاً `*Date:[Auditable]` یا `uniqueidentifier:[GuidColumn]`) و اتریبیوت‌های سراسری کلاس و پراپرتی‌ها. |
+| **اتریبیوت‌های سفارشی بالای کلاس (Data Annotations)** | جدول تعاملی برای تعریف انوتیشن‌های بالای کلاس‌ها (مانند `[Keyless]`، `[DataContract]`، `[Serializable]`) با قابلیت تفکیک دقیق بر اساس نوع آبجکت مقصد (`All`، `Table`، `View`، `Procedure`، `Function`)، دکمه تکثیر سریع (Duplicate) جهت کپی و تنظیم سریع برای انواع مختلف دیتامدل، و پشتیبانی از چندین اتریبیوت همزمان و توکن‌های `{ClassName}`، `{TableName}`، `{SchemaName}` و `{Database}`. |
+| **قوانین شرطی ستون‌ها و فیلدها** | اعمال قوانین شرطی بر اساس الگو (مثلاً `*Date:[Auditable]` یا `uniqueidentifier:[GuidColumn]`) و اتریبیوت‌های پیش‌فرض سراسری پراپرتی‌ها. |
 
 ---
 
@@ -222,9 +233,9 @@ BprDevKit از طیف گسترده‌ای از محبوب‌ترین پایگا�
 #### ۴.۸. تولید اسکریپت پایگاه‌داده (Script Generator)
 - امکان انتخاب دسته‌ای جداول، ویوها، پروسیجرها و توابع در انواع دیتابیس‌ها.
 - گزینه‌های تولید اسکریپت:
-  - ساخت ساختار (`CREATE`)
+  - ساخت ساختار (`CREATE`) با پشتیبانی هوشمند از انواع ستون‌های محاسباتی مجازی و فیزیکی (`PERSISTED` و `PERSISTED NOT NULL`).
   - حذف و ساخت مجدد (`DROP AND CREATE`)
-  - استخراج داده‌ها به صورت دستورات `INSERT` (همراه با مدیریت `IDENTITY_INSERT`)
+  - استخراج داده‌ها به صورت دستورات `INSERT` (همراه با مدیریت `IDENTITY_INSERT` و استثنا کردن خودکار ستون‌های محاسباتی و `rowversion`/`timestamp` برای جلوگیری از خطای دیتابیس)
 - تحلیل وابستگی‌ها و ایجاد اسکریپت مرتب بر اساس اولویت کلیدهای خارجی.
 
 ---
@@ -290,7 +301,7 @@ dotnet run --project SourceCode/BprDevKit.csproj
 
 #### ساخت نسخه پرتابل مستقل (Self-Contained Single-File برای ویندوز بدون نیاز به نصب بودن .NET روی سیستم مقصد):
 ```bash
-dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.3.0-Standalone
+dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.5.0-Standalone
 ```
 فایل خروجی `BprDevKit.exe` یک نسخه کاملاً مستقل و خودکفا است که بدون نیاز به پیش‌نیاز ران‌تایم، بر روی هر سیستم ویندوز ۶۴ بیتی با دو بار کلیک اجرا می‌شود.
 
@@ -373,6 +384,8 @@ BprDevKit provides dedicated SQL generator engines, metadata extractors, and con
   - Browse server disks to pick `.bak` files directly.
   - Overwrite option (`WITH REPLACE`).
   - Active connection termination (`ROLLBACK IMMEDIATE`).
+- **Computed & Persisted (Generated) Columns:**
+  - Full support for defining virtual and physical persisted/stored computed columns across all supported database engines (SQL Server, Oracle, PostgreSQL, MySQL, MariaDB, SQLite) with dynamic formula expressions, live alteration, and reactive change validation.
 
 ---
 
@@ -401,6 +414,14 @@ Fast 3-step generation workflow:
 - **Singularize Class Names:** Converts plural table names into singular entity names (e.g., `Users` $\rightarrow$ `User`), preserving exact casing when desired (default: `false`).
 - **Generate Navigation Properties:** Automatically creates reference and collection navigation properties for foreign keys. Navigation regions (`#region References` and `#region Relations`) are always rendered with closing `#endregion` to maintain consistent architectural structure across all entities.
 - **Include XML / Docstring Comments:** Extracts database extended properties and column descriptions into XML documentation comments (`/// <summary>`) or docstrings.
+- **Computed / Persisted Column Handling:** Flexible user-controlled strategy for calculated columns:
+  - `IncludeReadOnly`: Generates read-only properties without setters (in C# `{ get; }` with `[DatabaseGenerated(DatabaseGeneratedOption.Computed)]` and EF Core `.HasComputedColumnSql(...)`, in TypeScript `readonly`, in Python `Field(frozen=True)`, and in Java getter-only).
+  - `IncludeWithGetterAndSetter`: Generates standard read/write property with both getter and setter.
+  - `Exclude`: Completely omits computed columns from generated models.
+- **Special Column Inclusions:**
+  - **Include RowVersion Columns:** Toggle generation of concurrency token columns (`rowversion` / `timestamp`).
+  - **Include HierarchyId / Tree-Node Columns:** Toggle generation of hierarchical and tree node columns (`hierarchyid` and TreeNode patterns).
+  - **Excluded Column Patterns:** Comma-separated wildcard glob patterns to omit specific columns from output models (e.g. `sys_*`, `*_Audit`).
 
 ##### Output & Packaging:
 - Instant syntax-highlighted code preview with character and line counters.
@@ -423,6 +444,7 @@ Comprehensive options accessible via profile management:
 - **Partial Class:** Adds `partial` modifier to class signatures.
 - **#region Blocks:** Segregates fields, properties, foreign keys, and constructors cleanly. Empty navigation regions are safely preserved.
 - **Class Constants Definition:** Define compile-time constants per entity with token helpers (`{TableName}`, `{SchemaName}`, `{ClassName}`, `{Database}`).
+- **Custom Code Snippets:** Define arbitrary methods, helper logic, properties, and constructors placed cleanly at the bottom of generated model classes with a multiline code editor, selective filtering by database object type (`All`, `Table`, `View`, `Procedure`, `Function`), one-click Duplicate button, and token support (`{ClassName}`, `{TableName}`, `{SchemaName}`, `{Database}`).
 - **Nullable Primary Key Properties:** Option to generate primary key fields as nullable types (`int?`, `Guid?`, etc.) for DTOs, CQRS commands, and insertion payloads prior to key assignment.
 
 ##### 2. DbContext & Fluent API Generator:
@@ -448,7 +470,8 @@ Located under the **Custom Attributes** tab:
 | **`[Timestamp]`** | Concurrency token attribute for `rowversion` / `timestamp` fields. |
 | **`[Keyless]` for Views** | Generates `[Keyless]` and `.HasNoKey().ToView(...)` in EF Core for Views and Procedures without primary keys to prevent runtime query exceptions. |
 | **`[Display]` & `[Description]`** | Generates `[Display(Name = "...")]` with human-readable titles, and `[Description]` from database documentation. |
-| **Conditional Column Rules** | Define wildcard rules (e.g., `*Date:[Auditable]`, `uniqueidentifier:[GuidColumn]`) plus class-level and property-level custom attributes. |
+| **Custom Class Attributes (Data Annotations)** | Dedicated table to define class-level annotations (e.g. `[Keyless]`, `[DataContract]`, `[Serializable]`) filterable by target database object type (`All`, `Table`, `View`, `Procedure`, `Function`), one-click Duplicate button to quickly copy rules across object types, multiple attributes support per rule, and token interpolation (`{ClassName}`, `{TableName}`, `{SchemaName}`, `{Database}`). |
+| **Conditional Column Rules** | Define wildcard rules (e.g., `*Date:[Auditable]`, `uniqueidentifier:[GuidColumn]`) plus default property-level custom attributes. |
 
 ---
 
@@ -499,9 +522,9 @@ Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven De
 #### 4.8. Script Generator
 - Select any combination of database objects (Tables, Views, Procedures, Functions).
 - Script generation modes:
-  - `CREATE`
+  - `CREATE` with first-class support for virtual and physically persisted computed columns (`PERSISTED` and `PERSISTED NOT NULL`).
   - `DROP AND CREATE`
-  - `DATA (INSERT)` with automated `IDENTITY_INSERT` wrapping
+  - `DATA (INSERT)` with automated `IDENTITY_INSERT` wrapping and automatic exclusion of computed and `rowversion`/`timestamp` columns to prevent database execution errors.
 - Foreign key dependency resolution ensures scripts execute without constraint violations.
 
 ---
@@ -567,7 +590,7 @@ Open your browser and navigate to `http://localhost:5000` or `https://localhost:
 
 #### Build Self-Contained Standalone Executable (Windows x64 - Zero .NET installation required on target machine):
 ```bash
-dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.3.0-Standalone
+dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.5.0-Standalone
 ```
 The output `BprDevKit.exe` is completely self-contained and ready to execute on any 64-bit Windows machine by double-clicking.
 

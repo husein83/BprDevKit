@@ -171,20 +171,35 @@ namespace BprDevKit.DataModelGenerator.Models
     }
 
     /// <summary>
-    /// User-defined custom property definition for model classes.
-    /// Can target specific object types (e.g. All, Table, View, Procedure, Function).
+    /// User-defined custom code snippet placed at the bottom of the generated model class.
+    /// Can target specific object types (All, Table, View, Procedure, Function).
     /// </summary>
-    public class ClassPropertyDefinition
+    public class CustomCodeSnippetDefinition
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public bool IsEnabled { get; set; } = true;
-        public string AccessModifier { get; set; } = "public"; // public, protected, internal, private
-        public string Type { get; set; } = "int";
-        public string Name { get; set; } = "CustomProperty";
-        public string Accessor { get; set; } = "get_set"; // get_set, get_init, get_only, expression
-        public string? DefaultValue { get; set; }
-        public string? Attributes { get; set; } = "[NotMapped]";
-        public string? Summary { get; set; }
+
+        /// <summary>
+        /// Target object type: "All", "Table", "View", "Procedure", "Function"
+        /// </summary>
+        public string TargetObjectType { get; set; } = "All";
+
+        public string Title { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Multiline custom code body (methods, properties, constructors, helper logic)
+        /// </summary>
+        public string Code { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// User-defined custom class attribute (Data Annotation) definition placed on top of model classes.
+    /// Can target specific object types (e.g. All, Table, View, Procedure, Function).
+    /// </summary>
+    public class ClassAttributeDefinition
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public bool IsEnabled { get; set; } = true;
 
         /// <summary>
         /// Target object type: "All", "Table", "View", "Procedure", "Function"
@@ -192,9 +207,10 @@ namespace BprDevKit.DataModelGenerator.Models
         public string TargetObjectType { get; set; } = "All";
 
         /// <summary>
-        /// Placement in class: "Top" (before columns) or "Bottom" (after columns)
+        /// Attribute expression, e.g. "[Keyless]", "[DataContract]", "[Serializable]"
+        /// Available tokens: {ClassName}, {TableName}, {SchemaName}, {Database}
         /// </summary>
-        public string Position { get; set; } = "Top";
+        public string Attribute { get; set; } = "[Keyless]";
     }
 
     /// <summary>
@@ -245,6 +261,7 @@ namespace BprDevKit.DataModelGenerator.Models
         public string BaseClass { get; set; } = string.Empty;
         public string Interfaces { get; set; } = string.Empty;
         public string CustomClassAttributes { get; set; } = string.Empty;
+        public List<ClassAttributeDefinition> ClassAttributes { get; set; } = new();
 
         // Regions and Structure
         public bool UseRegions { get; set; } = false;
@@ -254,8 +271,6 @@ namespace BprDevKit.DataModelGenerator.Models
         public List<ClassConstantDefinition> Constants { get; set; } = new();
         public bool IncludeOverrides { get; set; } = false;
         public List<ClassOverrideDefinition> Overrides { get; set; } = new();
-        public bool IncludeCustomProperties { get; set; } = false;
-        public List<ClassPropertyDefinition> CustomProperties { get; set; } = new();
         public bool IncludeTableSchemaOverrides { get; set; } = false;
         public string OverrideProperties { get; set; } = string.Empty;
 
@@ -288,6 +303,7 @@ namespace BprDevKit.DataModelGenerator.Models
 
         // Custom Snippet
         public string CustomClassBodySnippet { get; set; } = string.Empty;
+        public List<CustomCodeSnippetDefinition> CustomSnippets { get; set; } = new();
 
         // DbContext
         public bool GenerateDbContext { get; set; } = false;

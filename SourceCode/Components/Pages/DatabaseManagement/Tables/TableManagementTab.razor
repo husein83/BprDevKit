@@ -214,13 +214,14 @@
                                     <td>
                                         @if (column.IsComputed)
                                         {
-                                            <div class="input-group input-group-sm">
-                                                <input class="form-control form-control-sm font-monospace" placeholder="@t[TranslationKeys.ColPanelFormulaPlaceholder]"
-                                                       @bind="column.ComputedFormula" />
-                                                <span class="input-group-text d-inline-flex align-items-center gap-1">
-                                                    <input class="form-check-input m-0" type="checkbox" id="@($"persisted-{column.GetHashCode()}")" checked="@column.IsPersisted" @onchange="e => column.IsPersisted = (bool)e.Value!" />
-                                                    <label class="form-check-label small mb-0 user-select-none" for="@($"persisted-{column.GetHashCode()}")">@t[TranslationKeys.ColPanelPersisted]</label>
-                                                </span>
+                                            <div>
+                                                <textarea class="form-control form-control-sm font-monospace mb-1" rows="2" style="resize: vertical; min-height: 38px;"
+                                                          placeholder="@t[TranslationKeys.ColPanelFormulaPlaceholder]"
+                                                          @bind="column.ComputedFormula"></textarea>
+                                                <div class="form-check form-check-inline m-0">
+                                                    <input class="form-check-input m-0 me-1" type="checkbox" id="@($"persisted-{column.GetHashCode()}")" checked="@column.IsPersisted" @onchange="e => column.IsPersisted = (bool)e.Value!" />
+                                                    <label class="form-check-label small user-select-none" for="@($"persisted-{column.GetHashCode()}")">@t[TranslationKeys.ColPanelPersisted]</label>
+                                                </div>
                                             </div>
                                         }
                                         else

@@ -729,7 +729,11 @@
         if (_selectedProfileId.HasValue)
         {
             _selectedProfile = _profiles.FirstOrDefault(p => p.Id == _selectedProfileId);
-            if (_selectedProfile == null)
+            if (_selectedProfile != null)
+            {
+                _options = _selectedProfile.Options;
+            }
+            else
             {
                 _selectedProfileId = null;
             }
@@ -864,6 +868,16 @@
     private async Task GenerateModels()
     {
         if (_databaseManager == null || string.IsNullOrWhiteSpace(_selectedDatabase)) return;
+
+        if (_selectedProfileId.HasValue)
+        {
+            var fresh = ModelGeneratorConfiguration.GetProfilesFor(_selectedServerId, _selectedDatabase).FirstOrDefault(p => p.Id == _selectedProfileId.Value);
+            if (fresh != null)
+            {
+                _selectedProfile = fresh;
+                _options = fresh.Options;
+            }
+        }
 
         if (TotalSelectedCount == 0)
         {

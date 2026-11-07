@@ -34,7 +34,7 @@
                     @if (_form.IsComputed)
                     {
                         <label class="form-label small fw-semibold" for="column-formula">@t[TranslationKeys.ColPanelFormula]</label>
-                        <input id="column-formula" class="form-control form-control-sm font-monospace" placeholder="@t[TranslationKeys.ColPanelFormulaPlaceholder]" @bind="_form.ComputedFormula" @bind:event="oninput" />
+                        <textarea id="column-formula" class="form-control form-control-sm font-monospace" rows="3" style="resize: vertical; min-height: 52px;" placeholder="@t[TranslationKeys.ColPanelFormulaPlaceholder]" @bind="_form.ComputedFormula" @bind:event="oninput"></textarea>
                     }
                     else if (CanEditType)
                     {

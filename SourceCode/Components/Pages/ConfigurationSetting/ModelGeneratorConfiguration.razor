@@ -118,7 +118,7 @@
                                         <button class="btn btn-outline-secondary" type="button" @onclick="() => CloneProfile(prof)" title="Clone Profile">
                                             <i class="bi bi-copy"></i>
                                         </button>
-                                        <button class="btn btn-outline-danger" type="button" @onclick="() => DeleteProfile(prof)" title="@t[TranslationKeys.Delete]">
+                                        <button class="btn btn-outline-danger" type="button" @onclick="() => ConfirmDeleteProfile(prof)" title="@t[TranslationKeys.Delete]">
                                             <i class="bi bi-trash3"></i>
                                         </button>
                                     </div>
@@ -128,6 +128,36 @@
                     </div>
                 }
             </div>
+
+            @if (_showDeleteProfileConfirmation && _profileToDelete != null)
+            {
+                <!-- Delete Profile Confirmation Modal -->
+                <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow">
+                            <div class="modal-header border-bottom-0 pb-0">
+                                <h5 class="modal-title text-danger">
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>@t[TranslationKeys.ConfirmDelete]
+                                </h5>
+                                <button type="button" class="btn-close" @onclick="CancelDeleteProfileConfirmation"></button>
+                            </div>
+                            <div class="modal-body py-4">
+                                <p class="mb-0">
+                                    @t.Get(TranslationKeys.ConfirmDeleteText, _profileToDelete.ProfileName)
+                                </p>
+                            </div>
+                            <div class="modal-footer border-top-0 pt-0">
+                                <button class="btn btn-outline-secondary" @onclick="CancelDeleteProfileConfirmation">
+                                    <i class="bi bi-x-lg me-1"></i> @t[TranslationKeys.Cancel]
+                                </button>
+                                <button class="btn btn-danger" @onclick="DeleteProfileConfirmed">
+                                    <i class="bi bi-trash3 me-1"></i> @t[TranslationKeys.YesDelete]
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
         }
     }
     else
@@ -521,115 +551,6 @@
                                                             </td>
                                                             <td class="text-center">
                                                                 <button class="btn btn-link btn-sm text-danger p-0" type="button" @onclick="() => RemoveOverride(item)">
-                                                                    <i class="bi bi-trash3"></i>
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    }
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    }
-                                }
-                            </div>
-                        </div>
-
-                        <!-- User-defined Custom Class Properties -->
-                        <div class="col-12 mt-3">
-                            <div class="card p-3 border shadow-sm bg-white rounded-3">
-                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                                    <div class="form-check form-switch mb-0">
-                                        <input class="form-check-input" type="checkbox" id="cs-p-customprops" @bind="_editingProfile.Options.CSharp.IncludeCustomProperties" @bind:after="EnsureInitialCustomProperties" />
-                                        <label class="form-check-label small fw-bold" for="cs-p-customprops">@t[TranslationKeys.DataModelCsIncludeCustomProperties]</label>
-                                    </div>
-                                    @if (_editingProfile.Options.CSharp.IncludeCustomProperties)
-                                    {
-                                        <button class="btn btn-xs btn-outline-primary" type="button" @onclick="AddCustomProperty">
-                                            <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.DataModelAddCustomProperty]
-                                        </button>
-                                    }
-                                </div>
-                                @if (_editingProfile.Options.CSharp.IncludeCustomProperties)
-                                {
-                                    <div class="small text-muted mb-2">
-                                        @t[TranslationKeys.DataModelCustomPropertiesHelp]
-                                        <span class="ms-2">Available tokens: <code>{TableName}</code>, <code>{SchemaName}</code>, <code>{ClassName}</code></span>
-                                    </div>
-
-                                    @if (_editingProfile.Options.CSharp.CustomProperties.Count > 0)
-                                    {
-                                        <div class="table-responsive">
-                                            <table class="table table-sm table-bordered align-middle small mb-0">
-                                                <thead class="table-light">
-                                                    <tr>
-                                                        <th style="width: 40px;" class="text-center" title="@t[TranslationKeys.FkPanelEnabled]">✓</th>
-                                                        <th style="width: 140px;">@t[TranslationKeys.DataModelTargetObjectType]</th>
-                                                        <th style="width: 100px;">@t[TranslationKeys.DataModelPropertyPosition]</th>
-                                                        <th style="width: 90px;">@t[TranslationKeys.DataModelConstantModifier]</th>
-                                                        <th style="width: 100px;">@t[TranslationKeys.DataType]</th>
-                                                        <th style="width: 140px;">@t[TranslationKeys.DataModelPropertyName]</th>
-                                                        <th style="width: 110px;">@t[TranslationKeys.DataModelPropertyAccessor]</th>
-                                                        <th style="width: 130px;">@t[TranslationKeys.DefaultValue]</th>
-                                                        <th style="width: 150px;">@t[TranslationKeys.DataModelPropertyAttributes]</th>
-                                                        <th style="width: 65px;"></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @foreach (var prop in _editingProfile.Options.CSharp.CustomProperties)
-                                                    {
-                                                        var item = prop;
-                                                        <tr>
-                                                            <td class="text-center">
-                                                                <input class="form-check-input" type="checkbox" @bind="item.IsEnabled" />
-                                                            </td>
-                                                            <td>
-                                                                <select class="form-select form-select-sm" @bind="item.TargetObjectType">
-                                                                    <option value="All">@t[TranslationKeys.DataModelTargetAll]</option>
-                                                                    <option value="Table">@t[TranslationKeys.DataModelTargetTable]</option>
-                                                                    <option value="View">@t[TranslationKeys.DataModelTargetView]</option>
-                                                                    <option value="Procedure">@t[TranslationKeys.DataModelTargetProcedure]</option>
-                                                                    <option value="Function">@t[TranslationKeys.DataModelTargetFunction]</option>
-                                                                </select>
-                                                            </td>
-                                                            <td>
-                                                                <select class="form-select form-select-sm" @bind="item.Position">
-                                                                    <option value="Top">@t[TranslationKeys.DataModelPositionTop]</option>
-                                                                    <option value="Bottom">@t[TranslationKeys.DataModelPositionBottom]</option>
-                                                                </select>
-                                                            </td>
-                                                            <td>
-                                                                <select class="form-select form-select-sm" @bind="item.AccessModifier">
-                                                                    <option value="public">public</option>
-                                                                    <option value="protected">protected</option>
-                                                                    <option value="internal">internal</option>
-                                                                    <option value="private">private</option>
-                                                                </select>
-                                                            </td>
-                                                            <td>
-                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="int" @bind="item.Type" />
-                                                            </td>
-                                                            <td>
-                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="PropertyName" @bind="item.Name" />
-                                                            </td>
-                                                            <td>
-                                                                <select class="form-select form-select-sm" @bind="item.Accessor">
-                                                                    <option value="get_set">{ get; set; }</option>
-                                                                    <option value="get_init">{ get; init; }</option>
-                                                                    <option value="get_only">{ get; }</option>
-                                                                    <option value="expression">=> expr</option>
-                                                                </select>
-                                                            </td>
-                                                            <td>
-                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="0, null" @bind="item.DefaultValue" />
-                                                            </td>
-                                                            <td>
-                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="[NotMapped], [JsonIgnore]" @bind="item.Attributes" />
-                                                            </td>
-                                                            <td class="text-center text-nowrap">
-                                                                <button class="btn btn-link btn-sm text-secondary p-0 me-2" type="button" title="@t[TranslationKeys.DataModelDuplicateProperty]" @onclick="() => DuplicateCustomProperty(item)">
-                                                                    <i class="bi bi-copy"></i>
-                                                                </button>
-                                                                <button class="btn btn-link btn-sm text-danger p-0" type="button" title="@t[TranslationKeys.Delete]" @onclick="() => RemoveCustomProperty(item)">
                                                                     <i class="bi bi-trash3"></i>
                                                                 </button>
                                                             </td>
@@ -1239,17 +1160,81 @@
                             </div>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsCustomClassAttributes]</label>
-                            <textarea class="form-control form-control-sm font-monospace" rows="3" placeholder="@("[DataContract]\n[Serializable]")" @bind="_editingProfile.Options.CSharp.CustomClassAttributes"></textarea>
-                            <div class="small text-muted" style="font-size: 0.72rem;">
-                                Tokens: <code>{ClassName}</code> <code>{TableName}</code> <code>{SchemaName}</code> <code>{Database}</code>
+                        <div class="col-12">
+                            <div class="card border shadow-sm">
+                                <div class="card-header bg-white py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                    <div>
+                                        <span class="small fw-semibold">
+                                            <i class="bi bi-tags text-primary me-1"></i>@t[TranslationKeys.DataModelCsCustomClassAttributes]
+                                        </span>
+                                        <span class="text-muted small ms-2" style="font-size: 0.72rem;">
+                                            Tokens: <code>{ClassName}</code> <code>{TableName}</code> <code>{SchemaName}</code> <code>{Database}</code>
+                                        </span>
+                                    </div>
+                                    <button class="btn btn-xs btn-outline-primary" type="button" @onclick="AddClassAttribute">
+                                        <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.DataModelAddClassAttribute]
+                                    </button>
+                                </div>
+                                <div class="card-body p-2">
+                                    @if (_editingProfile.Options.CSharp.ClassAttributes.Count == 0)
+                                    {
+                                        <div class="text-muted small text-center py-2">
+                                            @t[TranslationKeys.DataModelNoClassAttributes]
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered align-middle small mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th style="width: 40px;" class="text-center" title="@t[TranslationKeys.FkPanelEnabled]">✓</th>
+                                                        <th style="width: 170px;">@t[TranslationKeys.DataModelTargetObjectType]</th>
+                                                        <th>@t[TranslationKeys.DataModelClassAttributeExpression]</th>
+                                                        <th style="width: 65px;" class="text-center"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var attr in _editingProfile.Options.CSharp.ClassAttributes)
+                                                    {
+                                                        var item = attr;
+                                                        <tr @key="item.Id">
+                                                            <td class="text-center">
+                                                                <input class="form-check-input" type="checkbox" @bind="item.IsEnabled" />
+                                                            </td>
+                                                            <td>
+                                                                <select class="form-select form-select-sm" @bind="item.TargetObjectType">
+                                                                    <option value="All">@t[TranslationKeys.DataModelTargetAll]</option>
+                                                                    <option value="Table">@t[TranslationKeys.DataModelTargetTable]</option>
+                                                                    <option value="View">@t[TranslationKeys.DataModelTargetView]</option>
+                                                                    <option value="Procedure">@t[TranslationKeys.DataModelTargetProcedure]</option>
+                                                                    <option value="Function">@t[TranslationKeys.DataModelTargetFunction]</option>
+                                                                </select>
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" class="form-control form-control-sm font-monospace" placeholder="[Keyless], [DataContract], [Serializable]" @bind="item.Attribute" @bind:event="oninput" />
+                                                            </td>
+                                                            <td class="text-center text-nowrap">
+                                                                <button class="btn btn-link btn-sm text-secondary p-0 me-2" type="button" title="@t[TranslationKeys.DataModelDuplicateAttribute]" @onclick="() => DuplicateClassAttribute(item)">
+                                                                    <i class="bi bi-copy"></i>
+                                                                </button>
+                                                                <button class="btn btn-link btn-sm text-danger p-0" type="button" title="@t[TranslationKeys.Delete]" @onclick="() => RemoveClassAttribute(item)">
+                                                                    <i class="bi bi-trash3"></i>
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                </div>
                             </div>
                         </div>
 
-                        <div class="col-md-6">
+                        <div class="col-12">
                             <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsDefaultPropertyAttributes]</label>
-                            <textarea class="form-control form-control-sm font-monospace" rows="3" placeholder="@("[DataMember]\n[Column]")" @bind="_editingProfile.Options.CSharp.DefaultPropertyAttributes"></textarea>
+                            <textarea class="form-control form-control-sm font-monospace" rows="2" placeholder="@("[DataMember]\n[Column]")" @bind="_editingProfile.Options.CSharp.DefaultPropertyAttributes"></textarea>
                             <div class="small text-muted" style="font-size: 0.72rem;">
                                 @t[TranslationKeys.DataModelCsDefaultPropertyAttributesHelp] &bull; Tokens: <code>{ColumnName}</code> <code>{PropertyName}</code> <code>{DataType}</code> <code>{Length}</code>
                             </div>
@@ -1452,11 +1437,67 @@
                 {
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label small fw-semibold mb-1">@t[TranslationKeys.DataModelCsCustomSnippet]</label>
-                            <textarea class="form-control form-control-sm font-monospace" rows="8" placeholder="@("// Custom properties or methods\npublic string FullTitle => $\"{Id} - {Title}\";")" @bind="_editingProfile.Options.CSharp.CustomClassBodySnippet"></textarea>
-                            <div class="small text-muted mt-1">
-                                Tokens: <code>{ClassName}</code>, <code>{TableName}</code>, <code>{SchemaName}</code>
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                <div>
+                                    <h6 class="fw-bold mb-0">
+                                        <i class="bi bi-code-slash text-primary me-1"></i>@t[TranslationKeys.DataModelCsCustomSnippet]
+                                    </h6>
+                                    <div class="small text-muted" style="font-size: 0.75rem;">
+                                        Tokens: <code>{ClassName}</code>, <code>{TableName}</code>, <code>{SchemaName}</code>, <code>{Database}</code>
+                                    </div>
+                                </div>
+                                <button class="btn btn-xs btn-outline-primary" type="button" @onclick="AddCustomSnippet">
+                                    <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.DataModelAddCustomSnippet]
+                                </button>
                             </div>
+
+                            @if (_editingProfile.Options.CSharp.CustomSnippets.Count == 0)
+                            {
+                                <div class="p-4 text-center text-muted small bg-white rounded border">
+                                    <p class="mb-2">@t[TranslationKeys.DataModelNoCustomSnippets]</p>
+                                    <button class="btn btn-sm btn-outline-primary" type="button" @onclick="AddCustomSnippet">
+                                        <i class="bi bi-plus-lg me-1"></i>@t[TranslationKeys.DataModelAddCustomSnippet]
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="d-flex flex-column gap-3">
+                                    @foreach (var snippet in _editingProfile.Options.CSharp.CustomSnippets)
+                                    {
+                                        var item = snippet;
+                                        <div class="card border shadow-sm bg-white rounded-3" @key="item.Id">
+                                            <div class="card-header bg-light py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                                <div class="d-flex align-items-center gap-2 flex-grow-1 flex-wrap">
+                                                    <input class="form-check-input mt-0" type="checkbox" @bind="item.IsEnabled" title="@t[TranslationKeys.FkPanelEnabled]" />
+                                                    <input type="text" class="form-control form-control-sm" style="max-width: 250px;" placeholder="@t[TranslationKeys.DataModelSnippetTitle]" @bind="item.Title" @bind:event="oninput" />
+                                                    <div class="d-flex align-items-center gap-1">
+                                                        <span class="small text-muted">@t[TranslationKeys.DataModelTargetObjectType]:</span>
+                                                        <select class="form-select form-select-sm" style="width: 140px;" @bind="item.TargetObjectType">
+                                                            <option value="All">@t[TranslationKeys.DataModelTargetAll]</option>
+                                                            <option value="Table">@t[TranslationKeys.DataModelTargetTable]</option>
+                                                            <option value="View">@t[TranslationKeys.DataModelTargetView]</option>
+                                                            <option value="Procedure">@t[TranslationKeys.DataModelTargetProcedure]</option>
+                                                            <option value="Function">@t[TranslationKeys.DataModelTargetFunction]</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <button class="btn btn-link btn-sm text-secondary p-0 me-2" type="button" title="@t[TranslationKeys.DataModelDuplicateSnippet]" @onclick="() => DuplicateCustomSnippet(item)">
+                                                        <i class="bi bi-copy"></i>
+                                                    </button>
+                                                    <button class="btn btn-link btn-sm text-danger p-0" type="button" title="@t[TranslationKeys.Delete]" @onclick="() => RemoveCustomSnippet(item)">
+                                                        <i class="bi bi-trash3"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="card-body p-2">
+                                                <textarea class="form-control form-control-sm font-monospace" rows="6" style="resize: vertical; min-height: 120px;" placeholder="@("// Multiline custom properties, methods, or helper logic\npublic string FullTitle => $\"{Id} - {Title}\";\n\npublic void OnLoaded()\n{\n    // custom logic\n}")" @bind="item.Code" @bind:event="oninput"></textarea>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
                         </div>
                     </div>
                 }
@@ -1787,6 +1828,8 @@
             _panelMessage = null;
             var json = JsonSerializer.Serialize(profile);
             _editingProfile = JsonSerializer.Deserialize<DataModelProfile>(json) ?? new DataModelProfile();
+            EnsureClassAttributesMigrated(_editingProfile.Options.CSharp);
+            EnsureCustomSnippetsMigrated(_editingProfile.Options.CSharp);
             _isEditingProfile = true;
 
             // Initialize known schemas from saved rules first as immediate fallback
@@ -1819,6 +1862,8 @@
         catch
         {
             _editingProfile = profile;
+            EnsureClassAttributesMigrated(_editingProfile.Options.CSharp);
+            EnsureCustomSnippetsMigrated(_editingProfile.Options.CSharp);
             _isEditingProfile = true;
         }
     }
@@ -1844,11 +1889,27 @@
         }
     }
 
-    private void DeleteProfile(DataModelProfile profile)
+    private bool _showDeleteProfileConfirmation = false;
+    private DataModelProfile? _profileToDelete;
+
+    private void ConfirmDeleteProfile(DataModelProfile profile)
     {
+        _profileToDelete = profile;
+        _showDeleteProfileConfirmation = true;
+    }
+
+    private void CancelDeleteProfileConfirmation()
+    {
+        _profileToDelete = null;
+        _showDeleteProfileConfirmation = false;
+    }
+
+    private void DeleteProfileConfirmed()
+    {
+        if (_profileToDelete == null) return;
         try
         {
-            ModelGenConfig.DeleteProfile(profile.Id);
+            ModelGenConfig.DeleteProfile(_profileToDelete.Id);
             LoadAllData();
             OnConfigurationChanged.InvokeAsync();
             _panelMessage = BprMessage.Information(TranslationFactory.Current[TranslationKeys.DataModelProfileDeleteSuccess]);
@@ -1856,6 +1917,10 @@
         catch (Exception ex)
         {
             _panelMessage = BprMessage.Error(ex.Message);
+        }
+        finally
+        {
+            CancelDeleteProfileConfirmation();
         }
     }
 
@@ -1883,6 +1948,16 @@
             else
             {
                 _editingProfile.ServerName = null;
+            }
+
+            if (_editingProfile.Options.CSharp.ClassAttributes.Count > 0)
+            {
+                _editingProfile.Options.CSharp.CustomClassAttributes = string.Empty;
+            }
+
+            if (_editingProfile.Options.CSharp.CustomSnippets.Count > 0)
+            {
+                _editingProfile.Options.CSharp.CustomClassBodySnippet = string.Empty;
             }
 
             ModelGenConfig.SaveProfile(_editingProfile);
@@ -2386,66 +2461,112 @@
         _editingProfile.Options.CSharp.Overrides.Remove(item);
     }
 
-    private void EnsureInitialCustomProperties()
+    private void AddCustomSnippet()
     {
-        if (_editingProfile.Options.CSharp.IncludeCustomProperties && _editingProfile.Options.CSharp.CustomProperties.Count == 0)
+        _editingProfile.Options.CSharp.CustomSnippets.Add(new CustomCodeSnippetDefinition
         {
-            _editingProfile.Options.CSharp.CustomProperties.Add(new ClassPropertyDefinition
-            {
-                Name = "RowNumber",
-                Type = "int",
-                AccessModifier = "public",
-                Accessor = "get_set",
-                DefaultValue = "0",
-                Attributes = "[NotMapped]",
-                TargetObjectType = "View",
-                Position = "Top"
-            });
-        }
-    }
-
-    private void AddCustomProperty()
-    {
-        _editingProfile.Options.CSharp.CustomProperties.Add(new ClassPropertyDefinition
-        {
-            Name = "NewProperty",
-            Type = "string?",
-            AccessModifier = "public",
-            Accessor = "get_set",
             TargetObjectType = "All",
-            Position = "Top"
+            Title = "Custom Code",
+            Code = "// Custom properties, methods, or helper logic\n",
+            IsEnabled = true
         });
     }
 
-    private void DuplicateCustomProperty(ClassPropertyDefinition source)
+    private void DuplicateCustomSnippet(CustomCodeSnippetDefinition source)
     {
-        var copy = new ClassPropertyDefinition
+        var copy = new CustomCodeSnippetDefinition
         {
             Id = Guid.NewGuid(),
             IsEnabled = source.IsEnabled,
-            AccessModifier = source.AccessModifier,
-            Type = source.Type,
-            Name = source.Name,
-            Accessor = source.Accessor,
-            DefaultValue = source.DefaultValue,
-            Attributes = source.Attributes,
-            Summary = source.Summary,
             TargetObjectType = source.TargetObjectType,
-            Position = source.Position
+            Title = source.Title,
+            Code = source.Code
         };
-        var index = _editingProfile.Options.CSharp.CustomProperties.IndexOf(source);
+        var index = _editingProfile.Options.CSharp.CustomSnippets.IndexOf(source);
         if (index >= 0)
         {
-            _editingProfile.Options.CSharp.CustomProperties.Insert(index + 1, copy);
+            _editingProfile.Options.CSharp.CustomSnippets.Insert(index + 1, copy);
         }
         else
         {
-            _editingProfile.Options.CSharp.CustomProperties.Add(copy);
+            _editingProfile.Options.CSharp.CustomSnippets.Add(copy);
         }
     }
 
-    private void RemoveCustomProperty(ClassPropertyDefinition item)
+    private void RemoveCustomSnippet(CustomCodeSnippetDefinition item)
     {
-        _editingProfile.Options.CSharp.CustomProperties.Remove(item);
+        _editingProfile.Options.CSharp.CustomSnippets.Remove(item);
+    }
+
+    private void EnsureCustomSnippetsMigrated(CSharpOptions? cs)
+    {
+        if (cs == null) return;
+        if (cs.CustomSnippets.Count == 0 && !string.IsNullOrWhiteSpace(cs.CustomClassBodySnippet))
+        {
+            cs.CustomSnippets.Add(new CustomCodeSnippetDefinition
+            {
+                TargetObjectType = "All",
+                Title = "Custom Code",
+                Code = cs.CustomClassBodySnippet,
+                IsEnabled = true
+            });
+            cs.CustomClassBodySnippet = string.Empty;
+        }
+    }
+
+    private void AddClassAttribute()
+    {
+        _editingProfile.Options.CSharp.ClassAttributes.Add(new ClassAttributeDefinition
+        {
+            TargetObjectType = "All",
+            Attribute = "[DataContract]",
+            IsEnabled = true
+        });
+    }
+
+    private void DuplicateClassAttribute(ClassAttributeDefinition source)
+    {
+        var copy = new ClassAttributeDefinition
+        {
+            Id = Guid.NewGuid(),
+            IsEnabled = source.IsEnabled,
+            TargetObjectType = source.TargetObjectType,
+            Attribute = source.Attribute
+        };
+        var index = _editingProfile.Options.CSharp.ClassAttributes.IndexOf(source);
+        if (index >= 0)
+        {
+            _editingProfile.Options.CSharp.ClassAttributes.Insert(index + 1, copy);
+        }
+        else
+        {
+            _editingProfile.Options.CSharp.ClassAttributes.Add(copy);
+        }
+    }
+
+    private void RemoveClassAttribute(ClassAttributeDefinition item)
+    {
+        _editingProfile.Options.CSharp.ClassAttributes.Remove(item);
+    }
+
+    private void EnsureClassAttributesMigrated(CSharpOptions? cs)
+    {
+        if (cs == null) return;
+        if (cs.ClassAttributes.Count == 0 && !string.IsNullOrWhiteSpace(cs.CustomClassAttributes))
+        {
+            var lines = cs.CustomClassAttributes.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var line in lines)
+            {
+                var clean = line.Trim();
+                if (string.IsNullOrWhiteSpace(clean)) continue;
+                cs.ClassAttributes.Add(new ClassAttributeDefinition
+                {
+                    TargetObjectType = "All",
+                    Attribute = clean.StartsWith("[") ? clean : $"[{clean}]",
+                    IsEnabled = true
+                });
+            }
+            cs.CustomClassAttributes = string.Empty;
+        }
     }
 }
