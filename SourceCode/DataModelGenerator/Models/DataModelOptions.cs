@@ -267,6 +267,7 @@ namespace BprDevKit.DataModelGenerator.Models
         public bool UseRegions { get; set; } = false;
         public string OuterRegionName { get; set; } = string.Empty;
         public bool IncludeConstructor { get; set; } = false;
+        public bool InitializeNonNullableProperties { get; set; } = false;
         public bool IncludeConstants { get; set; } = false;
         public List<ClassConstantDefinition> Constants { get; set; } = new();
         public bool IncludeOverrides { get; set; } = false;

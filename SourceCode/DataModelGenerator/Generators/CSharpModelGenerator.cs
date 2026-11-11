@@ -35,7 +35,7 @@ namespace BprDevKit.DataModelGenerator.Generators
             usings.Add("System");
             usings.Add("System.Collections.Generic");
 
-            if (options.IncludeDataAnnotations)
+            if (options.IncludeDataAnnotations || globalOptions.IncludeNavigationProperties)
             {
                 usings.Add("System.ComponentModel.DataAnnotations");
                 usings.Add("System.ComponentModel.DataAnnotations.Schema");
@@ -284,13 +284,108 @@ namespace BprDevKit.DataModelGenerator.Generators
             }
 
             // #region Constructors
-            if (options.UseRegions && options.IncludeConstructor)
+            if (options.IncludeConstructor || options.InitializeNonNullableProperties)
             {
-                sb.AppendLine($"{indent}    #region Constructors");
+                if (options.UseRegions)
+                {
+                    sb.AppendLine($"{indent}    #region Constructors");
+                }
                 sb.AppendLine($"{indent}    public {className}()");
                 sb.AppendLine($"{indent}    {{");
+
+                if (options.InitializeNonNullableProperties)
+                {
+                    var overriddenProperties = (options.OverrideProperties ?? string.Empty)
+                        .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    foreach (var column in table.Columns.Where(c => DataModelFilterHelper.ShouldIncludeColumn(c, globalOptions)))
+                    {
+                        if (column.IsNullable || (options.NullablePrimaryKeys && column.IsPrimaryKey) || DataModelFilterHelper.IsComputed(column)) continue;
+
+                        var propertyName = DataModelNamingHelper.FormatPropertyName(column.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
+                        if (propertyName == className) propertyName += "Property";
+                        if (overriddenProperties.Contains(propertyName) || overriddenProperties.Contains(column.ColumnName)) continue;
+
+                        var rule = options.TransformRules?.FirstOrDefault(r => r.IsEnabled &&
+                            (MatchesPattern(column.ColumnName, r.ColumnNamePattern) || MatchesPattern(column.DataType, r.DataTypePattern)));
+                        if (rule?.ActionType is "TypeOverride" or "CustomGetterSetter") continue;
+
+                        var type = SqlTypeMapper.MapToCSharp(column.DataType, false, options.NullableReferenceTypes);
+                        var initializer = type switch
+                        {
+                            "string" => "string.Empty",
+                            "byte[]" => "Array.Empty<byte>()",
+                            _ => null
+                        };
+                        if (initializer == null) continue;
+
+                        var target = options.PropertyAccessor == "backing_field" ||
+                            (rule?.ActionType == "NotMappedHelper" && rule.EnableTwoWaySync)
+                            ? "_" + DataModelNamingHelper.ToCamelCase(propertyName)
+                            : propertyName;
+                        sb.AppendLine($"{indent}        this.{target} = {initializer};");
+                    }
+
+                    if (globalOptions.IncludeNavigationProperties && (string.IsNullOrWhiteSpace(table.ObjectType) || string.Equals(table.ObjectType, Constants.ObjectTypes.Table, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var ctorChildFks = GetIncomingForeignKeys(table, allTables, globalOptions);
+                        var usedCtorCollNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var child in ctorChildFks)
+                        {
+                            var childClassName = DataModelNamingHelper.FormatClassName(
+                                child.ChildTableName,
+                                globalOptions.RemoveTablePrefixes,
+                                globalOptions.TablePrefixes,
+                                globalOptions.SingularizeClassNames,
+                                globalOptions.PropertyNaming,
+                                Constants.ObjectTypes.Table);
+
+                            var childFkPropName = string.Join("", SplitForeignKeyColumns(child.Fk.ColumnName).Select(c =>
+                                FormatColumnPropertyName(c, childClassName, globalOptions)));
+                            var multipleFromChild = ctorChildFks.Count(other =>
+                                string.Equals(other.ChildTableName, child.ChildTableName, StringComparison.OrdinalIgnoreCase) &&
+                                string.Equals(other.ChildSchemaName, child.ChildSchemaName, StringComparison.OrdinalIgnoreCase)) > 1;
+
+                            var childNamespace = ResolveNamespace(options, child.ChildSchemaName, table.DatabaseName ?? string.Empty, child.ChildTableName);
+                            var currentNamespace = ResolveNamespace(options, table.SchemaName, table.DatabaseName ?? string.Empty, table.TableName);
+
+                            var isDifferentNamespace = !string.Equals(childNamespace, currentNamespace, StringComparison.OrdinalIgnoreCase);
+                            var useFullNav = options.UseFullNamespaceForNavTypes || isDifferentNamespace || string.Equals(options.NamespaceMode, "PerSchema", StringComparison.OrdinalIgnoreCase);
+
+                            var targetNamespacePrefix = useFullNav && !string.IsNullOrWhiteSpace(childNamespace)
+                                ? $"{childNamespace}."
+                                : "";
+
+                            var childFullTypeName = $"{targetNamespacePrefix}{childClassName}";
+
+                            var collectionPropName = ResolveChildCollectionPropertyName(
+                                child.ChildTableName,
+                                child.ChildSchemaName,
+                                childClassName,
+                                childFkPropName,
+                                className,
+                                multipleFromChild,
+                                options,
+                                usedCtorCollNames);
+
+                            if (options.PropertyAccessor == "backing_field")
+                            {
+                                var colBackingName = "_" + DataModelNamingHelper.ToCamelCase(collectionPropName);
+                                sb.AppendLine($"{indent}        this.{colBackingName} = new List<{childFullTypeName}>();");
+                            }
+                            else if (!options.MakeCollectionsNullable)
+                            {
+                                sb.AppendLine($"{indent}        this.{collectionPropName} = new List<{childFullTypeName}>();");
+                            }
+                        }
+                    }
+                }
+
                 sb.AppendLine($"{indent}    }}");
-                sb.AppendLine($"{indent}    #endregion");
+                if (options.UseRegions)
+                {
+                    sb.AppendLine($"{indent}    #endregion");
+                }
                 sb.AppendLine();
             }
 
@@ -308,7 +403,9 @@ namespace BprDevKit.DataModelGenerator.Generators
                 sb.AppendLine($"{indent}    #region Columns");
             }
 
-            var fkColumnNames = new HashSet<string>(table.ForeignKeys.Select(f => f.ColumnName), StringComparer.OrdinalIgnoreCase);
+            var fkColumnNames = new HashSet<string>(table.ForeignKeys
+                .Where(f => string.Equals(f.TableName, table.TableName, StringComparison.OrdinalIgnoreCase) && (string.IsNullOrWhiteSpace(f.SchemaName) || string.Equals(f.SchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase)))
+                .SelectMany(f => SplitForeignKeyColumns(f.ColumnName)), StringComparer.OrdinalIgnoreCase);
 
             foreach (var col in table.Columns)
             {
@@ -375,14 +472,33 @@ namespace BprDevKit.DataModelGenerator.Generators
                 }
 
                 var backingFieldName = "_" + DataModelNamingHelper.ToCamelCase(propName);
+                var backingInit = "";
+                bool isEffectivelyNullableBacking = col.IsNullable || (options.NullablePrimaryKeys && col.IsPrimaryKey);
+                if (!isEffectivelyNullableBacking && options.NullableReferenceTypes && !options.InitializeNonNullableProperties && !DataModelFilterHelper.IsComputed(col))
+                {
+                    if (options.StringInitialization == "NullForgiving")
+                    {
+                        if (csharpType == "string" || csharpType.StartsWith("byte[]") || csharpType == "object")
+                        {
+                            backingInit = " = null!";
+                        }
+                    }
+                    else if (options.StringInitialization == "EmptyString")
+                    {
+                        if (csharpType == "string") backingInit = " = string.Empty";
+                        else if (csharpType == "byte[]") backingInit = " = Array.Empty<byte>()";
+                        else if (csharpType == "object") backingInit = " = null!";
+                    }
+                }
+
                 if (isTwoWaySync)
                 {
-                    sb.AppendLine($"{indent}    private {csharpType} {backingFieldName};");
+                    sb.AppendLine($"{indent}    private {csharpType} {backingFieldName}{backingInit};");
                     sb.AppendLine($"{indent}    private {matchingRule!.TargetType} {helperBackingName};");
                 }
                 else if (options.PropertyAccessor == "backing_field")
                 {
-                    sb.AppendLine($"{indent}    private {csharpType} {backingFieldName};");
+                    sb.AppendLine($"{indent}    private {csharpType} {backingFieldName}{backingInit};");
                 }
 
                 // Data Annotations
@@ -505,7 +621,10 @@ namespace BprDevKit.DataModelGenerator.Generators
                 // Custom FK attribute
                 if (options.EnableCustomFkAttribute && isFk && !string.IsNullOrWhiteSpace(options.CustomFkAttributeTemplate))
                 {
-                    var fkInfo = table.ForeignKeys.FirstOrDefault(f => string.Equals(f.ColumnName, col.ColumnName, StringComparison.OrdinalIgnoreCase));
+                    var fkInfo = table.ForeignKeys.FirstOrDefault(f =>
+                        string.Equals(f.TableName, table.TableName, StringComparison.OrdinalIgnoreCase) &&
+                        (string.IsNullOrWhiteSpace(f.SchemaName) || string.Equals(f.SchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase)) &&
+                        SplitForeignKeyColumns(f.ColumnName).Contains(col.ColumnName, StringComparer.OrdinalIgnoreCase));
                     var toSchema = fkInfo != null && !string.IsNullOrWhiteSpace(fkInfo.RefSchemaName) ? fkInfo.RefSchemaName : table.SchemaName;
                     if (globalOptions.IsSchemaAccessAllowed(table.SchemaName, toSchema))
                     {
@@ -655,11 +774,11 @@ namespace BprDevKit.DataModelGenerator.Generators
 
                     var defaultValue = "";
                     bool isEffectivelyNullable = col.IsNullable || (options.NullablePrimaryKeys && col.IsPrimaryKey);
-                    if (!isEffectivelyNullable && options.NullableReferenceTypes)
+                    if (!isEffectivelyNullable && options.NullableReferenceTypes && !options.InitializeNonNullableProperties && !DataModelFilterHelper.IsComputed(col))
                     {
                         if (options.StringInitialization == "NullForgiving")
                         {
-                            if (csharpType == "string" || csharpType.StartsWith("byte[]"))
+                            if (csharpType == "string" || csharpType.StartsWith("byte[]") || csharpType == "object")
                             {
                                 defaultValue = " = null!;";
                             }
@@ -668,6 +787,7 @@ namespace BprDevKit.DataModelGenerator.Generators
                         {
                             if (csharpType == "string") defaultValue = " = string.Empty;";
                             else if (csharpType == "byte[]") defaultValue = " = Array.Empty<byte>();";
+                            else if (csharpType == "object") defaultValue = " = null!;";
                         }
                     }
 
@@ -776,7 +896,7 @@ namespace BprDevKit.DataModelGenerator.Generators
                 .Where(fk => globalOptions.IsSchemaAccessAllowed(table.SchemaName, string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName))
                 .ToList();
 
-            if (globalOptions.IncludeNavigationProperties)
+            if (globalOptions.IncludeNavigationProperties && (string.IsNullOrWhiteSpace(table.ObjectType) || string.Equals(table.ObjectType, Constants.ObjectTypes.Table, StringComparison.OrdinalIgnoreCase)))
             {
                 if (options.UseRegions)
                 {
@@ -797,8 +917,17 @@ namespace BprDevKit.DataModelGenerator.Generators
                             globalOptions.PropertyNaming,
                             Constants.ObjectTypes.Table);
 
-                        var localPropName = DataModelNamingHelper.FormatPropertyName(fk.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
+                        var colParts = SplitForeignKeyColumns(fk.ColumnName);
+                        var localPropNames = colParts.Select(c => DataModelNamingHelper.FormatPropertyName(c, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes) == className
+                            ? className + "Property"
+                            : DataModelNamingHelper.FormatPropertyName(c, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes)).ToList();
+                        if (localPropNames.Count == 0) continue;
+                        var localPropName = string.Join("", localPropNames);
+
                         var refSchema = string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName;
+                        var multipleToTarget = allowedFks.Count(other =>
+                            string.Equals(other.RefTableName, fk.RefTableName, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(string.IsNullOrWhiteSpace(other.RefSchemaName) ? table.SchemaName : other.RefSchemaName, refSchema, StringComparison.OrdinalIgnoreCase)) > 1;
                         var refNamespace = ResolveNamespace(options, refSchema, table.DatabaseName ?? string.Empty, fk.RefTableName);
                         var currentNamespace = ResolveNamespace(options, table.SchemaName, table.DatabaseName ?? string.Empty, table.TableName);
 
@@ -816,19 +945,20 @@ namespace BprDevKit.DataModelGenerator.Generators
                             ? (options.IncludeSchemaInRelationName && !string.IsNullOrWhiteSpace(table.SchemaName)
                                 ? $"{table.SchemaName}_{className}Set{localPropName}"
                                 : $"{className}Set{localPropName}")
-                            : (className == refClassName ? "Child" + className + "s" : className + "s");
+                            : (className == refClassName ? "Child" + className + "s" : className + "s") + (multipleToTarget ? localPropName : "");
 
                         // Only output InverseProperty if the target schema also has permission to access this schema
                         bool canTargetAccessCurrent = globalOptions.IsSchemaAccessAllowed(refSchema, table.SchemaName);
 
                         var refPropName = options.NavigationStyle == "Enterprise"
                             ? $"{refClassName}Ref{localPropName}"
-                            : (refClassName == className ? "Parent" + refClassName : refClassName);
+                            : (refClassName == className ? "Parent" + refClassName : refClassName) + (multipleToTarget ? localPropName : "");
 
                         var refBackingName = "_" + DataModelNamingHelper.ToCamelCase(refPropName);
+                        var nullSuffix = options.NullableReferenceTypes ? "?" : "";
                         if (options.PropertyAccessor == "backing_field")
                         {
-                            sb.AppendLine($"{indent}    private {navTypeName}? {refBackingName};");
+                            sb.AppendLine($"{indent}    private {navTypeName}{nullSuffix} {refBackingName};");
                         }
 
                         if (!string.IsNullOrWhiteSpace(options.CustomNavReferenceAttribute))
@@ -845,14 +975,28 @@ namespace BprDevKit.DataModelGenerator.Generators
                         }
                         else
                         {
-                            sb.AppendLine($"{indent}    [ForeignKey(nameof({localPropName}))]");
+                            if (options.UseNameofInAttributes && localPropNames.Count == 1)
+                            {
+                                sb.AppendLine($"{indent}    [ForeignKey(nameof({localPropName}))]");
+                            }
+                            else
+                            {
+                                sb.AppendLine($"{indent}    [ForeignKey(\"{string.Join(", ", localPropNames)}\")]");
+                            }
                         }
 
                         if (canTargetAccessCurrent)
                         {
                             if (options.NavigationStyle == "Enterprise" || options.IncludeEfCoreTableAttributes)
                             {
-                                sb.AppendLine($"{indent}    [InverseProperty(nameof({navTypeName}.{targetInversePropName}))]");
+                                if (options.UseNameofInAttributes)
+                                {
+                                    sb.AppendLine($"{indent}    [InverseProperty(nameof({refClassName}.{targetInversePropName}))]");
+                                }
+                                else
+                                {
+                                    sb.AppendLine($"{indent}    [InverseProperty(\"{targetInversePropName}\")]");
+                                }
                             }
                         }
 
@@ -868,7 +1012,7 @@ namespace BprDevKit.DataModelGenerator.Generators
 
                         if (options.PropertyAccessor == "backing_field")
                         {
-                            sb.AppendLine($"{indent}    public virtual {navTypeName}? {refPropName}");
+                            sb.AppendLine($"{indent}    public virtual {navTypeName}{nullSuffix} {refPropName}");
                             sb.AppendLine($"{indent}    {{");
                             sb.AppendLine($"{indent}        get");
                             sb.AppendLine($"{indent}        {{");
@@ -883,7 +1027,6 @@ namespace BprDevKit.DataModelGenerator.Generators
                         }
                         else
                         {
-                            var nullSuffix = options.NullableReferenceTypes ? "?" : "";
                             sb.AppendLine($"{indent}    public virtual {navTypeName}{nullSuffix} {refPropName} {{ get; set; }}");
                             sb.AppendLine();
                         }
@@ -898,18 +1041,9 @@ namespace BprDevKit.DataModelGenerator.Generators
             }
 
             // Reverse Navigation Properties (Incoming Foreign Keys / Relations / Children)
-            if (globalOptions.IncludeNavigationProperties)
+            if (globalOptions.IncludeNavigationProperties && (string.IsNullOrWhiteSpace(table.ObjectType) || string.Equals(table.ObjectType, Constants.ObjectTypes.Table, StringComparison.OrdinalIgnoreCase)))
             {
-                var childFks = allTables
-                    .SelectMany(t => t.ForeignKeys.Select(f => new { ChildTable = t, Fk = f }))
-                    .Where(x => string.Equals(x.Fk.TableName, x.ChildTable.TableName, StringComparison.OrdinalIgnoreCase)
-                             && (string.IsNullOrWhiteSpace(x.Fk.SchemaName) || string.Equals(x.Fk.SchemaName, x.ChildTable.SchemaName, StringComparison.OrdinalIgnoreCase)))
-                    .Where(x => string.Equals(x.Fk.RefTableName, table.TableName, StringComparison.OrdinalIgnoreCase)
-                             && (string.IsNullOrWhiteSpace(x.Fk.RefSchemaName) || string.Equals(x.Fk.RefSchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase)))
-                    .Where(x => globalOptions.IsSchemaAccessAllowed(table.SchemaName, x.ChildTable.SchemaName))
-                    .OrderBy(x => x.ChildTable.TableName)
-                    .ThenBy(x => x.Fk.ColumnName)
-                    .ToList();
+                var childFks = GetIncomingForeignKeys(table, allTables, globalOptions);
 
                 if (options.UseRegions)
                 {
@@ -918,18 +1052,23 @@ namespace BprDevKit.DataModelGenerator.Generators
 
                 if (childFks.Count > 0)
                 {
+                    var usedCollNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     foreach (var child in childFks)
                     {
                         var childClassName = DataModelNamingHelper.FormatClassName(
-                            child.ChildTable.TableName,
+                            child.ChildTableName,
                             globalOptions.RemoveTablePrefixes,
                             globalOptions.TablePrefixes,
                             globalOptions.SingularizeClassNames,
                             globalOptions.PropertyNaming,
                             Constants.ObjectTypes.Table);
 
-                        var childFkPropName = DataModelNamingHelper.FormatPropertyName(child.Fk.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
-                        var childNamespace = ResolveNamespace(options, child.ChildTable.SchemaName, table.DatabaseName ?? string.Empty, child.ChildTable.TableName);
+                        var childFkPropName = string.Join("", SplitForeignKeyColumns(child.Fk.ColumnName).Select(c =>
+                            FormatColumnPropertyName(c, childClassName, globalOptions)));
+                        var multipleFromChild = childFks.Count(other =>
+                            string.Equals(other.ChildTableName, child.ChildTableName, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(other.ChildSchemaName, child.ChildSchemaName, StringComparison.OrdinalIgnoreCase)) > 1;
+                        var childNamespace = ResolveNamespace(options, child.ChildSchemaName, table.DatabaseName ?? string.Empty, child.ChildTableName);
                         var currentNamespace = ResolveNamespace(options, table.SchemaName, table.DatabaseName ?? string.Empty, table.TableName);
 
                         var isDifferentNamespace = !string.Equals(childNamespace, currentNamespace, StringComparison.OrdinalIgnoreCase);
@@ -944,21 +1083,26 @@ namespace BprDevKit.DataModelGenerator.Generators
                         // Build the reference property name exactly as it will appear on the child side
                         var childRefPropName = options.NavigationStyle == "Enterprise"
                             ? $"{className}Ref{childFkPropName}"
-                            : (className == childClassName ? "Parent" + className : className);
+                            : (className == childClassName ? "Parent" + className : className) + (multipleFromChild ? childFkPropName : "");
 
                         // Only output InverseProperty if child schema has permission to access current schema
-                        bool canChildAccessCurrent = globalOptions.IsSchemaAccessAllowed(child.ChildTable.SchemaName, table.SchemaName);
+                        bool canChildAccessCurrent = globalOptions.IsSchemaAccessAllowed(child.ChildSchemaName, table.SchemaName);
 
-                        var collectionPropName = options.NavigationStyle == "Enterprise"
-                            ? (options.IncludeSchemaInRelationName && !string.IsNullOrWhiteSpace(child.ChildTable.SchemaName)
-                                ? $"{child.ChildTable.SchemaName}_{childClassName}Set{childFkPropName}"
-                                : $"{childClassName}Set{childFkPropName}")
-                            : (childClassName == className ? "Child" + childClassName + "s" : childClassName + "s");
+                        var collectionPropName = ResolveChildCollectionPropertyName(
+                            child.ChildTableName,
+                            child.ChildSchemaName,
+                            childClassName,
+                            childFkPropName,
+                            className,
+                            multipleFromChild,
+                            options,
+                            usedCollNames);
 
                         var colBackingName = "_" + DataModelNamingHelper.ToCamelCase(collectionPropName);
                         if (options.PropertyAccessor == "backing_field")
                         {
-                            sb.AppendLine($"{indent}    private ICollection<{childFullTypeName}> {colBackingName};");
+                            var backingInit = (!options.MakeCollectionsNullable && !options.InitializeNonNullableProperties) ? $" = new List<{childFullTypeName}>()" : "";
+                            sb.AppendLine($"{indent}    private ICollection<{childFullTypeName}> {colBackingName}{backingInit};");
                         }
 
                         if (!string.IsNullOrWhiteSpace(options.CustomNavInversePropertyAttribute))
@@ -977,7 +1121,15 @@ namespace BprDevKit.DataModelGenerator.Generators
                         {
                             if (options.NavigationStyle == "Enterprise" || (options.IncludeEfCoreTableAttributes && !string.IsNullOrWhiteSpace(child.Fk.ColumnName)))
                             {
-                                sb.AppendLine($"{indent}    [InverseProperty(nameof({childFullTypeName}.{childRefPropName}))]");
+                                if (options.UseNameofInAttributes)
+                                {
+                                    var typeForNameof = useFullNav ? childFullTypeName : childClassName;
+                                    sb.AppendLine($"{indent}    [InverseProperty(nameof({typeForNameof}.{childRefPropName}))]");
+                                }
+                                else
+                                {
+                                    sb.AppendLine($"{indent}    [InverseProperty(\"{childRefPropName}\")]");
+                                }
                             }
                         }
 
@@ -1244,6 +1396,15 @@ namespace BprDevKit.DataModelGenerator.Generators
                 Language = DataModelLanguage.CSharp,
                 ObjectType = table.ObjectType
             };
+        }
+
+        private static string[] SplitForeignKeyColumns(string columns) =>
+            (columns ?? string.Empty).Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        private static string FormatColumnPropertyName(string column, string className, DataModelOptions options)
+        {
+            var name = DataModelNamingHelper.FormatPropertyName(column, options.PropertyNaming, options.RemoveColumnPrefixes, options.ColumnPrefixes);
+            return name == className ? name + "Property" : name;
         }
 
         private static string ResolveNamespace(CSharpOptions options, string schema, string database, string table)
@@ -1719,25 +1880,34 @@ namespace BprDevKit.DataModelGenerator.Generators
                 foreach (var fk in table.ForeignKeys)
                 {
                     if (string.IsNullOrWhiteSpace(fk.RefTableName)) continue;
-                    var localProp = DataModelNamingHelper.FormatPropertyName(fk.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
+                    if (!string.Equals(fk.TableName, table.TableName, StringComparison.OrdinalIgnoreCase) ||
+                        (!string.IsNullOrWhiteSpace(fk.SchemaName) && !string.Equals(fk.SchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase))) continue;
+                    var localColumns = SplitForeignKeyColumns(fk.ColumnName);
+                    if (localColumns.Length == 0 || localColumns.Any(c => !table.Columns.Any(col =>
+                        string.Equals(col.ColumnName, c, StringComparison.OrdinalIgnoreCase) && DataModelFilterHelper.ShouldIncludeColumn(col, globalOptions)))) continue;
+                    var localProperties = localColumns.Select(c => FormatColumnPropertyName(c, className, globalOptions)).ToArray();
+                    var localProp = string.Join("", localProperties);
+                    var refSchema = string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName;
+                    if (!globalOptions.IsSchemaAccessAllowed(table.SchemaName, refSchema) ||
+                        !globalOptions.IsSchemaAccessAllowed(refSchema, table.SchemaName)) continue;
                     var refClass = DataModelNamingHelper.FormatClassName(fk.RefTableName, globalOptions.RemoveTablePrefixes, globalOptions.TablePrefixes, globalOptions.SingularizeClassNames, globalOptions.PropertyNaming, Constants.ObjectTypes.Table);
-
-                    // Build reference property name matching the model generator logic
+                    var multipleToTarget = table.ForeignKeys.Count(other =>
+                        string.Equals(other.RefTableName, fk.RefTableName, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(string.IsNullOrWhiteSpace(other.RefSchemaName) ? table.SchemaName : other.RefSchemaName, refSchema, StringComparison.OrdinalIgnoreCase)) > 1;
                     var refNavPropName = options.NavigationStyle == "Enterprise"
                         ? $"{refClass}Ref{localProp}"
-                        : (refClass == className ? "Parent" + refClass : refClass);
-
-                    // Build inverse collection property name matching the model generator logic
+                        : (refClass == className ? "Parent" + refClass : refClass) + (multipleToTarget ? localProp : "");
                     var inverseCollectionName = options.NavigationStyle == "Enterprise"
                         ? (options.IncludeSchemaInRelationName && !string.IsNullOrWhiteSpace(table.SchemaName)
                             ? $"{table.SchemaName}_{className}Set{localProp}"
                             : $"{className}Set{localProp}")
-                        : (className == refClass ? "Child" + className + "s" : className + "s");
+                        : (className == refClass ? "Child" + className + "s" : className + "s") + (multipleToTarget ? localProp : "");
 
-                    var fkName = string.IsNullOrWhiteSpace(fk.FKName) ? "" : $".HasConstraintName(\"{fk.FKName}\")";
+                    var fkName = string.IsNullOrWhiteSpace(fk.FKName) ? "" : $".HasConstraintName(\"{fk.FKName.Replace("\\", "\\\\").Replace("\"", "\\\"")}\")";
+                    var fkExpression = localProperties.Length == 1 ? $"d.{localProperties[0]}" : $"new {{ {string.Join(", ", localProperties.Select(p => $"d.{p}"))} }}";
                     sb.AppendLine($"            builder.HasOne(d => d.{refNavPropName})");
                     sb.AppendLine($"                .WithMany(p => p.{inverseCollectionName})");
-                    sb.AppendLine($"                .HasForeignKey(d => d.{localProp}){fkName};");
+                    sb.AppendLine($"                .HasForeignKey(d => {fkExpression}){fkName};");
                 }
             }
 
@@ -1849,6 +2019,98 @@ namespace BprDevKit.DataModelGenerator.Generators
             }
 
             return result;
+        }
+
+        private static List<(string ChildTableName, string ChildSchemaName, ForeignKeyOperation.Information Fk)> GetIncomingForeignKeys(
+            TableOperation.Information table,
+            IReadOnlyList<TableOperation.Information>? allTables,
+            DataModelOptions globalOptions)
+        {
+            var result = new List<(string ChildTableName, string ChildSchemaName, ForeignKeyOperation.Information Fk)>();
+            if (!string.IsNullOrWhiteSpace(table.ObjectType) && !string.Equals(table.ObjectType, Constants.ObjectTypes.Table, StringComparison.OrdinalIgnoreCase))
+            {
+                return result;
+            }
+
+            // 1. From table's own foreign keys list (e.g. SQL Server queries both incoming and outgoing for a table)
+            if (table.ForeignKeys != null)
+            {
+                foreach (var fk in table.ForeignKeys)
+                {
+                    if (string.Equals(fk.RefTableName, table.TableName, StringComparison.OrdinalIgnoreCase)
+                        && (string.IsNullOrWhiteSpace(fk.RefSchemaName) || string.Equals(fk.RefSchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var childTable = !string.IsNullOrWhiteSpace(fk.TableName) ? fk.TableName : table.TableName;
+                        var childSchema = !string.IsNullOrWhiteSpace(fk.SchemaName) ? fk.SchemaName : table.SchemaName;
+                        result.Add((childTable, childSchema, fk));
+                    }
+                }
+            }
+
+            // 2. From all other tables in the generation set
+            if (allTables != null)
+            {
+                foreach (var otherTable in allTables)
+                {
+                    if (otherTable.ForeignKeys == null) continue;
+                    foreach (var fk in otherTable.ForeignKeys)
+                    {
+                        if (string.Equals(fk.RefTableName, table.TableName, StringComparison.OrdinalIgnoreCase)
+                            && (string.IsNullOrWhiteSpace(fk.RefSchemaName) || string.Equals(fk.RefSchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            var childTable = !string.IsNullOrWhiteSpace(fk.TableName) ? fk.TableName : otherTable.TableName;
+                            var childSchema = !string.IsNullOrWhiteSpace(fk.SchemaName) ? fk.SchemaName : otherTable.SchemaName;
+                            result.Add((childTable, childSchema, fk));
+                        }
+                    }
+                }
+            }
+
+            return result
+                .GroupBy(x => $"{x.ChildSchemaName}.{x.ChildTableName}.{(string.IsNullOrWhiteSpace(x.Fk.FKName) ? x.Fk.ColumnName : x.Fk.FKName)}", StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .Where(x => globalOptions.IsSchemaAccessAllowed(table.SchemaName, x.ChildSchemaName))
+                .OrderBy(x => x.ChildTableName)
+                .ThenBy(x => x.Fk.ColumnName)
+                .ToList();
+        }
+
+        private static string ResolveChildCollectionPropertyName(
+            string childTableName,
+            string childSchemaName,
+            string childClassName,
+            string childFkPropName,
+            string currentClassName,
+            bool multipleFromChild,
+            CSharpOptions options,
+            HashSet<string> usedNames)
+        {
+            var baseName = options.NavigationStyle == "Enterprise"
+                ? (options.IncludeSchemaInRelationName && !string.IsNullOrWhiteSpace(childSchemaName)
+                    ? $"{childSchemaName}_{childClassName}Set{childFkPropName}"
+                    : $"{childClassName}Set{childFkPropName}")
+                : (childClassName == currentClassName ? "Child" + childClassName + "s" : childClassName + "s") + (multipleFromChild ? childFkPropName : "");
+
+            var finalName = baseName;
+            if (usedNames.Contains(finalName))
+            {
+                if (!string.IsNullOrWhiteSpace(childSchemaName) && !finalName.Contains(childSchemaName, StringComparison.OrdinalIgnoreCase))
+                {
+                    finalName = $"{baseName}_{childSchemaName}";
+                }
+                if (usedNames.Contains(finalName) && !finalName.Contains(childFkPropName, StringComparison.OrdinalIgnoreCase))
+                {
+                    finalName = $"{baseName}_{childFkPropName}";
+                }
+                var counter = 2;
+                while (usedNames.Contains(finalName))
+                {
+                    finalName = $"{baseName}_{counter++}";
+                }
+            }
+
+            usedNames.Add(finalName);
+            return finalName;
         }
     }
 }

@@ -10,6 +10,7 @@ namespace BprDevKit.DatabaseManagement.SqlGenerators
     /// </summary>
     public interface ISqlGenerator
     {
+        string ProviderName { get; }
         #region Database Operations
         string GenerateCreateDatabaseScript(DatabaseOperation.Create config);
         string GenerateAlterDatabaseScript(DatabaseOperation.Alter config);

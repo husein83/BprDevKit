@@ -688,6 +688,7 @@ namespace BprDevKit.Localization
         public const string DataModelCsIncludeIndexes = "DataModel.CsIncludeIndexes";
         public const string DataModelCsUseRegions = "DataModel.CsUseRegions";
         public const string DataModelCsIncludeConstructor = "DataModel.CsIncludeConstructor";
+        public const string DataModelCsInitializeNonNullableProperties = "DataModel.CsInitializeNonNullableProperties";
         public const string DataModelCsIncludeConstants = "DataModel.CsIncludeConstants";
         public const string DataModelCsIncludeTableSchemaOverrides = "DataModel.CsIncludeTableSchemaOverrides";
         public const string DataModelCsOverrideProperties = "DataModel.CsOverrideProperties";

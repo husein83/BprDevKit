@@ -226,7 +226,10 @@ namespace BprDevKit.DataModelGenerator.Generators
                 if (col.IsIdentity) args.Add("autoincrement=True");
                 if (!col.IsNullable && !col.IsPrimaryKey) args.Add("nullable=False");
 
-                var fk = table.ForeignKeys.FirstOrDefault(f => f.ColumnName == col.ColumnName);
+                var fk = table.ForeignKeys.FirstOrDefault(f =>
+                    string.Equals(f.TableName, table.TableName, StringComparison.OrdinalIgnoreCase) &&
+                    (string.IsNullOrWhiteSpace(f.SchemaName) || string.Equals(f.SchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase)) &&
+                    f.ColumnName == col.ColumnName);
                 if (fk != null && !string.IsNullOrWhiteSpace(fk.RefTableName))
                 {
                     args.Add($"ForeignKey(\"{fk.RefTableName}.{fk.RefColumnName}\")");
@@ -242,10 +245,13 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             // Relationships
             var allowedFks = table.ForeignKeys
+                .Where(fk => string.Equals(fk.TableName, table.TableName, StringComparison.OrdinalIgnoreCase)
+                          && (string.IsNullOrWhiteSpace(fk.SchemaName) || string.Equals(fk.SchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase))
+                          && !string.IsNullOrWhiteSpace(fk.RefTableName))
                 .Where(fk => globalOptions.IsSchemaAccessAllowed(table.SchemaName, string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName))
                 .ToList();
 
-            if (globalOptions.IncludeNavigationProperties && allowedFks.Count > 0)
+            if (globalOptions.IncludeNavigationProperties && (string.IsNullOrWhiteSpace(table.ObjectType) || string.Equals(table.ObjectType, Constants.ObjectTypes.Table, StringComparison.OrdinalIgnoreCase)) && allowedFks.Count > 0)
             {
                 sb.AppendLine();
                 sb.AppendLine("    # Relationships");
@@ -257,7 +263,12 @@ namespace BprDevKit.DataModelGenerator.Generators
                         globalOptions.TablePrefixes,
                         globalOptions.SingularizeClassNames);
 
-                    var relName = DataModelNamingHelper.ToSnakeCase(parentClassName);
+                    var refSchema = string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName;
+                    var multipleToTarget = allowedFks.Count(other =>
+                        string.Equals(other.RefTableName, fk.RefTableName, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(string.IsNullOrWhiteSpace(other.RefSchemaName) ? table.SchemaName : other.RefSchemaName, refSchema, StringComparison.OrdinalIgnoreCase)) > 1;
+
+                    var relName = DataModelNamingHelper.ToSnakeCase(parentClassName) + (multipleToTarget ? "_" + DataModelNamingHelper.ToSnakeCase(fk.ColumnName) : "");
                     sb.AppendLine($"    {relName} = relationship(\"{parentClassName}\")");
                 }
             }

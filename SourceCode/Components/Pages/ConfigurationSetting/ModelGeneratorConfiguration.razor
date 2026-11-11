@@ -350,13 +350,17 @@
                                 <label class="form-check-label small fw-bold" for="cs-p-regions">@t[TranslationKeys.DataModelCsUseRegions]</label>
                             </div>
 
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cs-p-ctor" @bind="_editingProfile.Options.CSharp.IncludeConstructor" />
+                                <label class="form-check-label small" for="cs-p-ctor">@t[TranslationKeys.DataModelCsIncludeConstructor]</label>
+                            </div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="cs-p-ctor-init" @bind="_editingProfile.Options.CSharp.InitializeNonNullableProperties" />
+                                <label class="form-check-label small" for="cs-p-ctor-init">@t[TranslationKeys.DataModelCsInitializeNonNullableProperties]</label>
+                            </div>
                             @if (_editingProfile.Options.CSharp.UseRegions)
                             {
                                 <div class="ps-3 border-start mb-2">
-                                    <div class="form-check form-switch mb-2">
-                                        <input class="form-check-input" type="checkbox" id="cs-p-ctor" @bind="_editingProfile.Options.CSharp.IncludeConstructor" />
-                                        <label class="form-check-label small" for="cs-p-ctor">@t[TranslationKeys.DataModelCsIncludeConstructor]</label>
-                                    </div>
                                     <div class="mb-2">
                                         <label class="form-label small mb-1" for="cs-p-outer-region">@t[TranslationKeys.DataModelCsOuterRegionName]</label>
                                         <input type="text" id="cs-p-outer-region" class="form-control form-control-sm font-monospace" placeholder="e.g. Generator" @bind="_editingProfile.Options.CSharp.OuterRegionName" />

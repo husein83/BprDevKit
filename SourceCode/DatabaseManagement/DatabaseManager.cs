@@ -24,6 +24,7 @@ namespace BprDevKit.DatabaseManagement
     public class DatabaseManager
     {
         private readonly ISqlGenerator _sqlGenerator;
+        public string ProviderName => _sqlGenerator.ProviderName;
         private readonly ServerConfiguration _config;
         private readonly IDatabaseConnectionFactory _connectionFactory;
         private readonly ISqlObjectDecryptor _decryptor;
@@ -1708,18 +1709,30 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
             };
         }
 
+        private static string CleanColumnName(string? colName)
+        {
+            if (string.IsNullOrWhiteSpace(colName)) return string.Empty;
+            return colName.Replace("[", "").Replace("]", "").Replace("\"", "").Replace("`", "").Trim();
+        }
+
         private static ForeignKeyOperation.Information MapForeignKey(string databaseName, DataRow row)
         {
+            var fkName = row.GetString("FKName");
+            if (string.IsNullOrWhiteSpace(fkName))
+            {
+                fkName = row.GetString("ForeignKeyName");
+            }
+
             return new ForeignKeyOperation.Information
             {
                 DatabaseName = databaseName,
-                FKName = row.GetString("FKName"),
+                FKName = fkName,
                 SchemaName = row.GetString("SchemaName"),
                 TableName = row.GetString("TableName"),
-                ColumnName = row.GetString("ColumnName"),
+                ColumnName = CleanColumnName(row.GetString("ColumnName")),
                 RefSchemaName = row.GetString("RefSchemaName"),
                 RefTableName = row.GetString("RefTableName"),
-                RefColumnName = row.GetString("RefColumnName"),
+                RefColumnName = CleanColumnName(row.GetString("RefColumnName")),
                 OnDelete = (row.GetString("OnDelete", "NO_ACTION")).Replace('_', ' '),
                 OnUpdate = (row.GetString("OnUpdate", "NO_ACTION")).Replace('_', ' '),
                 IsNotForReplication = row.GetBoolean("IsNotForReplication"),

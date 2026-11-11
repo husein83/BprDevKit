@@ -26,6 +26,8 @@ namespace BprDevKit.ScriptGenerator.Services
             if (string.IsNullOrWhiteSpace(databaseName))
                 throw new ArgumentException("Database name is required.", nameof(databaseName));
             ArgumentNullException.ThrowIfNull(options);
+            if (!string.Equals(_manager.ProviderName, "SqlServer", StringComparison.OrdinalIgnoreCase))
+                throw new NotSupportedException($"Script export is not implemented for {_manager.ProviderName}; exporting SQL Server syntax for this provider would produce an invalid script.");
 
             var sb = new StringBuilder();
 

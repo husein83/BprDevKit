@@ -21,8 +21,7 @@ namespace BprDevKit.DatabaseManagement.SqlGenerators
         public override string GenerateCreateDatabaseScript(DatabaseOperation.Create config)
         {
             ArgumentNullException.ThrowIfNull(config);
-            // In Oracle multitenant, create pluggable database
-            return $"CREATE PLUGGABLE DATABASE \"{config.DatabaseName}\" ADMIN USER pdb_admin IDENTIFIED BY \"Password123!\";";
+            throw new NotSupportedException("Oracle pluggable database creation requires an explicitly supplied administrator password and is not available through this operation.");
         }
 
         public override string GenerateDropDatabaseScript(DatabaseOperation.Drop config)
@@ -50,7 +49,7 @@ ORDER BY username;";
         public override string GenerateCreateSchemaScript(SchemaOperation.Create config)
         {
             ArgumentNullException.ThrowIfNull(config);
-            return $"CREATE USER \"{config.SchemaName.ToUpperInvariant()}\" IDENTIFIED BY \"SchemaPass123!\" DEFAULT TABLESPACE users QUOTA UNLIMITED ON users;";
+            throw new NotSupportedException("Oracle user creation requires an explicitly supplied password and is not available through this operation.");
         }
 
         public override string GenerateDropSchemaScript(SchemaOperation.Drop config)
@@ -147,13 +146,18 @@ ORDER BY i.index_name, ic.column_position;";
             var table = Escape(config.TableName).ToUpperInvariant();
 
             return $@"SELECT 
+    con.constraint_name AS FKName,
+    con.owner AS SchemaName,
+    con.table_name AS TableName,
     con.constraint_name AS ForeignKeyName,
     c.column_name AS ColumnName,
     ref_con.owner AS RefSchemaName,
     ref_con.table_name AS RefTableName,
     ref_c.column_name AS RefColumnName,
-    CASE WHEN con.delete_rule = 'CASCADE' THEN 'CASCADE' ELSE 'NO ACTION' END AS DeleteAction,
-    'NO ACTION' AS UpdateAction
+    CASE WHEN con.delete_rule = 'CASCADE' THEN 'CASCADE' ELSE 'NO ACTION' END AS OnDelete,
+    'NO ACTION' AS OnUpdate,
+    0 AS IsNotForReplication,
+    CASE WHEN con.status = 'ENABLED' THEN 1 ELSE 0 END AS Enabled
 FROM all_constraints con
 JOIN all_cons_columns c ON con.owner = c.owner AND con.constraint_name = c.constraint_name
 JOIN all_constraints ref_con ON con.r_owner = ref_con.owner AND con.r_constraint_name = ref_con.constraint_name

@@ -101,12 +101,13 @@ namespace BprDevKit.DataModelGenerator.Generators
             }
 
             // Navigation Properties
-            if (options.IncludeNavigationProperties && globalOptions.IncludeNavigationProperties)
+            if (options.IncludeNavigationProperties && globalOptions.IncludeNavigationProperties && (string.IsNullOrWhiteSpace(table.ObjectType) || string.Equals(table.ObjectType, Constants.ObjectTypes.Table, StringComparison.OrdinalIgnoreCase)))
             {
                 // Reference navigation properties
                 var allowedFks = table.ForeignKeys
                     .Where(fk => string.Equals(fk.TableName, table.TableName, StringComparison.OrdinalIgnoreCase)
-                              && (string.IsNullOrWhiteSpace(fk.SchemaName) || string.Equals(fk.SchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase)))
+                              && (string.IsNullOrWhiteSpace(fk.SchemaName) || string.Equals(fk.SchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase))
+                              && !string.IsNullOrWhiteSpace(fk.RefTableName))
                     .Where(fk => globalOptions.IsSchemaAccessAllowed(table.SchemaName, string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName))
                     .ToList();
 
@@ -116,7 +117,6 @@ namespace BprDevKit.DataModelGenerator.Generators
                     sb.AppendLine("  // References (Many-to-One / Foreign Keys)");
                     foreach (var fk in allowedFks)
                     {
-                        if (string.IsNullOrWhiteSpace(fk.RefTableName)) continue;
                         var refClassName = DataModelNamingHelper.FormatClassName(
                             fk.RefTableName,
                             globalOptions.RemoveTablePrefixes,
@@ -125,20 +125,57 @@ namespace BprDevKit.DataModelGenerator.Generators
                             globalOptions.PropertyNaming,
                             Constants.ObjectTypes.Table);
 
-                        var navPropName = DataModelNamingHelper.FormatPropertyName(refClassName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
+                        var refSchema = string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName;
+                        var multipleToTarget = allowedFks.Count(other =>
+                            string.Equals(other.RefTableName, fk.RefTableName, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(string.IsNullOrWhiteSpace(other.RefSchemaName) ? table.SchemaName : other.RefSchemaName, refSchema, StringComparison.OrdinalIgnoreCase)) > 1;
+
+                        var localProp = DataModelNamingHelper.FormatPropertyName(fk.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
+                        var navPropName = DataModelNamingHelper.FormatPropertyName(refClassName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes)
+                            + (multipleToTarget ? localProp : "");
                         sb.AppendLine($"  {navPropName}?: {refClassName} | null;");
                     }
                 }
 
                 // Reverse relations (One-to-Many / Children)
-                var childFks = allTables
-                    .SelectMany(t => t.ForeignKeys.Select(f => new { ChildTable = t, Fk = f }))
-                    .Where(x => string.Equals(x.Fk.TableName, x.ChildTable.TableName, StringComparison.OrdinalIgnoreCase)
-                             && (string.IsNullOrWhiteSpace(x.Fk.SchemaName) || string.Equals(x.Fk.SchemaName, x.ChildTable.SchemaName, StringComparison.OrdinalIgnoreCase)))
-                    .Where(x => string.Equals(x.Fk.RefTableName, table.TableName, StringComparison.OrdinalIgnoreCase)
-                             && (string.IsNullOrWhiteSpace(x.Fk.RefSchemaName) || string.Equals(x.Fk.RefSchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase)))
-                    .Where(x => globalOptions.IsSchemaAccessAllowed(table.SchemaName, x.ChildTable.SchemaName))
-                    .OrderBy(x => x.ChildTable.TableName)
+                var allIncoming = new List<(string ChildTableName, string ChildSchemaName, ForeignKeyOperation.Information Fk)>();
+                if (table.ForeignKeys != null)
+                {
+                    foreach (var fk in table.ForeignKeys)
+                    {
+                        if (string.Equals(fk.RefTableName, table.TableName, StringComparison.OrdinalIgnoreCase)
+                            && (string.IsNullOrWhiteSpace(fk.RefSchemaName) || string.Equals(fk.RefSchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            var childTable = !string.IsNullOrWhiteSpace(fk.TableName) ? fk.TableName : table.TableName;
+                            var childSchema = !string.IsNullOrWhiteSpace(fk.SchemaName) ? fk.SchemaName : table.SchemaName;
+                            allIncoming.Add((childTable, childSchema, fk));
+                        }
+                    }
+                }
+                if (allTables != null)
+                {
+                    foreach (var otherTable in allTables)
+                    {
+                        if (otherTable.ForeignKeys == null) continue;
+                        foreach (var fk in otherTable.ForeignKeys)
+                        {
+                            if (string.Equals(fk.RefTableName, table.TableName, StringComparison.OrdinalIgnoreCase)
+                                && (string.IsNullOrWhiteSpace(fk.RefSchemaName) || string.Equals(fk.RefSchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                var childTable = !string.IsNullOrWhiteSpace(fk.TableName) ? fk.TableName : otherTable.TableName;
+                                var childSchema = !string.IsNullOrWhiteSpace(fk.SchemaName) ? fk.SchemaName : otherTable.SchemaName;
+                                allIncoming.Add((childTable, childSchema, fk));
+                            }
+                        }
+                    }
+                }
+
+                var childFks = allIncoming
+                    .GroupBy(x => $"{x.ChildSchemaName}.{x.ChildTableName}.{(string.IsNullOrWhiteSpace(x.Fk.FKName) ? x.Fk.ColumnName : x.Fk.FKName)}", StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .Where(x => globalOptions.IsSchemaAccessAllowed(table.SchemaName, x.ChildSchemaName))
+                    .OrderBy(x => x.ChildTableName)
+                    .ThenBy(x => x.Fk.ColumnName)
                     .ToList();
 
                 if (childFks.Count > 0)
@@ -149,14 +186,21 @@ namespace BprDevKit.DataModelGenerator.Generators
                     foreach (var child in childFks)
                     {
                         var childClassName = DataModelNamingHelper.FormatClassName(
-                            child.ChildTable.TableName,
+                            child.ChildTableName,
                             globalOptions.RemoveTablePrefixes,
                             globalOptions.TablePrefixes,
                             globalOptions.SingularizeClassNames,
                             globalOptions.PropertyNaming,
                             Constants.ObjectTypes.Table);
 
-                        var collPropName = DataModelNamingHelper.FormatPropertyName(child.ChildTable.TableName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
+                        var multipleFromChild = childFks.Count(other =>
+                            string.Equals(other.ChildTableName, child.ChildTableName, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(other.ChildSchemaName, child.ChildSchemaName, StringComparison.OrdinalIgnoreCase)) > 1;
+
+                        var childFkProp = DataModelNamingHelper.FormatPropertyName(child.Fk.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
+                        var collPropName = DataModelNamingHelper.FormatPropertyName(child.ChildTableName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes)
+                            + (multipleFromChild ? childFkProp : "");
+
                         if (addedCollections.Add(collPropName))
                         {
                             sb.AppendLine($"  {collPropName}?: {childClassName}[];");

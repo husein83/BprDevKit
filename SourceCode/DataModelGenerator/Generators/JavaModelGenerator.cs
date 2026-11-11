@@ -229,10 +229,13 @@ namespace BprDevKit.DataModelGenerator.Generators
 
             // JPA Relationships
             var allowedFks = table.ForeignKeys
+                .Where(fk => string.Equals(fk.TableName, table.TableName, StringComparison.OrdinalIgnoreCase)
+                          && (string.IsNullOrWhiteSpace(fk.SchemaName) || string.Equals(fk.SchemaName, table.SchemaName, StringComparison.OrdinalIgnoreCase))
+                          && !string.IsNullOrWhiteSpace(fk.RefTableName))
                 .Where(fk => globalOptions.IsSchemaAccessAllowed(table.SchemaName, string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName))
                 .ToList();
 
-            if (options.Style == "jpa" && globalOptions.IncludeNavigationProperties && allowedFks.Count > 0)
+            if (options.Style == "jpa" && globalOptions.IncludeNavigationProperties && (string.IsNullOrWhiteSpace(table.ObjectType) || string.Equals(table.ObjectType, Constants.ObjectTypes.Table, StringComparison.OrdinalIgnoreCase)) && allowedFks.Count > 0)
             {
                 sb.AppendLine("    // JPA Relationships");
                 foreach (var fk in allowedFks)
@@ -245,7 +248,13 @@ namespace BprDevKit.DataModelGenerator.Generators
                         globalOptions.PropertyNaming,
                         Constants.ObjectTypes.Table);
 
-                    var fieldName = DataModelNamingHelper.ToCamelCase(parentClassName);
+                    var refSchema = string.IsNullOrWhiteSpace(fk.RefSchemaName) ? table.SchemaName : fk.RefSchemaName;
+                    var multipleToTarget = allowedFks.Count(other =>
+                        string.Equals(other.RefTableName, fk.RefTableName, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(string.IsNullOrWhiteSpace(other.RefSchemaName) ? table.SchemaName : other.RefSchemaName, refSchema, StringComparison.OrdinalIgnoreCase)) > 1;
+
+                    var localColProp = DataModelNamingHelper.FormatPropertyName(fk.ColumnName, globalOptions.PropertyNaming, globalOptions.RemoveColumnPrefixes, globalOptions.ColumnPrefixes);
+                    var fieldName = DataModelNamingHelper.ToCamelCase(parentClassName) + (multipleToTarget ? localColProp : "");
                     sb.AppendLine("    @ManyToOne(fetch = FetchType.LAZY)");
                     sb.AppendLine($"    @JoinColumn(name = \"{fk.ColumnName}\")");
                     sb.AppendLine($"    private {parentClassName} {fieldName};");

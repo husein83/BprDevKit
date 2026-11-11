@@ -169,30 +169,30 @@ GROUP BY i.relname, am.amname, ix.indisunique, ix.indisprimary, ix.indpred, ix.i
             var schema = string.IsNullOrWhiteSpace(config.SchemaName) ? "public" : config.SchemaName;
 
             return $@"SELECT
-    tc.constraint_name AS FKName,
-    tc.table_schema AS SchemaName,
-    tc.table_name AS TableName,
-    kcu.column_name AS ColumnName,
-    ccu.table_schema AS RefSchemaName,
-    ccu.table_name AS RefTableName,
-    ccu.column_name AS RefColumnName,
-    rc.delete_rule AS OnDelete,
-    rc.update_rule AS OnUpdate,
+    con.conname AS FKName,
+    source_ns.nspname AS SchemaName,
+    source_table.relname AS TableName,
+    string_agg(source_col.attname, ', ' ORDER BY pairs.ordinality) AS ColumnName,
+    target_ns.nspname AS RefSchemaName,
+    target_table.relname AS RefTableName,
+    string_agg(target_col.attname, ', ' ORDER BY pairs.ordinality) AS RefColumnName,
+    CASE con.confdeltype WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' WHEN 'r' THEN 'RESTRICT' ELSE 'NO ACTION' END AS OnDelete,
+    CASE con.confupdtype WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' WHEN 'r' THEN 'RESTRICT' ELSE 'NO ACTION' END AS OnUpdate,
     0 AS IsNotForReplication,
     1 AS Enabled
-FROM information_schema.table_constraints tc
-JOIN information_schema.key_column_usage kcu
-    ON tc.constraint_name = kcu.constraint_name
-    AND tc.table_schema = kcu.table_schema
-JOIN information_schema.referential_constraints rc
-    ON tc.constraint_name = rc.constraint_name
-    AND tc.table_schema = rc.constraint_schema
-JOIN information_schema.constraint_column_usage ccu
-    ON rc.unique_constraint_name = ccu.constraint_name
-    AND rc.unique_constraint_schema = ccu.constraint_schema
-WHERE tc.constraint_type = 'FOREIGN KEY'
-  AND tc.table_schema = '{Escape(schema)}'
-  AND tc.table_name = '{Escape(config.TableName)}';";
+FROM pg_constraint con
+JOIN pg_class source_table ON source_table.oid = con.conrelid
+JOIN pg_namespace source_ns ON source_ns.oid = source_table.relnamespace
+JOIN pg_class target_table ON target_table.oid = con.confrelid
+JOIN pg_namespace target_ns ON target_ns.oid = target_table.relnamespace
+JOIN LATERAL unnest(con.conkey, con.confkey) WITH ORDINALITY AS pairs(source_attnum, target_attnum, ordinality) ON TRUE
+JOIN pg_attribute source_col ON source_col.attrelid = con.conrelid AND source_col.attnum = pairs.source_attnum
+JOIN pg_attribute target_col ON target_col.attrelid = con.confrelid AND target_col.attnum = pairs.target_attnum
+WHERE con.contype = 'f'
+  AND source_ns.nspname = '{Escape(schema)}'
+  AND source_table.relname = '{Escape(config.TableName)}'
+GROUP BY con.oid, con.conname, source_ns.nspname, source_table.relname,
+    target_ns.nspname, target_table.relname, con.confdeltype, con.confupdtype;";
         }
 
         public override string GenerateGetTableCheckConstraintsScript(TableOperation.Information config)

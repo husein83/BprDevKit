@@ -77,6 +77,12 @@ namespace BprDevKit.DataModelGenerator.Services
                     csharpType = "byte[]";
                     isValueType = false;
                     break;
+                case "sql_variant":
+                case "sqlvariant":
+                case "variant":
+                    csharpType = "object";
+                    isValueType = false;
+                    break;
                 case "char":
                 case "nchar":
                 case "varchar":
@@ -150,6 +156,11 @@ namespace BprDevKit.DataModelGenerator.Services
                 case "timestamp":
                     pyType = "bytes";
                     break;
+                case "sql_variant":
+                case "sqlvariant":
+                case "variant":
+                    pyType = "Any";
+                    break;
                 case "char":
                 case "nchar":
                 case "varchar":
@@ -211,6 +222,11 @@ namespace BprDevKit.DataModelGenerator.Services
                 case "rowversion":
                 case "timestamp":
                     dartType = "Uint8List";
+                    break;
+                case "sql_variant":
+                case "sqlvariant":
+                case "variant":
+                    dartType = "dynamic";
                     break;
                 case "uniqueidentifier":
                 case "char":
@@ -277,6 +293,10 @@ namespace BprDevKit.DataModelGenerator.Services
                 case "rowversion":
                 case "timestamp":
                     return "byte[]";
+                case "sql_variant":
+                case "sqlvariant":
+                case "variant":
+                    return "Object";
                 case "char":
                 case "nchar":
                 case "varchar":
@@ -302,6 +322,7 @@ namespace BprDevKit.DataModelGenerator.Services
                 "char" or "nchar" or "varchar" or "nvarchar" or "varchar2" or "nvarchar2" or "text" or "ntext" or "xml" or "uniqueidentifier" or "uuid" or "guid" or "json" or "jsonb" => "string",
                 "date" or "datetime" or "datetime2" or "smalldatetime" or "datetimeoffset" or "timestamp" or "time" => dateAsDate ? "Date" : "string",
                 "binary" or "varbinary" or "image" or "blob" or "bytea" or "raw" => "Uint8Array",
+                "sql_variant" or "sqlvariant" or "variant" => "any",
                 _ => "any"
             };
 

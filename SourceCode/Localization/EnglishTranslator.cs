@@ -697,6 +697,7 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelCsIncludeIndexes] = "Generate [Index] Attributes from Database Indexes",
             [TranslationKeys.DataModelCsUseRegions] = "Organize Class with #region Blocks",
             [TranslationKeys.DataModelCsIncludeConstructor] = "Include Parameterless Constructor",
+            [TranslationKeys.DataModelCsInitializeNonNullableProperties] = "Initialize non-nullable properties in constructor",
             [TranslationKeys.DataModelCsIncludeConstants] = "Include Constants",
             [TranslationKeys.DataModelCsIncludeTableSchemaOverrides] = "Include GetTableName and GetSchemaName Overrides",
             [TranslationKeys.DataModelCsOverrideProperties] = "Properties with override Modifier (Comma-separated)",

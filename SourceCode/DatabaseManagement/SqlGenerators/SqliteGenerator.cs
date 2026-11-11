@@ -20,12 +20,12 @@ namespace BprDevKit.DatabaseManagement.SqlGenerators
 
         public override string GenerateCreateDatabaseScript(DatabaseOperation.Create config)
         {
-            return "SELECT 1;";
+            throw new NotSupportedException("SQLite databases are files and cannot be created with SQL. Create the database by opening its file.");
         }
 
         public override string GenerateDropDatabaseScript(DatabaseOperation.Drop config)
         {
-            return "SELECT 1;";
+            throw new NotSupportedException("SQLite databases are files and cannot be dropped with SQL. Remove the file explicitly after closing connections.");
         }
         #endregion
 
@@ -37,12 +37,12 @@ namespace BprDevKit.DatabaseManagement.SqlGenerators
 
         public override string GenerateCreateSchemaScript(SchemaOperation.Create config)
         {
-            return "SELECT 1;";
+            throw new NotSupportedException("SQLite does not support creating SQL schemas.");
         }
 
         public override string GenerateDropSchemaScript(SchemaOperation.Drop config)
         {
-            return "SELECT 1;";
+            throw new NotSupportedException("SQLite does not support dropping SQL schemas.");
         }
         #endregion
 

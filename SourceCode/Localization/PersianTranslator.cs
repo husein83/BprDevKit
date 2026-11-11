@@ -698,6 +698,7 @@ namespace BprDevKit.Localization
             [TranslationKeys.DataModelCsIncludeIndexes] = "تولید اتریبیوت‌های [Index] از روی ایندکس‌های دیتابیس",
             [TranslationKeys.DataModelCsUseRegions] = "ریجن‌بندی کدهای کلاس با (#region)",
             [TranslationKeys.DataModelCsIncludeConstructor] = "تولید سازنده بدون پارامتر",
+            [TranslationKeys.DataModelCsInitializeNonNullableProperties] = "مقداردهی اولیهٔ ویژگی‌های غیرقابل‌تهی در سازنده",
             [TranslationKeys.DataModelCsIncludeConstants] = "درج ثابت‌ها",
             [TranslationKeys.DataModelCsIncludeTableSchemaOverrides] = "تولید متدهای Override نام جدول و اسکیما",
             [TranslationKeys.DataModelCsOverrideProperties] = "فیلدهای با کلمه کلیدی override (با کاما جدا کنید)",
