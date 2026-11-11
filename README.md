@@ -122,7 +122,7 @@ BprDevKit از طیف گسترده‌ای از محبوب‌ترین پایگا�
 - **Strip Common Table/Object Prefixes:** حذف پیشوندهای متداول جداول و آبجکت‌ها از نام کلاس‌ها (مانند `tbl_`، `vw_`، `sp_`، `usp_`) — پیش‌فرض: غیرفعال (`false`).
 - **Strip Common Column/Field Prefixes:** حذف پیشوندهای فنی ستون‌ها و فیلدها از نام پراپرتی‌ها (مانند `fld_`، `col_`) — پیش‌فرض: غیرفعال (`false`).
 - **Singularize Class Names:** مفردسازی هوشمند نام کلاس‌ها (مثلاً تبدیل جدول `Users` به کلاس `User`) — پیش‌فرض: غیرفعال (`false`).
-- **Generate Navigation Properties:** تولید خودکار رفرنس‌ها و کالکشن‌های ارتباطی کلید خارجی (FK). در تمام کلاس‌ها، ریجن‌های `#region References` و `#region Relations` حتی در صورت عدم وجود کلید خارجی برای حفظ ساختار یکنواخت درج می‌شوند.
+- **Generate Navigation Properties:** تولید خودکار رفرنس‌ها (Many-to-One) و کالکشن‌های ارتباطی معکوس (One-to-Many). مجهز به پشتیبانی کامل از کلیدهای خارجی ترکیبی (Composite Keys)، ارجاع به خود (Self-Referencing)، تفکیک هوشمند نام پراپرتی‌ها در صورت وجود چند رابطه بین دو جدول یکسان، و تولید بی‌نقص روابط حتی در صورت انتخاب انفرادی یا زیرمجموعه‌ای از جداول. در C#، ریجن‌های `#region References` و `#region Relations` حتی در صورت عدم وجود کلید خارجی برای حفظ ساختار یکنواخت درج می‌شوند.
 - **Include XML / Docstring Comments:** استخراج اتوماتیک توضیحات ستون‌ها (Extended Properties) از دیتابیس و قرار دادن آن به عنوان کامنت بالای هر پراپرتی.
 - **رفتار و مدیریت ستون‌های محاسباتی و پایدار (Computed / Persisted Columns):** کنترل انتخابی کامل بر نحوه ایجاد فیلدهای محاسباتی در مدل:
   - `فقط خواندنی (IncludeReadOnly)`: تولید فیلد صرفاً با Getter و بدون Setter (در C# به شکل `{ get; }` همراه با انوتیشن `[DatabaseGenerated(DatabaseGeneratedOption.Computed)]` و کانفیگ Fluent API `.HasComputedColumnSql(...)`، در TypeScript به صورت `readonly`، در Python با `Field(frozen=True)` و در Java بدون متد Setter).
@@ -153,6 +153,7 @@ BprDevKit از طیف گسترده‌ای از محبوب‌ترین پایگا�
 - **Base Class & Interfaces:** تعیین نام کلاس پایه یا اینترفیس‌هایی که کلاس‌ها باید از آن‌ها ارث‌بری کنند (با پشتیبانی از توکن‌های `{TableName}` و `{ClassName}`).
 - **Partial Class:** تولید کلاس به صورت `public partial class`.
 - **Organize Class with #region Blocks:** تفکیک منظم پراپرتی‌ها، کلیدها، فیلدهای پشتیبان و رفرنس‌ها در بلوک‌های `#region`. ریجن‌های References و Relations حتی برای کلاس‌های فاقد کلید خارجی جهت یکدستی سورس‌کد همیشه ایجاد می‌شوند.
+- **Include Parameterless Constructor & Initialize Non-Nullable Properties:** امکان تولید سازنده بدون پارامتر به همراه سوییچ مقداردهی فیلدهای غیرقابل‌تهی (`InitializeNonNullableProperties`) برای انتساب خودکار فیلدهای رشته‌ای به `string.Empty`، آرایه‌های بایت به `Array.Empty<byte>()` و نمونه‌سازی خودکار کالکشن‌های ناوبری فرزند (`new List<T>()`) در سازنده کلاس جهت جلوگیری کامل از خطاهای `NullReferenceException`.
 - **Class Constants Definition:** تعریف ثابت‌های اختصاصی برای هر کلاس با توکن‌های `{TableName}`، `{SchemaName}`، `{ClassName}` و `{Database}`.
 - **تکه کدهای سفارشی بدنه کلاس (Custom Code Snippets):** امکان تعریف متدها، توابع کمکی، لاجیک‌های اختصاصی و پراپرتی‌ها در انتهای کلاس‌ها (`Bottom of class`) با ویرایشگر چندخطی (Multiline Textarea)، قابلیت فیلتر بر اساس نوع دیتامدل (`All`، `Table`، `View`، `Procedure`، `Function`)، دکمه تکثیر سریع (Duplicate) و پشتیبانی از توکن‌های `{ClassName}`، `{TableName}`، `{SchemaName}` و `{Database}`.
 - **Nullable Primary Key Properties:** قابلیت تعریف فیلدهای کلید اصلی (PK) به صورت نال‌پذیر (`int?`، `Guid?` و ...) جهت استفاده در DTOها، سناریوهای CQRS و مدل‌های ثبت داده قبل از تخصیص شناسه دیتابیس.
@@ -244,6 +245,7 @@ BprDevKit از طیف گسترده‌ای از محبوب‌ترین پایگا�
 #### ۴.۹. پشتیبان‌گیری و بازگردانی تنظیمات (Config Backup & Restore)
 - خروجی گرفتن و بارگذاری تنظیمات تمام سرورها، پروفایل‌های مدل‌ساز و پیکربندی‌های برنامه منحصراً در قالب فایل‌های امن و رمزنگاری‌شده `.enc.json` با کلید محافظت‌شده و بدون افشای متن خام JSON جهت بالاترین سطح امنیت اطلاعات حساس.
 - امکان بازگردانی سریع در کامپیوتر یا محیط‌های دیگر با پیش‌نمایش تعداد سرورها و پروفایل‌ها پیش از اعمال نهایی.
+- **حفاظت از پروفایل‌ها با مودال تایید حذف:** جلوگیری از حذف تصادفی پروفایل‌های کاری با مودال تایید دومرحله‌ای امن.
 
 ---
 
@@ -412,7 +414,7 @@ Fast 3-step generation workflow:
 - **Strip Common Table/Object Prefixes:** Removes prefixes like `tbl_`, `vw_`, `sp_`, `usp_` from class names (default: `false`).
 - **Strip Common Column/Field Prefixes:** Strips prefixes like `fld_`, `col_` from property names (default: `false`).
 - **Singularize Class Names:** Converts plural table names into singular entity names (e.g., `Users` $\rightarrow$ `User`), preserving exact casing when desired (default: `false`).
-- **Generate Navigation Properties:** Automatically creates reference and collection navigation properties for foreign keys. Navigation regions (`#region References` and `#region Relations`) are always rendered with closing `#endregion` to maintain consistent architectural structure across all entities.
+- **Generate Navigation Properties:** Automatically creates reference (Many-to-One) and reverse collection (One-to-Many) navigation properties. Features first-class support for composite foreign keys (multi-column keys), self-referencing entities, automated disambiguation for multiple relationships targeting the same parent table, and consistent relationship generation even when tables are selected individually. In C#, navigation regions (`#region References` and `#region Relations`) are always rendered with closing `#endregion` to maintain consistent architectural structure across all entities.
 - **Include XML / Docstring Comments:** Extracts database extended properties and column descriptions into XML documentation comments (`/// <summary>`) or docstrings.
 - **Computed / Persisted Column Handling:** Flexible user-controlled strategy for calculated columns:
   - `IncludeReadOnly`: Generates read-only properties without setters (in C# `{ get; }` with `[DatabaseGenerated(DatabaseGeneratedOption.Computed)]` and EF Core `.HasComputedColumnSql(...)`, in TypeScript `readonly`, in Python `Field(frozen=True)`, and in Java getter-only).
@@ -443,6 +445,7 @@ Comprehensive options accessible via profile management:
 - **Base Class & Interfaces:** Specify inheritance using token variables (`{TableName}`, `{ClassName}`).
 - **Partial Class:** Adds `partial` modifier to class signatures.
 - **#region Blocks:** Segregates fields, properties, foreign keys, and constructors cleanly. Empty navigation regions are safely preserved.
+- **Parameterless Constructor & Initialize Non-Nullable Properties:** Option to generate a parameterless constructor with automated non-nullable property initialization (`InitializeNonNullableProperties`) for strings (`string.Empty`), byte arrays (`Array.Empty<byte>()`), and child relationship collections (`new List<T>()`) to eliminate runtime `NullReferenceException` risks.
 - **Class Constants Definition:** Define compile-time constants per entity with token helpers (`{TableName}`, `{SchemaName}`, `{ClassName}`, `{Database}`).
 - **Custom Code Snippets:** Define arbitrary methods, helper logic, properties, and constructors placed cleanly at the bottom of generated model classes with a multiline code editor, selective filtering by database object type (`All`, `Table`, `View`, `Procedure`, `Function`), one-click Duplicate button, and token support (`{ClassName}`, `{TableName}`, `{SchemaName}`, `{Database}`).
 - **Nullable Primary Key Properties:** Option to generate primary key fields as nullable types (`int?`, `Guid?`, etc.) for DTOs, CQRS commands, and insertion payloads prior to key assignment.
@@ -533,6 +536,7 @@ Enforce architectural boundaries for **Modular Monoliths** or **Domain-Driven De
 #### 4.9. Configuration Backup & Restore
 - Export and import all server connections, generator profiles, and app preferences exclusively via secured `.enc.json` files protected with AES-256 encryption, preventing any raw plaintext credential exposure.
 - Restore onto other developer workstations or environments with a pre-import summary verification.
+- **Safe Profile Deletion:** Two-step confirmation modal preventing accidental deletion of active generator profiles.
 
 ---
 
