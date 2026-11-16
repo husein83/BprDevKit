@@ -158,7 +158,17 @@ namespace BprDevKit.Localization
             [TranslationKeys.ServerEncryptConnection] = "رمزنگاری اتصال (SSL/TLS)",
             [TranslationKeys.ServerTestingConnection] = "در حال بررسی اتصال...",
             [TranslationKeys.ServerTestConnectionFailed] = "خطا در برقراری اتصال: {0}",
+            [TranslationKeys.ServerMariaDbMismatchError] = "سرور متصل‌شده MySQL ({0}) است نه MariaDB. لطفاً نوع سرور را در پیکربندی روی MySQL تنظیم کنید.",
+            [TranslationKeys.ServerMySqlMismatchError] = "سرور متصل‌شده MariaDB ({0}) است نه MySQL. لطفاً نوع سرور را در پیکربندی روی MariaDB تنظیم کنید.",
             [TranslationKeys.ServerVersion] = "نسخه سرور",
+
+            // Database Capabilities & Unsupported Feature Notices
+            [TranslationKeys.DbFeatureNotSupported] = "عدم پشتیبانی از قابلیت",
+            [TranslationKeys.DbFeatureNotSupportedDesc] = "این قابلیت توسط پایگاه داده {0} پشتیبانی نمی‌شود.",
+            [TranslationKeys.DbSchemasNotSupported] = "در دیتابیس {0}، طرح‌واره (Schema) معادل پایگاه داده است و امکان ایجاد شمای مجزا درون یک دیتابیس وجود ندارد.",
+            [TranslationKeys.DbStoredProceduresNotSupported] = "رویه‌های ذخیره‌شده (Stored Procedures) توسط موتور دیتابیس {0} پشتیبانی نمی‌شوند.",
+            [TranslationKeys.DbFunctionsNotSupported] = "توابع ذخیره‌شده در کاتالوگ پایگاه داده توسط موتور {0} پشتیبانی نمی‌شوند.",
+            [TranslationKeys.DbFileGroupsNotSupported] = "گروه‌های فایلی (FileGroups) مختص SQL Server بوده و توسط دیتابیس {0} پشتیبانی نمی‌شوند.",
 
             // Home Page
             [TranslationKeys.HomeEyebrow] = "محیط کاری BprDevKit",

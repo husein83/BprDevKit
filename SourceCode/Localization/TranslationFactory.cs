@@ -10,6 +10,8 @@ namespace BprDevKit.Localization
     /// </summary>
     public class TranslationFactory : ITranslationFactory
     {
+        public static TranslationFactory Instance { get; } = new();
+
         private readonly ConcurrentDictionary<Language, ITranslator> _translators = new();
 
         public event Action<Language>? LanguageChanged;

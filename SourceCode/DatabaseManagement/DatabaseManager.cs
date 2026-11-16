@@ -25,6 +25,8 @@ namespace BprDevKit.DatabaseManagement
     {
         private readonly ISqlGenerator _sqlGenerator;
         public string ProviderName => _sqlGenerator.ProviderName;
+        public ISqlGenerator SqlGenerator => _sqlGenerator;
+        public DatabaseServerType ServerType => _config.Server.DatabaseServerType;
         private readonly ServerConfiguration _config;
         private readonly IDatabaseConnectionFactory _connectionFactory;
         private readonly ISqlObjectDecryptor _decryptor;
@@ -239,7 +241,7 @@ namespace BprDevKit.DatabaseManagement
         {
             try
             {
-                var table = await ExecuteQuery(_sqlGenerator.GenerateGetSchemaListScript(databaseName));
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetSchemaListScript(databaseName), databaseName);
                 var schemas = table.Rows.Cast<DataRow>().Select(row => MapSchema(databaseName, row)).ToList();
 
                 return (OperationResult.SuccessResult($"Retrieved {schemas.Count} schema(s)"), schemas);
@@ -257,13 +259,13 @@ namespace BprDevKit.DatabaseManagement
         {
             try
             {
-                var header = await ExecuteQuery(_sqlGenerator.GenerateGetSchemaListScript(config.DatabaseName, config.SchemaName));
+                var header = await ExecuteQuery(_sqlGenerator.GenerateGetSchemaListScript(config.DatabaseName, config.SchemaName), config.DatabaseName);
                 if (header.Rows.Count == 0)
                     return (OperationResult.ErrorResult($"[BprDevKit] Schema [{config.SchemaName}] does not exist in database [{config.DatabaseName}]."), null);
 
                 var schema = MapSchema(config.DatabaseName, header.Rows[0]);
 
-                var objects = await ExecuteQuery(_sqlGenerator.GenerateGetSchemaInformationScript(config));
+                var objects = await ExecuteQuery(_sqlGenerator.GenerateGetSchemaInformationScript(config), config.DatabaseName);
                 schema.Objects = objects.Rows.Cast<DataRow>()
                     .Select(row => (
                         ObjectType: row.GetString("ObjectType"),
@@ -370,7 +372,7 @@ namespace BprDevKit.DatabaseManagement
         {
             try
             {
-                var header = await ExecuteQuery(_sqlGenerator.GenerateGetTableInfoScript(config));
+                var header = await ExecuteQuery(_sqlGenerator.GenerateGetTableInfoScript(config), config.DatabaseName);
                 if (header.Rows.Count == 0)
                     return (OperationResult.ErrorResult($"[BprDevKit] Table [{config.SchemaName}].[{config.TableName}] does not exist in database [{config.DatabaseName}]."), null);
 
@@ -386,17 +388,17 @@ namespace BprDevKit.DatabaseManagement
                     ModifyDate = headerRow.GetDateTime("ModifyDate")
                 };
 
-                var columns = await ExecuteQuery(_sqlGenerator.GenerateGetTableColumnsScript(config));
+                var columns = await ExecuteQuery(_sqlGenerator.GenerateGetTableColumnsScript(config), config.DatabaseName);
                 table.Columns = columns.Rows.Cast<DataRow>().Select(row => MapColumn(config, row)).ToList();
                 table.ColumnCount = table.Columns.Count;
 
-                var indexes = await ExecuteQuery(_sqlGenerator.GenerateGetTableIndexesScript(config));
+                var indexes = await ExecuteQuery(_sqlGenerator.GenerateGetTableIndexesScript(config), config.DatabaseName);
                 table.Indexes = indexes.Rows.Cast<DataRow>().Select(row => MapIndex(config, row)).ToList();
 
-                var foreignKeys = await ExecuteQuery(_sqlGenerator.GenerateGetTableForeignKeysScript(config));
+                var foreignKeys = await ExecuteQuery(_sqlGenerator.GenerateGetTableForeignKeysScript(config), config.DatabaseName);
                 table.ForeignKeys = foreignKeys.Rows.Cast<DataRow>().Select(row => MapForeignKey(config.DatabaseName, row)).ToList();
 
-                var checkConstraints = await ExecuteQuery(_sqlGenerator.GenerateGetTableCheckConstraintsScript(config));
+                var checkConstraints = await ExecuteQuery(_sqlGenerator.GenerateGetTableCheckConstraintsScript(config), config.DatabaseName);
                 table.CheckConstraints = checkConstraints.Rows.Cast<DataRow>().Select(row => MapCheckConstraint(config, row)).ToList();
 
                 return (OperationResult.SuccessResult($"Retrieved information for table '{config.SchemaName}.{config.TableName}'."), table);
@@ -414,7 +416,7 @@ namespace BprDevKit.DatabaseManagement
         {
             try
             {
-                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTableListScript(databaseName));
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTableListScript(databaseName), databaseName);
 
                 var tables = table.Rows.Cast<DataRow>()
                     .Select(row => new TableOperation.Information
@@ -813,7 +815,7 @@ namespace BprDevKit.DatabaseManagement
         {
             try
             {
-                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTableCheckConstraintsScript(config));
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTableCheckConstraintsScript(config), config.DatabaseName);
                 var constraints = table.Rows.Cast<DataRow>().Select(row => MapCheckConstraint(config, row)).ToList();
                 return (OperationResult.SuccessResult($"Retrieved {constraints.Count} check constraint(s)"), constraints);
             }
@@ -829,8 +831,14 @@ namespace BprDevKit.DatabaseManagement
         {
             try
             {
+                if (_config.Server.DatabaseServerType != DatabaseServerType.SqlServer && _config.Server.DatabaseServerType != DatabaseServerType.Sqlite)
+                {
+                    return OperationResult.ErrorResult($"[BprDevKit] Direct SQL file backup is only supported for SQL Server (.bak) and SQLite (VACUUM INTO). For {_config.Server.DatabaseServerType}, please use the Script Generator to export schemas and data, or use native command-line backup utilities (e.g., mysqldump / pg_dump).");
+                }
+
                 var script = _sqlGenerator.GenerateBackupScript(config);
-                return await ExecuteDatabaseCommand(script, $"Database '{config.DatabaseName}' backed up successfully to '{config.BackupPath}'", "master");
+                var targetDb = _config.Server.DatabaseServerType == DatabaseServerType.SqlServer ? "master" : null;
+                return await ExecuteDatabaseCommand(script, $"Database '{config.DatabaseName}' backed up successfully to '{config.BackupPath}'", targetDb);
             }
             catch (Exception ex)
             {
@@ -842,6 +850,11 @@ namespace BprDevKit.DatabaseManagement
         {
             try
             {
+                if (_config.Server.DatabaseServerType != DatabaseServerType.SqlServer)
+                {
+                    return OperationResult.ErrorResult($"[BprDevKit] Direct SQL database restoration from .bak files is only supported for SQL Server. For {_config.Server.DatabaseServerType}, please execute the SQL script using the Query tab or use native command-line restoration utilities.");
+                }
+
                 var script = _sqlGenerator.GenerateRestoreScript(config);
                 return await ExecuteDatabaseCommand(script, $"Database '{config.DatabaseName}' restored successfully from '{config.RestorePath}'", "master");
             }
@@ -1600,47 +1613,81 @@ DROP TABLE #DirTree;";
             return await command.ExecuteScalarAsync() is not null;
         }
 
-        private Task<bool> SchemaExistsAsync(string databaseName, string schemaName) =>
-            ExistsAsync(databaseName, "SELECT 1 FROM sys.schemas WHERE name = @schemaName;", ("@schemaName", schemaName));
+        private Task<bool> SchemaExistsAsync(string databaseName, string schemaName)
+        {
+            if (_config.Server.DatabaseServerType == DatabaseServerType.SqlServer)
+                return ExistsAsync(databaseName, "SELECT 1 FROM sys.schemas WHERE name = @schemaName;", ("@schemaName", schemaName));
+            if (_config.Server.DatabaseServerType == DatabaseServerType.Sqlite)
+                return Task.FromResult(string.Equals(schemaName, "main", StringComparison.OrdinalIgnoreCase));
+            return ExistsAsync(databaseName, "SELECT 1 FROM information_schema.schemata WHERE schema_name = @schemaName;", ("@schemaName", schemaName));
+        }
 
-        private Task<bool> TableExistsAsync(string databaseName, string schemaName, string tableName) =>
-            ExistsAsync(databaseName,
-                @"SELECT 1 FROM sys.tables AS t
+        private Task<bool> TableExistsAsync(string databaseName, string schemaName, string tableName)
+        {
+            if (_config.Server.DatabaseServerType == DatabaseServerType.SqlServer)
+                return ExistsAsync(databaseName,
+                    @"SELECT 1 FROM sys.tables AS t
 INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
 WHERE s.name = @schemaName AND t.name = @tableName;",
-                ("@schemaName", schemaName), ("@tableName", tableName));
+                    ("@schemaName", schemaName), ("@tableName", tableName));
+            if (_config.Server.DatabaseServerType == DatabaseServerType.Sqlite)
+                return ExistsAsync(databaseName, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = @tableName;", ("@tableName", tableName));
+            return ExistsAsync(databaseName, "SELECT 1 FROM information_schema.tables WHERE table_schema = @schemaName AND table_name = @tableName;", ("@schemaName", schemaName), ("@tableName", tableName));
+        }
 
-        private Task<bool> ColumnExistsAsync(string databaseName, string schemaName, string tableName, string columnName) =>
-            ExistsAsync(databaseName,
-                @"SELECT 1 FROM sys.columns AS c
+        private Task<bool> ColumnExistsAsync(string databaseName, string schemaName, string tableName, string columnName)
+        {
+            if (_config.Server.DatabaseServerType == DatabaseServerType.SqlServer)
+                return ExistsAsync(databaseName,
+                    @"SELECT 1 FROM sys.columns AS c
 INNER JOIN sys.tables AS t ON t.object_id = c.object_id
 INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
 WHERE s.name = @schemaName AND t.name = @tableName AND c.name = @columnName;",
-                ("@schemaName", schemaName), ("@tableName", tableName), ("@columnName", columnName));
+                    ("@schemaName", schemaName), ("@tableName", tableName), ("@columnName", columnName));
+            if (_config.Server.DatabaseServerType == DatabaseServerType.Sqlite)
+                return Task.FromResult(true);
+            return ExistsAsync(databaseName, "SELECT 1 FROM information_schema.columns WHERE table_schema = @schemaName AND table_name = @tableName AND column_name = @columnName;", ("@schemaName", schemaName), ("@tableName", tableName), ("@columnName", columnName));
+        }
 
-        private Task<bool> IndexExistsAsync(string databaseName, string schemaName, string tableName, string indexName) =>
-            ExistsAsync(databaseName,
-                @"SELECT 1 FROM sys.indexes AS i
+        private Task<bool> IndexExistsAsync(string databaseName, string schemaName, string tableName, string indexName)
+        {
+            if (_config.Server.DatabaseServerType == DatabaseServerType.SqlServer)
+                return ExistsAsync(databaseName,
+                    @"SELECT 1 FROM sys.indexes AS i
 INNER JOIN sys.tables AS t ON t.object_id = i.object_id
 INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
 WHERE s.name = @schemaName AND t.name = @tableName AND i.index_id > 0 AND i.name = @indexName;",
-                ("@schemaName", schemaName), ("@tableName", tableName), ("@indexName", indexName));
+                    ("@schemaName", schemaName), ("@tableName", tableName), ("@indexName", indexName));
+            return Task.FromResult(false);
+        }
 
-        private Task<bool> ForeignKeyExistsAsync(string databaseName, string schemaName, string tableName, string foreignKeyName) =>
-            ExistsAsync(databaseName,
-                @"SELECT 1 FROM sys.foreign_keys AS fk
+        private Task<bool> ForeignKeyExistsAsync(string databaseName, string schemaName, string tableName, string foreignKeyName)
+        {
+            if (_config.Server.DatabaseServerType == DatabaseServerType.SqlServer)
+                return ExistsAsync(databaseName,
+                    @"SELECT 1 FROM sys.foreign_keys AS fk
 INNER JOIN sys.tables AS t ON t.object_id = fk.parent_object_id
 INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
 WHERE s.name = @schemaName AND t.name = @tableName AND fk.name = @foreignKeyName;",
-                ("@schemaName", schemaName), ("@tableName", tableName), ("@foreignKeyName", foreignKeyName));
+                    ("@schemaName", schemaName), ("@tableName", tableName), ("@foreignKeyName", foreignKeyName));
+            if (_config.Server.DatabaseServerType == DatabaseServerType.Sqlite)
+                return Task.FromResult(false);
+            return ExistsAsync(databaseName, "SELECT 1 FROM information_schema.table_constraints WHERE table_schema = @schemaName AND table_name = @tableName AND constraint_name = @foreignKeyName AND constraint_type = 'FOREIGN KEY';", ("@schemaName", schemaName), ("@tableName", tableName), ("@foreignKeyName", foreignKeyName));
+        }
 
-        private Task<bool> CheckConstraintExistsAsync(string databaseName, string schemaName, string tableName, string constraintName) =>
-            ExistsAsync(databaseName,
-                @"SELECT 1 FROM sys.check_constraints AS cc
+        private Task<bool> CheckConstraintExistsAsync(string databaseName, string schemaName, string tableName, string constraintName)
+        {
+            if (_config.Server.DatabaseServerType == DatabaseServerType.SqlServer)
+                return ExistsAsync(databaseName,
+                    @"SELECT 1 FROM sys.check_constraints AS cc
 INNER JOIN sys.tables AS t ON t.object_id = cc.parent_object_id
 INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
 WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName;",
-                ("@schemaName", schemaName), ("@tableName", tableName), ("@constraintName", constraintName));
+                    ("@schemaName", schemaName), ("@tableName", tableName), ("@constraintName", constraintName));
+            if (_config.Server.DatabaseServerType == DatabaseServerType.Sqlite)
+                return Task.FromResult(false);
+            return ExistsAsync(databaseName, "SELECT 1 FROM information_schema.table_constraints WHERE table_schema = @schemaName AND table_name = @tableName AND constraint_name = @constraintName AND constraint_type = 'CHECK';", ("@schemaName", schemaName), ("@tableName", tableName), ("@constraintName", constraintName));
+        }
 
         private static SchemaOperation.Information MapSchema(string databaseName, DataRow row)
         {
@@ -1770,17 +1817,28 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
             if (string.IsNullOrWhiteSpace(databaseName))
                 return false;
 
-            using var connection = await OpenConnectionAsync();
-            using var command = connection.CreateCommand();
-            command.CommandText = "SELECT 1 FROM sys.databases WHERE name = @databaseName;";
-            command.CommandTimeout = _config.Server.CommandTimeout;
+            if (_config.Server.DatabaseServerType == DatabaseServerType.SqlServer)
+            {
+                using var connection = await OpenConnectionAsync();
+                using var command = connection.CreateCommand();
+                command.CommandText = "SELECT 1 FROM sys.databases WHERE name = @databaseName;";
+                command.CommandTimeout = _config.Server.CommandTimeout;
 
-            var param = command.CreateParameter();
-            param.ParameterName = "@databaseName";
-            param.Value = databaseName;
-            command.Parameters.Add(param);
+                var param = command.CreateParameter();
+                param.ParameterName = "@databaseName";
+                param.Value = databaseName;
+                command.Parameters.Add(param);
 
-            return await command.ExecuteScalarAsync() is not null;
+                return await command.ExecuteScalarAsync() is not null;
+            }
+
+            if (_config.Server.DatabaseServerType == DatabaseServerType.Sqlite)
+            {
+                return string.Equals(databaseName, "main", StringComparison.OrdinalIgnoreCase);
+            }
+
+            var (op, dbs) = await GetDatabases();
+            return op.Success && dbs != null && dbs.Any(d => string.Equals(d, databaseName, StringComparison.OrdinalIgnoreCase));
         }
 
         #region View Operations
@@ -1827,7 +1885,7 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
         {
             try
             {
-                var table = await ExecuteQuery(_sqlGenerator.GenerateGetViewsScript(databaseName));
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetViewsScript(databaseName), databaseName);
                 var views = table.Rows.Cast<DataRow>().Select(row =>
                 {
                     var isEncrypted = row.GetBoolean("IsEncrypted");
@@ -1855,7 +1913,7 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
         {
             try
             {
-                var table = await ExecuteQuery(_sqlGenerator.GenerateGetViewInfoScript(databaseName, schemaName, viewName));
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetViewInfoScript(databaseName, schemaName, viewName), databaseName);
                 if (table.Rows.Count == 0)
                     return (OperationResult.ErrorResult($"View '{schemaName}.{viewName}' not found."), null);
 
@@ -1886,7 +1944,7 @@ WHERE s.name = @schemaName AND t.name = @tableName AND cc.name = @constraintName
         {
             try
             {
-                var table = await ExecuteQuery(_sqlGenerator.GenerateTestViewScript(databaseName, selectStatement));
+                var table = await ExecuteQuery(_sqlGenerator.GenerateTestViewScript(databaseName, selectStatement), databaseName);
                 return (OperationResult.SuccessResult($"Query executed successfully ({table.Rows.Count} rows returned)."), table);
             }
             catch (Exception ex)
@@ -1966,7 +2024,7 @@ ORDER BY cols.ordinal_position;";
     column_name AS ColumnName,
     data_type AS DataType,
     COALESCE(character_maximum_length, 0) AS MaxLength,
-    COALESCE(numeric_precision, datetime_precision, 0) AS Precision,
+    COALESCE(numeric_precision, datetime_precision, 0) AS `Precision`,
     COALESCE(numeric_scale, 0) AS Scale,
     CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END AS IsNullable,
     0 AS IsIdentity,
@@ -2098,7 +2156,7 @@ ORDER BY cid;";
         {
             try
             {
-                var table = await ExecuteQuery(_sqlGenerator.GenerateGetProceduresScript(databaseName));
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetProceduresScript(databaseName), databaseName);
                 var procs = table.Rows.Cast<DataRow>().Select(row =>
                 {
                     var isEncrypted = row.GetBoolean("IsEncrypted");
@@ -2126,7 +2184,7 @@ ORDER BY cid;";
         {
             try
             {
-                var table = await ExecuteQuery(_sqlGenerator.GenerateGetProcedureInfoScript(databaseName, schemaName, procName));
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetProcedureInfoScript(databaseName, schemaName, procName), databaseName);
                 if (table.Rows.Count == 0)
                     return (OperationResult.ErrorResult($"Stored procedure '{schemaName}.{procName}' not found."), null);
 
@@ -2258,12 +2316,13 @@ ORDER BY column_ordinal;";
                 }
                 else if (serverType == DatabaseServerType.PostgreSql || serverType == DatabaseServerType.MySql || serverType == DatabaseServerType.MariaDb)
                 {
+                    var precAlias = serverType == DatabaseServerType.PostgreSql ? "\"Precision\"" : "`Precision`";
                     var paramSql = $@"SELECT
     ordinal_position AS OrdinalPosition,
     COALESCE(parameter_name, CONCAT('param_', ordinal_position)) AS ColumnName,
     data_type AS DataType,
     COALESCE(character_maximum_length, 0) AS MaxLength,
-    COALESCE(numeric_precision, datetime_precision, 0) AS Precision,
+    COALESCE(numeric_precision, datetime_precision, 0) AS {precAlias},
     COALESCE(numeric_scale, 0) AS Scale,
     1 AS IsNullable,
     0 AS IsIdentity,
@@ -2366,7 +2425,7 @@ ORDER BY position";
         {
             try
             {
-                var table = await ExecuteQuery(_sqlGenerator.GenerateGetFunctionsScript(databaseName));
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetFunctionsScript(databaseName), databaseName);
                 var funcs = table.Rows.Cast<DataRow>().Select(row =>
                 {
                     var isEncrypted = row.GetBoolean("IsEncrypted");
@@ -2396,7 +2455,7 @@ ORDER BY position";
         {
             try
             {
-                var table = await ExecuteQuery(_sqlGenerator.GenerateGetFunctionInfoScript(databaseName, schemaName, funcName));
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetFunctionInfoScript(databaseName, schemaName, funcName), databaseName);
                 if (table.Rows.Count == 0)
                     return (OperationResult.ErrorResult($"Function '{schemaName}.{funcName}' not found."), null);
 
@@ -2511,12 +2570,13 @@ ORDER BY c.column_id;";
                 }
                 else if (serverType == DatabaseServerType.PostgreSql || serverType == DatabaseServerType.MySql || serverType == DatabaseServerType.MariaDb)
                 {
+                    var precAlias = serverType == DatabaseServerType.PostgreSql ? "\"Precision\"" : "`Precision`";
                     var paramSql = $@"SELECT
     ordinal_position AS OrdinalPosition,
     COALESCE(parameter_name, CONCAT('param_', ordinal_position)) AS ColumnName,
     data_type AS DataType,
     COALESCE(character_maximum_length, 0) AS MaxLength,
-    COALESCE(numeric_precision, datetime_precision, 0) AS Precision,
+    COALESCE(numeric_precision, datetime_precision, 0) AS {precAlias},
     COALESCE(numeric_scale, 0) AS Scale,
     1 AS IsNullable,
     0 AS IsIdentity,
@@ -2633,7 +2693,7 @@ ORDER BY position";
         {
             try
             {
-                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTriggersScript(databaseName));
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTriggersScript(databaseName), databaseName);
                 var triggers = table.Rows.Cast<DataRow>().Select(row =>
                 {
                     var isEncrypted = row.GetBoolean("IsEncrypted");
@@ -2668,7 +2728,7 @@ ORDER BY position";
         {
             try
             {
-                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTriggerInfoScript(databaseName, schemaName, triggerName));
+                var table = await ExecuteQuery(_sqlGenerator.GenerateGetTriggerInfoScript(databaseName, schemaName, triggerName), databaseName);
                 if (table.Rows.Count == 0)
                     return (OperationResult.ErrorResult($"Trigger '{schemaName}.{triggerName}' not found."), null);
 

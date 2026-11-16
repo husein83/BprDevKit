@@ -158,7 +158,17 @@ namespace BprDevKit.Localization
             [TranslationKeys.ServerEncryptConnection] = "Encrypt Connection (SSL/TLS)",
             [TranslationKeys.ServerTestingConnection] = "Testing Connection...",
             [TranslationKeys.ServerTestConnectionFailed] = "Connection failed: {0}",
+            [TranslationKeys.ServerMariaDbMismatchError] = "The connected server is MySQL ({0}), not MariaDB. Please change the server type to MySQL in configuration.",
+            [TranslationKeys.ServerMySqlMismatchError] = "The connected server is MariaDB ({0}), not MySQL. Please change the server type to MariaDB in configuration.",
             [TranslationKeys.ServerVersion] = "Server Version",
+
+            // Database Capabilities & Unsupported Feature Notices
+            [TranslationKeys.DbFeatureNotSupported] = "Feature Not Supported",
+            [TranslationKeys.DbFeatureNotSupportedDesc] = "This feature is not supported by {0}.",
+            [TranslationKeys.DbSchemasNotSupported] = "In {0}, schemas are synonymous with databases; separate isolated schemas inside a database are not supported.",
+            [TranslationKeys.DbStoredProceduresNotSupported] = "Stored procedures are not supported by the {0} database engine.",
+            [TranslationKeys.DbFunctionsNotSupported] = "User-defined catalog functions are not supported by the {0} database engine.",
+            [TranslationKeys.DbFileGroupsNotSupported] = "FileGroups are a Microsoft SQL Server concept and are not supported by {0}.",
 
             // Home Page
             [TranslationKeys.HomeEyebrow] = "BprDevKit workspace",

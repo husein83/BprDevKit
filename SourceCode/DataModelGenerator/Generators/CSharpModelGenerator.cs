@@ -311,12 +311,27 @@ namespace BprDevKit.DataModelGenerator.Generators
                         if (rule?.ActionType is "TypeOverride" or "CustomGetterSetter") continue;
 
                         var type = SqlTypeMapper.MapToCSharp(column.DataType, false, options.NullableReferenceTypes);
-                        var initializer = type switch
+                        string? initializer = null;
+                        if (options.StringInitialization == "NullForgiving")
                         {
-                            "string" => "string.Empty",
-                            "byte[]" => "Array.Empty<byte>()",
-                            _ => null
-                        };
+                            initializer = type switch
+                            {
+                                "string" or "object" => "null!",
+                                "byte[]" => "null!",
+                                _ => null
+                            };
+                        }
+                        else if (options.StringInitialization == "EmptyString")
+                        {
+                            initializer = type switch
+                            {
+                                "string" => "string.Empty",
+                                "byte[]" => "Array.Empty<byte>()",
+                                "object" => "null!",
+                                _ => null
+                            };
+                        }
+
                         if (initializer == null) continue;
 
                         var target = options.PropertyAccessor == "backing_field" ||
@@ -1166,7 +1181,8 @@ namespace BprDevKit.DataModelGenerator.Generators
                             }
                             else
                             {
-                                sb.AppendLine($"{indent}    public virtual ICollection<{childFullTypeName}> {collectionPropName} {{ get; set; }} = new List<{childFullTypeName}>();");
+                                var collInit = options.InitializeNonNullableProperties ? "" : $" = new List<{childFullTypeName}>();";
+                                sb.AppendLine($"{indent}    public virtual ICollection<{childFullTypeName}> {collectionPropName} {{ get; set; }}{collInit}");
                             }
                             sb.AppendLine();
                         }

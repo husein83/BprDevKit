@@ -53,92 +53,98 @@
                             }
                         </select>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label fw-semibold" for="data-directory">@t[TranslationKeys.DbTabDataDirectory]</label>
-                        <input id="data-directory" class="form-control" @bind="_createConfiguration.DataFilePath" placeholder="D:\\SqlData" />
-                        <div class="form-text">@t[TranslationKeys.DbTabDataDirHelp]</div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label fw-semibold" for="log-directory">@t[TranslationKeys.DbTabLogDirectory] <span class="text-muted fw-normal">@t[TranslationKeys.DbTabOptional]</span></label>
-                        <input id="log-directory" class="form-control" @bind="_createConfiguration.LogFilePath" placeholder="D:\\SqlLogs" />
-                        <div class="form-text">@t[TranslationKeys.DbTabLogDirHelp]</div>
-                    </div>
+                    @if (ServerConfig?.Server?.DatabaseServerType == DatabaseServerType.SqlServer)
+                    {
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" for="data-directory">@t[TranslationKeys.DbTabDataDirectory]</label>
+                            <input id="data-directory" class="form-control" @bind="_createConfiguration.DataFilePath" placeholder="D:\\SqlData" />
+                            <div class="form-text">@t[TranslationKeys.DbTabDataDirHelp]</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" for="log-directory">@t[TranslationKeys.DbTabLogDirectory] <span class="text-muted fw-normal">@t[TranslationKeys.DbTabOptional]</span></label>
+                            <input id="log-directory" class="form-control" @bind="_createConfiguration.LogFilePath" placeholder="D:\\SqlLogs" />
+                            <div class="form-text">@t[TranslationKeys.DbTabLogDirHelp]</div>
+                        </div>
+                    }
                 </div>
 
-                <hr class="my-4" />
-                <h3 class="h6 text-uppercase text-muted mb-3">@t[TranslationKeys.DbTabDataFile]</h3>
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label" for="data-initial-size">@t[TranslationKeys.DbTabInitialSizeMB]</label>
-                        <input id="data-initial-size" type="number" min="1" class="form-control" @bind="_createConfiguration.InitialSizeMB" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="data-max-size">@t[TranslationKeys.DbTabMaxSizeMB]</label>
-                        <input id="data-max-size" type="number" min="1" class="form-control" @bind="_createConfiguration.MaxSizeMB" placeholder="@t[TranslationKeys.DbTabUnlimited]" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="data-growth">@t[TranslationKeys.DbTabGrowthMB]</label>
-                        <input id="data-growth" type="number" min="1" class="form-control" @bind="_createConfiguration.FileGrowthMB" />
-                    </div>
-                </div>
-
-                <h3 class="h6 text-uppercase text-muted mb-3 mt-4">@t[TranslationKeys.DbTabLogFile]</h3>
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label" for="log-initial-size">@t[TranslationKeys.DbTabInitialSizeMB]</label>
-                        <input id="log-initial-size" type="number" min="1" class="form-control" @bind="_createConfiguration.LogInitialSizeMB" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="log-max-size">@t[TranslationKeys.DbTabMaxSizeMB]</label>
-                        <input id="log-max-size" type="number" min="1" class="form-control" @bind="_createConfiguration.LogMaxSizeMB" placeholder="@t[TranslationKeys.DbTabUnlimited]" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="log-growth">@t[TranslationKeys.DbTabGrowthMB]</label>
-                        <input id="log-growth" type="number" min="1" class="form-control" @bind="_createConfiguration.LogFileGrowthMB" />
-                    </div>
-                </div>
-
-                <h3 class="h6 text-uppercase text-muted mb-3 mt-4">@t[TranslationKeys.DbTabDbOptions]</h3>
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label" for="recovery-model">@t[TranslationKeys.DbTabRecoveryModel]</label>
-                        <select id="recovery-model" class="form-select" @bind="_createConfiguration.RecoveryModel">
-                            <option value="SIMPLE">@t[TranslationKeys.DbTabRecoverySimple]</option>
-                            <option value="FULL">@t[TranslationKeys.DbTabRecoveryFull]</option>
-                            <option value="BULK_LOGGED">@t[TranslationKeys.DbTabRecoveryBulkLogged]</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="page-verify">@t[TranslationKeys.DbTabPageVerify]</label>
-                        <select id="page-verify" class="form-select" @bind="_createConfiguration.PageVerify">
-                            <option value="CHECKSUM">@t[TranslationKeys.DbTabPageVerifyChecksum]</option>
-                            <option value="TORN_PAGE_DETECTION">@t[TranslationKeys.DbTabPageVerifyTornPage]</option>
-                            <option value="NONE">@t[TranslationKeys.DbTabPageVerifyNone]</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="compatibility-level">@t[TranslationKeys.DbTabCompatibilityLevel] <span class="text-muted fw-normal">@t[TranslationKeys.DbTabOptional]</span></label>
-                        <input id="compatibility-level" type="number" min="1" class="form-control" @bind="_createConfiguration.CompatibilityLevel" placeholder="@t[TranslationKeys.DbTabServerDefault]" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="file-group">@t[TranslationKeys.DbTabAdditionalFilegroup] <span class="text-muted fw-normal">@t[TranslationKeys.DbTabOptional]</span></label>
-                        <input id="file-group" maxlength="128" class="form-control" @bind="_createConfiguration.FileGroup" placeholder="Reporting" />
-                        <div class="form-text">@t[TranslationKeys.DbTabFilegroupHelp]</div>
-                    </div>
-                </div>
-                <div class="row g-3 mt-1">
-                    <div class="col-md-4">
-                        <div class="form-check form-switch">
-                            <input id="is-read-only" class="form-check-input" type="checkbox" @bind="_createConfiguration.IsReadOnly" /><label class="form-check-label" for="is-read-only">@t[TranslationKeys.DbTabReadOnly]</label>
+                @if (ServerConfig?.Server?.DatabaseServerType == DatabaseServerType.SqlServer)
+                {
+                    <hr class="my-4" />
+                    <h3 class="h6 text-uppercase text-muted mb-3">@t[TranslationKeys.DbTabDataFile]</h3>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label" for="data-initial-size">@t[TranslationKeys.DbTabInitialSizeMB]</label>
+                            <input id="data-initial-size" type="number" min="1" class="form-control" @bind="_createConfiguration.InitialSizeMB" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="data-max-size">@t[TranslationKeys.DbTabMaxSizeMB]</label>
+                            <input id="data-max-size" type="number" min="1" class="form-control" @bind="_createConfiguration.MaxSizeMB" placeholder="@t[TranslationKeys.DbTabUnlimited]" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="data-growth">@t[TranslationKeys.DbTabGrowthMB]</label>
+                            <input id="data-growth" type="number" min="1" class="form-control" @bind="_createConfiguration.FileGrowthMB" />
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <div class="form-check form-switch">
-                            <input id="auto-shrink" class="form-check-input" type="checkbox" @bind="_createConfiguration.AutoShrink" /><label class="form-check-label" for="auto-shrink">@t[TranslationKeys.DbTabAutoShrink]</label>
+
+                    <h3 class="h6 text-uppercase text-muted mb-3 mt-4">@t[TranslationKeys.DbTabLogFile]</h3>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label" for="log-initial-size">@t[TranslationKeys.DbTabInitialSizeMB]</label>
+                            <input id="log-initial-size" type="number" min="1" class="form-control" @bind="_createConfiguration.LogInitialSizeMB" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="log-max-size">@t[TranslationKeys.DbTabMaxSizeMB]</label>
+                            <input id="log-max-size" type="number" min="1" class="form-control" @bind="_createConfiguration.LogMaxSizeMB" placeholder="@t[TranslationKeys.DbTabUnlimited]" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="log-growth">@t[TranslationKeys.DbTabGrowthMB]</label>
+                            <input id="log-growth" type="number" min="1" class="form-control" @bind="_createConfiguration.LogFileGrowthMB" />
                         </div>
                     </div>
-                    <div class="col-md-4"><div class="form-check form-switch"><input id="auto-close" class="form-check-input" type="checkbox" @bind="_createConfiguration.AutoClose" /><label class="form-check-label" for="auto-close">@t[TranslationKeys.DbTabAutoClose]</label></div></div>
-                </div>
+
+                    <h3 class="h6 text-uppercase text-muted mb-3 mt-4">@t[TranslationKeys.DbTabDbOptions]</h3>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label" for="recovery-model">@t[TranslationKeys.DbTabRecoveryModel]</label>
+                            <select id="recovery-model" class="form-select" @bind="_createConfiguration.RecoveryModel">
+                                <option value="SIMPLE">@t[TranslationKeys.DbTabRecoverySimple]</option>
+                                <option value="FULL">@t[TranslationKeys.DbTabRecoveryFull]</option>
+                                <option value="BULK_LOGGED">@t[TranslationKeys.DbTabRecoveryBulkLogged]</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="page-verify">@t[TranslationKeys.DbTabPageVerify]</label>
+                            <select id="page-verify" class="form-select" @bind="_createConfiguration.PageVerify">
+                                <option value="CHECKSUM">@t[TranslationKeys.DbTabPageVerifyChecksum]</option>
+                                <option value="TORN_PAGE_DETECTION">@t[TranslationKeys.DbTabPageVerifyTornPage]</option>
+                                <option value="NONE">@t[TranslationKeys.DbTabPageVerifyNone]</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="compatibility-level">@t[TranslationKeys.DbTabCompatibilityLevel] <span class="text-muted fw-normal">@t[TranslationKeys.DbTabOptional]</span></label>
+                            <input id="compatibility-level" type="number" min="1" class="form-control" @bind="_createConfiguration.CompatibilityLevel" placeholder="@t[TranslationKeys.DbTabServerDefault]" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="file-group">@t[TranslationKeys.DbTabAdditionalFilegroup] <span class="text-muted fw-normal">@t[TranslationKeys.DbTabOptional]</span></label>
+                            <input id="file-group" maxlength="128" class="form-control" @bind="_createConfiguration.FileGroup" placeholder="Reporting" />
+                            <div class="form-text">@t[TranslationKeys.DbTabFilegroupHelp]</div>
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                <input id="is-read-only" class="form-check-input" type="checkbox" @bind="_createConfiguration.IsReadOnly" /><label class="form-check-label" for="is-read-only">@t[TranslationKeys.DbTabReadOnly]</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                <input id="auto-shrink" class="form-check-input" type="checkbox" @bind="_createConfiguration.AutoShrink" /><label class="form-check-label" for="auto-shrink">@t[TranslationKeys.DbTabAutoShrink]</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4"><div class="form-check form-switch"><input id="auto-close" class="form-check-input" type="checkbox" @bind="_createConfiguration.AutoClose" /><label class="form-check-label" for="auto-close">@t[TranslationKeys.DbTabAutoClose]</label></div></div>
+                    </div>
+                }
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
                     <button class="btn btn-light" type="button" @onclick="CloseCreateDatabase">@t[TranslationKeys.Cancel]</button>
@@ -207,24 +213,27 @@
                             }
                         </select>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="edit-recovery">@t[TranslationKeys.DbTabRecoveryModel]</label><select id="edit-recovery" class="form-select" @bind="_editConfiguration.RecoveryModel"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="SIMPLE">@t[TranslationKeys.DbTabRecoverySimple]</option><option value="FULL">@t[TranslationKeys.DbTabRecoveryFull]</option><option value="BULK_LOGGED">@t[TranslationKeys.DbTabRecoveryBulkLogged]</option></select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="edit-page-verify">@t[TranslationKeys.DbTabPageVerify]</label><select id="edit-page-verify" class="form-select" @bind="_editConfiguration.PageVerify"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="CHECKSUM">@t[TranslationKeys.DbTabPageVerifyChecksum]</option><option value="TORN_PAGE_DETECTION">@t[TranslationKeys.DbTabPageVerifyTornPage]</option><option value="NONE">@t[TranslationKeys.DbTabPageVerifyNone]</option></select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="edit-compatibility">@t[TranslationKeys.DbTabCompatibilityLevel]</label><input id="edit-compatibility" type="number" min="1" class="form-control" @bind="_editConfiguration.CompatibilityLevel" placeholder="@t[TranslationKeys.DbTabKeepCurrentValue]" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="edit-read-only">@t[TranslationKeys.DbTabReadOnly]</label><select id="edit-read-only" class="form-select" @bind="_readOnlySelection"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="true">@t[TranslationKeys.Enable]</option><option value="false">@t[TranslationKeys.Disable]</option></select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="edit-auto-shrink">@t[TranslationKeys.DbTabAutoShrink]</label><select id="edit-auto-shrink" class="form-select" @bind="_autoShrinkSelection"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="true">@t[TranslationKeys.Enable]</option><option value="false">@t[TranslationKeys.Disable]</option></select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="edit-auto-close">@t[TranslationKeys.DbTabAutoClose]</label><select id="edit-auto-close" class="form-select" @bind="_autoCloseSelection"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="true">@t[TranslationKeys.Enable]</option><option value="false">@t[TranslationKeys.Disable]</option></select>
-                    </div>
+                    @if (ServerConfig?.Server?.DatabaseServerType == DatabaseServerType.SqlServer)
+                    {
+                        <div class="col-md-6">
+                            <label class="form-label" for="edit-recovery">@t[TranslationKeys.DbTabRecoveryModel]</label><select id="edit-recovery" class="form-select" @bind="_editConfiguration.RecoveryModel"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="SIMPLE">@t[TranslationKeys.DbTabRecoverySimple]</option><option value="FULL">@t[TranslationKeys.DbTabRecoveryFull]</option><option value="BULK_LOGGED">@t[TranslationKeys.DbTabRecoveryBulkLogged]</option></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="edit-page-verify">@t[TranslationKeys.DbTabPageVerify]</label><select id="edit-page-verify" class="form-select" @bind="_editConfiguration.PageVerify"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="CHECKSUM">@t[TranslationKeys.DbTabPageVerifyChecksum]</option><option value="TORN_PAGE_DETECTION">@t[TranslationKeys.DbTabPageVerifyTornPage]</option><option value="NONE">@t[TranslationKeys.DbTabPageVerifyNone]</option></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="edit-compatibility">@t[TranslationKeys.DbTabCompatibilityLevel]</label><input id="edit-compatibility" type="number" min="1" class="form-control" @bind="_editConfiguration.CompatibilityLevel" placeholder="@t[TranslationKeys.DbTabKeepCurrentValue]" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="edit-read-only">@t[TranslationKeys.DbTabReadOnly]</label><select id="edit-read-only" class="form-select" @bind="_readOnlySelection"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="true">@t[TranslationKeys.Enable]</option><option value="false">@t[TranslationKeys.Disable]</option></select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="edit-auto-shrink">@t[TranslationKeys.DbTabAutoShrink]</label><select id="edit-auto-shrink" class="form-select" @bind="_autoShrinkSelection"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="true">@t[TranslationKeys.Enable]</option><option value="false">@t[TranslationKeys.Disable]</option></select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="edit-auto-close">@t[TranslationKeys.DbTabAutoClose]</label><select id="edit-auto-close" class="form-select" @bind="_autoCloseSelection"><option value="">@t[TranslationKeys.DbTabKeepCurrentValue]</option><option value="true">@t[TranslationKeys.Enable]</option><option value="false">@t[TranslationKeys.Disable]</option></select>
+                        </div>
+                    }
                 </div>
             </div>
             <div class="modal-footer"><button class="btn btn-light" type="button" @onclick="CloseDialogs">@t[TranslationKeys.Cancel]</button><button class="btn btn-primary" type="button" @onclick="SaveDatabaseChanges" disabled="@_isSaving">@t[TranslationKeys.SaveChanges]</button></div>
@@ -600,6 +609,12 @@
     {
         if (_databaseManager is null) return;
 
+        if (ServerConfig?.Server?.DatabaseServerType == DatabaseServerType.Sqlite)
+        {
+            ShowMessage("[BprDevKit] SQLite databases are single-file databases and do not support database-level configuration changes.", "alert-warning", "bi-exclamation-triangle-fill");
+            return;
+        }
+
         _isSaving = true;
         try
         {
@@ -642,9 +657,21 @@
     private async Task SaveDatabaseChanges()
     {
         if (_databaseManager is null) return;
-        _editConfiguration.IsReadOnly = ParseNullableBoolean(_readOnlySelection);
-        _editConfiguration.AutoShrink = ParseNullableBoolean(_autoShrinkSelection);
-        _editConfiguration.AutoClose = ParseNullableBoolean(_autoCloseSelection);
+        if (ServerConfig?.Server?.DatabaseServerType == DatabaseServerType.SqlServer)
+        {
+            _editConfiguration.IsReadOnly = ParseNullableBoolean(_readOnlySelection);
+            _editConfiguration.AutoShrink = ParseNullableBoolean(_autoShrinkSelection);
+            _editConfiguration.AutoClose = ParseNullableBoolean(_autoCloseSelection);
+        }
+        else
+        {
+            _editConfiguration.IsReadOnly = null;
+            _editConfiguration.AutoShrink = null;
+            _editConfiguration.AutoClose = null;
+            _editConfiguration.RecoveryModel = null;
+            _editConfiguration.PageVerify = null;
+            _editConfiguration.CompatibilityLevel = null;
+        }
         _isSaving = true;
         try
         {
@@ -697,6 +724,11 @@
     private void OpenBackupDatabase(string databaseName)
     {
         if (_databaseManager is null) return;
+        if (ServerConfig?.Server?.DatabaseServerType != DatabaseServerType.SqlServer && ServerConfig?.Server?.DatabaseServerType != DatabaseServerType.Sqlite)
+        {
+            ShowMessage($"[BprDevKit] Direct SQL file backup is only supported for SQL Server (.bak) and SQLite. For {ServerConfig?.Server?.DatabaseServerType}, please use the Script Generator to export schemas and data, or use native command-line backup utilities.", "alert-warning", "bi-exclamation-triangle-fill");
+            return;
+        }
         _backupFileName = $"{databaseName}_Backup_{DevFunctions.GetReadableTimestamp()}.bak";
         _backupConfiguration = new BackupOperation
         {
@@ -835,6 +867,11 @@
 
     private void OpenRestoreDatabase(string? defaultDb = null)
     {
+        if (ServerConfig?.Server?.DatabaseServerType != DatabaseServerType.SqlServer)
+        {
+            ShowMessage($"[BprDevKit] Database restore from .bak files is only supported for SQL Server. For {ServerConfig?.Server?.DatabaseServerType}, please execute your SQL scripts using the Query tab.", "alert-warning", "bi-exclamation-triangle-fill");
+            return;
+        }
         _restoreConfiguration = new RestoreOperation
         {
             DatabaseName = defaultDb ?? (_databases.Count > 0 ? _databases[0] : string.Empty),

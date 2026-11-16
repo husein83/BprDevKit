@@ -21,6 +21,10 @@ namespace BprDevKit.Config
         bool SupportsCredentials,
         bool SupportsSchemas,
         bool SupportsFileGroups,
+        bool SupportsStoredProcedures,
+        bool SupportsFunctions,
+        bool SupportsTriggers,
+        bool SupportsViews,
         string BatchSeparator,
         IReadOnlyList<string> SystemDatabases
     );
@@ -45,6 +49,10 @@ namespace BprDevKit.Config
                 SupportsCredentials: true,
                 SupportsSchemas: true,
                 SupportsFileGroups: true,
+                SupportsStoredProcedures: true,
+                SupportsFunctions: true,
+                SupportsTriggers: true,
+                SupportsViews: true,
                 BatchSeparator: "GO",
                 SystemDatabases: new[] { "master", "tempdb", "model", "msdb" }
             ),
@@ -61,6 +69,10 @@ namespace BprDevKit.Config
                 SupportsCredentials: true,
                 SupportsSchemas: true,
                 SupportsFileGroups: false,
+                SupportsStoredProcedures: true,
+                SupportsFunctions: true,
+                SupportsTriggers: true,
+                SupportsViews: true,
                 BatchSeparator: ";",
                 SystemDatabases: new[] { "postgres", "template0", "template1" }
             ),
@@ -77,6 +89,10 @@ namespace BprDevKit.Config
                 SupportsCredentials: true,
                 SupportsSchemas: false,
                 SupportsFileGroups: false,
+                SupportsStoredProcedures: true,
+                SupportsFunctions: true,
+                SupportsTriggers: true,
+                SupportsViews: true,
                 BatchSeparator: ";",
                 SystemDatabases: new[] { "mysql", "information_schema", "performance_schema", "sys" }
             ),
@@ -93,6 +109,10 @@ namespace BprDevKit.Config
                 SupportsCredentials: true,
                 SupportsSchemas: false,
                 SupportsFileGroups: false,
+                SupportsStoredProcedures: true,
+                SupportsFunctions: true,
+                SupportsTriggers: true,
+                SupportsViews: true,
                 BatchSeparator: ";",
                 SystemDatabases: new[] { "mysql", "information_schema", "performance_schema", "sys" }
             ),
@@ -109,6 +129,10 @@ namespace BprDevKit.Config
                 SupportsCredentials: true,
                 SupportsSchemas: true,
                 SupportsFileGroups: false,
+                SupportsStoredProcedures: true,
+                SupportsFunctions: true,
+                SupportsTriggers: true,
+                SupportsViews: true,
                 BatchSeparator: "/",
                 SystemDatabases: new[] { "SYS", "SYSTEM" }
             ),
@@ -125,6 +149,10 @@ namespace BprDevKit.Config
                 SupportsCredentials: false,
                 SupportsSchemas: false,
                 SupportsFileGroups: false,
+                SupportsStoredProcedures: false,
+                SupportsFunctions: false,
+                SupportsTriggers: true,
+                SupportsViews: true,
                 BatchSeparator: ";",
                 SystemDatabases: Array.Empty<string>()
             )
@@ -150,6 +178,18 @@ namespace BprDevKit.Config
         public static bool SupportsPort(DatabaseServerType serverType) => GetCapabilities(serverType).SupportsPort;
 
         public static bool SupportsCredentials(DatabaseServerType serverType) => GetCapabilities(serverType).SupportsCredentials;
+
+        public static bool SupportsSchemas(DatabaseServerType serverType) => GetCapabilities(serverType).SupportsSchemas;
+
+        public static bool SupportsFileGroups(DatabaseServerType serverType) => GetCapabilities(serverType).SupportsFileGroups;
+
+        public static bool SupportsStoredProcedures(DatabaseServerType serverType) => GetCapabilities(serverType).SupportsStoredProcedures;
+
+        public static bool SupportsFunctions(DatabaseServerType serverType) => GetCapabilities(serverType).SupportsFunctions;
+
+        public static bool SupportsTriggers(DatabaseServerType serverType) => GetCapabilities(serverType).SupportsTriggers;
+
+        public static bool SupportsViews(DatabaseServerType serverType) => GetCapabilities(serverType).SupportsViews;
 
         public static bool IsSystemDatabase(DatabaseServerType serverType, string databaseName)
         {

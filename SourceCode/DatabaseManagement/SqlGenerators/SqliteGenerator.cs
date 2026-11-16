@@ -18,14 +18,47 @@ namespace BprDevKit.DatabaseManagement.SqlGenerators
             return "SELECT 'main' AS datname;";
         }
 
+        public override string GenerateGetCollationsScript()
+        {
+            return "SELECT 'BINARY' AS Collation UNION ALL SELECT 'NOCASE' UNION ALL SELECT 'RTRIM';";
+        }
+
         public override string GenerateCreateDatabaseScript(DatabaseOperation.Create config)
         {
             throw new NotSupportedException("SQLite databases are files and cannot be created with SQL. Create the database by opening its file.");
         }
 
+        public override string GenerateAlterDatabaseScript(DatabaseOperation.Alter config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            return "-- SQLite databases are stored in files; database-level ALTER options are not supported.";
+        }
+
         public override string GenerateDropDatabaseScript(DatabaseOperation.Drop config)
         {
             throw new NotSupportedException("SQLite databases are files and cannot be dropped with SQL. Remove the file explicitly after closing connections.");
+        }
+
+        public override string GenerateGetDatabaseInfoScript(DatabaseOperation.Information config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            return @"SELECT 
+    'main' AS DatabaseName,
+    'BINARY' AS Collation,
+    'UTF-8' AS CharacterSet,
+    'ONLINE' AS State,
+    ROUND((page_count * page_size) / 1024.0 / 1024.0, 2) AS DataFileSizeMB,
+    0 AS IsReadOnly
+FROM pragma_page_count(), pragma_page_size();";
+        }
+        #endregion
+
+        #region Backup/Restore
+        public override string GenerateBackupScript(BackupOperation config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var escaped = (config.BackupPath ?? string.Empty).Replace("'", "''");
+            return $"VACUUM INTO '{escaped}';";
         }
         #endregion
 
@@ -225,6 +258,111 @@ FROM pragma_foreign_key_list('{Escape(config.TableName)}');";
 FROM sqlite_master
 WHERE type = 'view'
 ORDER BY name;";
+        }
+
+        public override string GenerateCreateViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true)
+        {
+            return $"CREATE VIEW IF NOT EXISTS [{Escape(viewName)}] AS\n{selectStatement.Trim()};";
+        }
+
+        public override string GenerateAlterViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true)
+        {
+            return $"DROP VIEW IF EXISTS [{Escape(viewName)}];\nCREATE VIEW [{Escape(viewName)}] AS\n{selectStatement.Trim()};";
+        }
+
+        public override string GenerateDropViewScript(string databaseName, string schemaName, string viewName)
+        {
+            return $"DROP VIEW IF EXISTS [{Escape(viewName)}];";
+        }
+
+        public override string GenerateGetViewInfoScript(string databaseName, string schemaName, string viewName)
+        {
+            return $@"SELECT
+    'main' AS SchemaName,
+    name AS ViewName,
+    COALESCE(sql, '') AS ViewDefinition,
+    0 AS IsEncrypted,
+    datetime('now') AS CreateDate,
+    datetime('now') AS ModifyDate
+FROM sqlite_master
+WHERE type = 'view' AND name = '{Escape(viewName)}';";
+        }
+        #endregion
+
+        #region Index Operations
+        public override string GenerateCreateIndexScript(IndexOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var unique = config.IsUnique ? "UNIQUE " : "";
+            var cols = string.Join(", ", config.Columns.ConvertAll(c => $"[{Escape(c.ColumnName)}]"));
+            return $"CREATE {unique}INDEX IF NOT EXISTS [{Escape(config.IndexName ?? "")}] ON [{Escape(config.TableName)}] ({cols});";
+        }
+
+        public override string GenerateDropIndexScript(IndexOperation.Drop config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            return $"DROP INDEX IF EXISTS [{Escape(config.IndexName ?? "")}];";
+        }
+        #endregion
+
+        #region Foreign Key Operations
+        public override string GenerateCreateForeignKeyScript(ForeignKeyOperation.Create config)
+        {
+            return "-- SQLite does not support ALTER TABLE ADD CONSTRAINT FOREIGN KEY. Foreign keys must be defined within CREATE TABLE.";
+        }
+
+        public override string GenerateDropForeignKeyScript(ForeignKeyOperation.Drop config)
+        {
+            return "-- SQLite does not support ALTER TABLE DROP CONSTRAINT. Table must be recreated.";
+        }
+        #endregion
+
+        #region Trigger Operations
+        public override string GenerateGetTriggersScript(string databaseName)
+        {
+            return @"SELECT
+    'main' AS SchemaName,
+    name AS TriggerName,
+    'main' AS TableSchema,
+    tbl_name AS TableName,
+    0 AS IsDisabled,
+    0 AS IsInsteadOfTrigger,
+    '' AS TriggerEvents,
+    0 AS IsEncrypted,
+    datetime('now') AS CreateDate,
+    datetime('now') AS ModifyDate
+FROM sqlite_master
+WHERE type = 'trigger'
+ORDER BY name;";
+        }
+
+        public override string GenerateGetTriggerInfoScript(string databaseName, string schemaName, string triggerName)
+        {
+            return $@"SELECT
+    'main' AS SchemaName,
+    name AS TriggerName,
+    'main' AS TableSchema,
+    tbl_name AS TableName,
+    0 AS IsDisabled,
+    0 AS IsInsteadOfTrigger,
+    '' AS TriggerEvents,
+    COALESCE(sql, '') AS TriggerDefinition,
+    0 AS IsEncrypted,
+    datetime('now') AS CreateDate,
+    datetime('now') AS ModifyDate
+FROM sqlite_master
+WHERE type = 'trigger' AND name = '{Escape(triggerName)}';";
+        }
+
+        public override string GenerateCreateTriggerScript(TriggerOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            return config.Body.Trim();
+        }
+
+        public override string GenerateDropTriggerScript(string databaseName, string schemaName, string triggerName)
+        {
+            return $"DROP TRIGGER IF EXISTS [{Escape(triggerName)}];";
         }
         #endregion
 

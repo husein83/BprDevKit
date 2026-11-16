@@ -1,9 +1,11 @@
 using System;
 using System.Data.Common;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using BprDevKit.Config;
+using BprDevKit.Localization;
 using BprDevKit.Utility;
 
 namespace BprDevKit.DatabaseManagement.Connections
@@ -112,6 +114,34 @@ namespace BprDevKit.DatabaseManagement.Connections
                 catch
                 {
                     // If version query fails, retain connection.ServerVersion
+                }
+
+                // Validate MariaDB vs MySQL engine mismatch
+                var isMariaDb = serverVersion.Contains("MariaDB", StringComparison.OrdinalIgnoreCase);
+                if (serverType == DatabaseServerType.MariaDb && !isMariaDb)
+                {
+                    return new ConnectionTestResult
+                    {
+                        Success = false,
+                        LatencyMs = stopwatch.ElapsedMilliseconds,
+                        ServerVersion = serverVersion,
+                        Database = database,
+                        Provider = caps.DisplayName,
+                        Message = TranslationFactory.Instance.Current.Get(TranslationKeys.ServerMariaDbMismatchError, serverVersion)
+                    };
+                }
+
+                if (serverType == DatabaseServerType.MySql && isMariaDb)
+                {
+                    return new ConnectionTestResult
+                    {
+                        Success = false,
+                        LatencyMs = stopwatch.ElapsedMilliseconds,
+                        ServerVersion = serverVersion,
+                        Database = database,
+                        Provider = caps.DisplayName,
+                        Message = TranslationFactory.Instance.Current.Get(TranslationKeys.ServerMySqlMismatchError, serverVersion)
+                    };
                 }
 
                 return new ConnectionTestResult

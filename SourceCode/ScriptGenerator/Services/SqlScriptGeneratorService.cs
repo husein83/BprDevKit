@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using BprDevKit.Config;
 using BprDevKit.DatabaseManagement.Models.Metadata;
 using BprDevKit.DatabaseManagement.Models.Operations;
 using BprDevKit.Utility;
@@ -15,10 +16,14 @@ namespace BprDevKit.ScriptGenerator.Services
     public sealed class SqlScriptGeneratorService
     {
         private readonly DatabaseManager _manager;
+        private readonly DatabaseServerType _serverType;
+        private readonly ProviderCapabilities _caps;
 
         public SqlScriptGeneratorService(DatabaseManager manager)
         {
             _manager = manager ?? throw new ArgumentNullException(nameof(manager));
+            _serverType = manager.ServerType;
+            _caps = DatabaseProviderMetadata.GetCapabilities(_serverType);
         }
 
         public async Task<string> GenerateScriptAsync(string databaseName, ScriptingOptions options, IProgress<string>? progress = null)
@@ -26,8 +31,6 @@ namespace BprDevKit.ScriptGenerator.Services
             if (string.IsNullOrWhiteSpace(databaseName))
                 throw new ArgumentException("Database name is required.", nameof(databaseName));
             ArgumentNullException.ThrowIfNull(options);
-            if (!string.Equals(_manager.ProviderName, "SqlServer", StringComparison.OrdinalIgnoreCase))
-                throw new NotSupportedException($"Script export is not implemented for {_manager.ProviderName}; exporting SQL Server syntax for this provider would produce an invalid script.");
 
             var sb = new StringBuilder();
 
@@ -37,6 +40,7 @@ namespace BprDevKit.ScriptGenerator.Services
                 sb.AppendLine("================================================================================");
                 sb.AppendLine("BprDevKit SQL Script Generator");
                 sb.AppendLine($"Database: [{databaseName}]");
+                sb.AppendLine($"Provider: {_caps.DisplayName}");
                 sb.AppendLine($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 sb.AppendLine($"Script Mode: {options.ScriptType}");
                 sb.AppendLine("================================================================================");
@@ -46,13 +50,21 @@ namespace BprDevKit.ScriptGenerator.Services
 
             if (options.IncludeUseDatabase)
             {
-                sb.AppendLine($"USE [{databaseName}];");
-                sb.AppendLine("GO");
-                sb.AppendLine();
+                if (_serverType == DatabaseServerType.SqlServer)
+                {
+                    sb.AppendLine($"USE [{databaseName}];");
+                    sb.AppendLine("GO");
+                    sb.AppendLine();
+                }
+                else if (_serverType is DatabaseServerType.MySql or DatabaseServerType.MariaDb)
+                {
+                    sb.AppendLine($"USE `{databaseName}`;");
+                    sb.AppendLine();
+                }
             }
 
             // 1. Schemas
-            if (options.ScriptType != ScriptType.DataOnly && options.SelectedSchemas.Count > 0)
+            if (_caps.SupportsSchemas && options.ScriptType != ScriptType.DataOnly && options.SelectedSchemas.Count > 0)
             {
                 progress?.Report("Scripting Schemas...");
                 await ScriptSchemasAsync(databaseName, options, sb);
@@ -106,28 +118,28 @@ namespace BprDevKit.ScriptGenerator.Services
             }
 
             // 4. Functions
-            if (options.ScriptType != ScriptType.DataOnly && options.SelectedFunctions.Count > 0)
+            if (_caps.SupportsFunctions && options.ScriptType != ScriptType.DataOnly && options.SelectedFunctions.Count > 0)
             {
                 progress?.Report("Scripting Functions...");
                 await ScriptFunctionsAsync(databaseName, options, sb);
             }
 
             // 5. Views
-            if (options.ScriptType != ScriptType.DataOnly && options.SelectedViews.Count > 0)
+            if (_caps.SupportsViews && options.ScriptType != ScriptType.DataOnly && options.SelectedViews.Count > 0)
             {
                 progress?.Report("Scripting Views...");
                 await ScriptViewsAsync(databaseName, options, sb);
             }
 
             // 6. Stored Procedures
-            if (options.ScriptType != ScriptType.DataOnly && options.SelectedProcedures.Count > 0)
+            if (_caps.SupportsStoredProcedures && options.ScriptType != ScriptType.DataOnly && options.SelectedProcedures.Count > 0)
             {
                 progress?.Report("Scripting Stored Procedures...");
                 await ScriptProceduresAsync(databaseName, options, sb);
             }
 
             // 7. Triggers
-            if (options.ScriptType != ScriptType.DataOnly && options.IncludeTriggers && options.SelectedTriggers.Count > 0)
+            if (_caps.SupportsTriggers && options.ScriptType != ScriptType.DataOnly && options.IncludeTriggers && options.SelectedTriggers.Count > 0)
             {
                 progress?.Report("Scripting Triggers...");
                 await ScriptTriggersAsync(databaseName, options, sb);
@@ -137,8 +149,53 @@ namespace BprDevKit.ScriptGenerator.Services
             return sb.ToString();
         }
 
-        private async Task ScriptSchemasAsync(string databaseName, ScriptingOptions options, StringBuilder sb)
+        private string Quote(string name)
         {
+            if (string.IsNullOrWhiteSpace(name)) return string.Empty;
+            return _serverType switch
+            {
+                DatabaseServerType.MySql or DatabaseServerType.MariaDb => $"`{name.Replace("`", "``")}`",
+                DatabaseServerType.PostgreSql or DatabaseServerType.Oracle => $"\"{name.Replace("\"", "\"\"")}\"",
+                _ => $"[{name.Replace("]", "]]")}]"
+            };
+        }
+
+        private string FormatTable(string? schema, string table)
+        {
+            var qTable = Quote(table);
+            if (string.IsNullOrWhiteSpace(schema) || !_caps.SupportsSchemas)
+            {
+                return qTable;
+            }
+            return $"{Quote(schema)}.{qTable}";
+        }
+
+        private void AppendGoOrSeparator(StringBuilder sb)
+        {
+            if (_serverType == DatabaseServerType.SqlServer)
+            {
+                sb.AppendLine("GO");
+            }
+        }
+
+        private string BuildDropTableScript(string schema, string tbl)
+        {
+            var objName = FormatTable(schema, tbl);
+            if (_serverType == DatabaseServerType.SqlServer)
+            {
+                return $"IF OBJECT_ID(N'[{schema}].[{tbl}]', N'U') IS NOT NULL\n    DROP TABLE [{schema}].[{tbl}];";
+            }
+            if (_serverType == DatabaseServerType.PostgreSql)
+            {
+                return $"DROP TABLE IF EXISTS {objName} CASCADE;";
+            }
+            return $"DROP TABLE IF EXISTS {objName};";
+        }
+
+        private Task ScriptSchemasAsync(string databaseName, ScriptingOptions options, StringBuilder sb)
+        {
+            if (!_caps.SupportsSchemas) return Task.CompletedTask;
+
             if (options.IncludeComments)
             {
                 sb.AppendLine("-- =============================================");
@@ -148,24 +205,33 @@ namespace BprDevKit.ScriptGenerator.Services
 
             foreach (var schema in options.SelectedSchemas)
             {
-                if (string.Equals(schema, "dbo", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(schema, "dbo", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(schema, "public", StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                if (options.IncludeIfNotExists)
+                if (_serverType == DatabaseServerType.SqlServer)
                 {
-                    sb.AppendLine($"IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = N'{schema.Replace("'", "''")}')");
-                    sb.AppendLine($"    EXEC('CREATE SCHEMA [{schema}]');");
+                    if (options.IncludeIfNotExists)
+                    {
+                        sb.AppendLine($"IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = N'{schema.Replace("'", "''")}')");
+                        sb.AppendLine($"    EXEC('CREATE SCHEMA [{schema}]');");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"CREATE SCHEMA [{schema}];");
+                    }
+                    sb.AppendLine("GO");
                 }
-                else
+                else if (_serverType == DatabaseServerType.PostgreSql)
                 {
-                    sb.AppendLine($"CREATE SCHEMA [{schema}];");
+                    sb.AppendLine($"CREATE SCHEMA IF NOT EXISTS \"{schema.Replace("\"", "\"\"")}\";");
                 }
-                sb.AppendLine("GO");
             }
             sb.AppendLine();
+            return Task.CompletedTask;
         }
 
-        private static void ScriptTablesDdl(ScriptingOptions options, List<TableOperation.Information> orderedTables, Dictionary<string, TableOperation.Information> tableDetailsMap, StringBuilder sb)
+        private void ScriptTablesDdl(ScriptingOptions options, List<TableOperation.Information> orderedTables, Dictionary<string, TableOperation.Information> tableDetailsMap, StringBuilder sb)
         {
             if (options.IncludeComments)
             {
@@ -184,9 +250,8 @@ namespace BprDevKit.ScriptGenerator.Services
                 for (var i = orderedTables.Count - 1; i >= 0; i--)
                 {
                     var t = orderedTables[i];
-                    sb.AppendLine($"IF OBJECT_ID(N'[{t.SchemaName}].[{t.TableName}]', N'U') IS NOT NULL");
-                    sb.AppendLine($"    DROP TABLE [{t.SchemaName}].[{t.TableName}];");
-                    sb.AppendLine("GO");
+                    sb.AppendLine(BuildDropTableScript(t.SchemaName, t.TableName));
+                    AppendGoOrSeparator(sb);
                 }
                 sb.AppendLine();
             }
@@ -199,7 +264,7 @@ namespace BprDevKit.ScriptGenerator.Services
 
             foreach (var schemaGroup in schemaGroups)
             {
-                if (options.IncludeComments)
+                if (options.IncludeComments && _caps.SupportsSchemas && !string.IsNullOrWhiteSpace(schemaGroup.Key))
                 {
                     sb.AppendLine("-- =============================================");
                     sb.AppendLine($"-- Schema: [{schemaGroup.Key}]");
@@ -210,22 +275,24 @@ namespace BprDevKit.ScriptGenerator.Services
                 {
                     var schema = details.SchemaName;
                     var tbl = details.TableName;
+                    var fullTableName = FormatTable(schema, tbl);
 
                     if (options.IncludeComments)
                     {
                         sb.AppendLine("------------------------------------------------");
-                        sb.AppendLine($"-- Table: [{schema}].[{tbl}]");
+                        sb.AppendLine($"-- Table: {fullTableName}");
                         sb.AppendLine("------------------------------------------------");
                     }
 
-                    if (options.IncludeIfNotExists)
+                    if (options.IncludeIfNotExists && _serverType == DatabaseServerType.SqlServer)
                     {
                         sb.AppendLine($"IF OBJECT_ID(N'[{schema}].[{tbl}]', N'U') IS NULL");
                         sb.AppendLine("BEGIN");
                     }
 
-                    var indent = options.IncludeIfNotExists ? "    " : "";
-                    sb.AppendLine($"{indent}CREATE TABLE [{schema}].[{tbl}] (");
+                    var indent = (options.IncludeIfNotExists && _serverType == DatabaseServerType.SqlServer) ? "    " : "";
+                    var ifNotExists = (options.IncludeIfNotExists && _serverType != DatabaseServerType.SqlServer) ? "IF NOT EXISTS " : "";
+                    sb.AppendLine($"{indent}CREATE TABLE {ifNotExists}{fullTableName} (");
 
                     var tableItemDefs = new List<string>();
 
@@ -235,29 +302,33 @@ namespace BprDevKit.ScriptGenerator.Services
                         tableItemDefs.Add($"{indent}    {BuildColumnDefinition(col)}");
                     }
 
-                    // 2. Primary Key constraint (from database sys.indexes)
+                    // 2. Primary Key constraint
                     var pkIndex = details.Indexes.FirstOrDefault(i => i.IsPrimaryKey);
-                    if (pkIndex is not null)
+                    if (_serverType != DatabaseServerType.Sqlite || !details.Columns.Any(c => c.IsPrimaryKey && c.IsIdentity))
                     {
-                        var pkName = pkIndex.IndexName;
-                        var pkType = string.Equals(pkIndex.IndexType, "NONCLUSTERED", StringComparison.OrdinalIgnoreCase) ? "NONCLUSTERED" : "CLUSTERED";
-                        var pkCols = !string.IsNullOrWhiteSpace(pkIndex.Columns)
-                            ? pkIndex.Columns
-                            : string.Join(", ", details.Columns.Where(c => c.IsPrimaryKey).Select(c => $"[{c.ColumnName}]"));
-                        tableItemDefs.Add($"{indent}    CONSTRAINT [{pkName}] PRIMARY KEY {pkType} ({pkCols})");
-                    }
-                    else
-                    {
-                        var pkCols = details.Columns.Where(c => c.IsPrimaryKey).OrderBy(c => c.OrdinalPosition).ToList();
-                        if (pkCols.Count > 0)
+                        if (pkIndex is not null)
                         {
-                            var pkName = $"PK_{schema}_{tbl}";
-                            var pkList = string.Join(", ", pkCols.Select(c => $"[{c.ColumnName}]"));
-                            tableItemDefs.Add($"{indent}    CONSTRAINT [{pkName}] PRIMARY KEY CLUSTERED ({pkList})");
+                            var pkName = pkIndex.IndexName;
+                            var pkType = (_serverType == DatabaseServerType.SqlServer && string.Equals(pkIndex.IndexType, "NONCLUSTERED", StringComparison.OrdinalIgnoreCase)) ? "NONCLUSTERED " : (_serverType == DatabaseServerType.SqlServer ? "CLUSTERED " : "");
+                            var pkCols = !string.IsNullOrWhiteSpace(pkIndex.Columns)
+                                ? FormatColumnList(pkIndex.Columns)
+                                : string.Join(", ", details.Columns.Where(c => c.IsPrimaryKey).Select(c => Quote(c.ColumnName)));
+                            tableItemDefs.Add($"{indent}    CONSTRAINT {Quote(pkName)} PRIMARY KEY {pkType}({pkCols})");
+                        }
+                        else
+                        {
+                            var pkCols = details.Columns.Where(c => c.IsPrimaryKey).OrderBy(c => c.OrdinalPosition).ToList();
+                            if (pkCols.Count > 0)
+                            {
+                                var pkName = $"PK_{schema}_{tbl}";
+                                var pkList = string.Join(", ", pkCols.Select(c => Quote(c.ColumnName)));
+                                var pkType = _serverType == DatabaseServerType.SqlServer ? "CLUSTERED " : "";
+                                tableItemDefs.Add($"{indent}    CONSTRAINT {Quote(pkName)} PRIMARY KEY {pkType}({pkList})");
+                            }
                         }
                     }
 
-                    // 3. Foreign Key constraints (defined inline under the table)
+                    // 3. Foreign Key constraints
                     if (options.IncludeForeignKeys && details.ForeignKeys.Count > 0)
                     {
                         var outgoingFks = details.ForeignKeys.Where(fk =>
@@ -274,11 +345,12 @@ namespace BprDevKit.ScriptGenerator.Services
                             var refColList = FormatColumnList(fk.RefColumnName);
                             var onDelete = string.IsNullOrWhiteSpace(fk.OnDelete) ? "NO ACTION" : fk.OnDelete;
                             var onUpdate = string.IsNullOrWhiteSpace(fk.OnUpdate) ? "NO ACTION" : fk.OnUpdate;
-                            var notForRep = fk.IsNotForReplication ? " NOT FOR REPLICATION" : "";
+                            var notForRep = (fk.IsNotForReplication && _serverType == DatabaseServerType.SqlServer) ? " NOT FOR REPLICATION" : "";
+                            var refTable = FormatTable(fk.RefSchemaName, fk.RefTableName);
 
-                            if (isTargetCreated)
+                            if (isTargetCreated || _serverType == DatabaseServerType.Sqlite)
                             {
-                                tableItemDefs.Add($"{indent}    CONSTRAINT [{fk.FKName}] FOREIGN KEY ({colList}) REFERENCES [{fk.RefSchemaName}].[{fk.RefTableName}] ({refColList}) ON DELETE {onDelete} ON UPDATE {onUpdate}{notForRep}");
+                                tableItemDefs.Add($"{indent}    CONSTRAINT {Quote(fk.FKName)} FOREIGN KEY ({colList}) REFERENCES {refTable} ({refColList}) ON DELETE {onDelete} ON UPDATE {onUpdate}{notForRep}");
                             }
                             else
                             {
@@ -297,18 +369,19 @@ namespace BprDevKit.ScriptGenerator.Services
                             {
                                 checkExpr = $"({checkExpr})";
                             }
-                            tableItemDefs.Add($"{indent}    CONSTRAINT [{ck.ConstraintName}] CHECK {checkExpr}");
+                            tableItemDefs.Add($"{indent}    CONSTRAINT {Quote(ck.ConstraintName)} CHECK {checkExpr}");
                         }
                     }
 
                     sb.AppendLine(string.Join("," + Environment.NewLine, tableItemDefs));
-                    sb.AppendLine($"{indent});");
+                    var tableSuffix = (_serverType is DatabaseServerType.MySql or DatabaseServerType.MariaDb) ? ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" : ");";
+                    sb.AppendLine($"{indent}{tableSuffix}");
 
-                    if (options.IncludeIfNotExists)
+                    if (options.IncludeIfNotExists && _serverType == DatabaseServerType.SqlServer)
                     {
                         sb.AppendLine("END");
                     }
-                    sb.AppendLine("GO");
+                    AppendGoOrSeparator(sb);
                     sb.AppendLine();
 
                     createdTablesSet.Add($"{schema}.{tbl}");
@@ -322,21 +395,29 @@ namespace BprDevKit.ScriptGenerator.Services
                             foreach (var idx in nonPkIndexes)
                             {
                                 var unique = idx.IsUnique ? "UNIQUE " : "";
-                                var type = string.Equals(idx.IndexType, "CLUSTERED", StringComparison.OrdinalIgnoreCase) ? "CLUSTERED" : "NONCLUSTERED";
-                                var cols = string.IsNullOrWhiteSpace(idx.Columns) ? "" : idx.Columns;
-                                var includes = string.IsNullOrWhiteSpace(idx.IncludeColumns) ? "" : $" INCLUDE ({idx.IncludeColumns})";
-                                var filter = string.IsNullOrWhiteSpace(idx.FilterPredicate) ? "" : $" WHERE {idx.FilterPredicate}";
-
-                                if (options.IncludeIfNotExists)
+                                var cols = string.IsNullOrWhiteSpace(idx.Columns) ? "" : FormatColumnList(idx.Columns);
+                                if (_serverType == DatabaseServerType.SqlServer)
                                 {
-                                    sb.AppendLine($"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = N'{idx.IndexName.Replace("'", "''")}' AND object_id = OBJECT_ID(N'[{schema}].[{tbl}]'))");
-                                    sb.AppendLine($"    CREATE {unique}{type} INDEX [{idx.IndexName}] ON [{schema}].[{tbl}] ({cols}){includes}{filter};");
+                                    var type = string.Equals(idx.IndexType, "CLUSTERED", StringComparison.OrdinalIgnoreCase) ? "CLUSTERED " : "NONCLUSTERED ";
+                                    var includes = string.IsNullOrWhiteSpace(idx.IncludeColumns) ? "" : $" INCLUDE ({FormatColumnList(idx.IncludeColumns)})";
+                                    var filter = string.IsNullOrWhiteSpace(idx.FilterPredicate) ? "" : $" WHERE {idx.FilterPredicate}";
+
+                                    if (options.IncludeIfNotExists)
+                                    {
+                                        sb.AppendLine($"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = N'{idx.IndexName.Replace("'", "''")}' AND object_id = OBJECT_ID(N'[{schema}].[{tbl}]'))");
+                                        sb.AppendLine($"    CREATE {unique}{type}INDEX [{idx.IndexName}] ON [{schema}].[{tbl}] ({cols}){includes}{filter};");
+                                    }
+                                    else
+                                    {
+                                        sb.AppendLine($"CREATE {unique}{type}INDEX [{idx.IndexName}] ON [{schema}].[{tbl}] ({cols}){includes}{filter};");
+                                    }
+                                    sb.AppendLine("GO");
                                 }
                                 else
                                 {
-                                    sb.AppendLine($"CREATE {unique}{type} INDEX [{idx.IndexName}] ON [{schema}].[{tbl}] ({cols}){includes}{filter};");
+                                    var ifNot = (options.IncludeIfNotExists && _serverType is DatabaseServerType.Sqlite or DatabaseServerType.PostgreSql) ? "IF NOT EXISTS " : "";
+                                    sb.AppendLine($"CREATE {unique}INDEX {ifNot}{Quote(idx.IndexName)} ON {fullTableName} ({cols});");
                                 }
-                                sb.AppendLine("GO");
                             }
                             sb.AppendLine();
                         }
@@ -344,7 +425,7 @@ namespace BprDevKit.ScriptGenerator.Services
                 }
             }
 
-            // Deferred foreign keys for rare circular cross-table references
+            // Deferred foreign keys for circular cross-table references
             if (deferredFks.Count > 0)
             {
                 if (options.IncludeComments)
@@ -360,18 +441,27 @@ namespace BprDevKit.ScriptGenerator.Services
                     var refColList = FormatColumnList(fk.RefColumnName);
                     var onDelete = string.IsNullOrWhiteSpace(fk.OnDelete) ? "NO ACTION" : fk.OnDelete;
                     var onUpdate = string.IsNullOrWhiteSpace(fk.OnUpdate) ? "NO ACTION" : fk.OnUpdate;
-                    var notForRep = fk.IsNotForReplication ? " NOT FOR REPLICATION" : "";
+                    var notForRep = (fk.IsNotForReplication && _serverType == DatabaseServerType.SqlServer) ? " NOT FOR REPLICATION" : "";
+                    var parentName = FormatTable(parentTable.SchemaName, parentTable.TableName);
+                    var refTable = FormatTable(fk.RefSchemaName, fk.RefTableName);
 
-                    if (options.IncludeIfNotExists)
+                    if (_serverType == DatabaseServerType.SqlServer)
                     {
-                        sb.AppendLine($"IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = N'{fk.FKName.Replace("'", "''")}' AND parent_object_id = OBJECT_ID(N'[{parentTable.SchemaName}].[{parentTable.TableName}]'))");
-                        sb.AppendLine($"    ALTER TABLE [{parentTable.SchemaName}].[{parentTable.TableName}] WITH CHECK ADD CONSTRAINT [{fk.FKName}] FOREIGN KEY ({colList}) REFERENCES [{fk.RefSchemaName}].[{fk.RefTableName}] ({refColList}) ON DELETE {onDelete} ON UPDATE {onUpdate}{notForRep};");
+                        if (options.IncludeIfNotExists)
+                        {
+                            sb.AppendLine($"IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = N'{fk.FKName.Replace("'", "''")}' AND parent_object_id = OBJECT_ID(N'[{parentTable.SchemaName}].[{parentTable.TableName}]'))");
+                            sb.AppendLine($"    ALTER TABLE {parentName} WITH CHECK ADD CONSTRAINT [{fk.FKName}] FOREIGN KEY ({colList}) REFERENCES {refTable} ({refColList}) ON DELETE {onDelete} ON UPDATE {onUpdate}{notForRep};");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"ALTER TABLE {parentName} WITH CHECK ADD CONSTRAINT [{fk.FKName}] FOREIGN KEY ({colList}) REFERENCES {refTable} ({refColList}) ON DELETE {onDelete} ON UPDATE {onUpdate}{notForRep};");
+                        }
+                        sb.AppendLine("GO");
                     }
-                    else
+                    else if (_serverType != DatabaseServerType.Sqlite) // SQLite cannot alter table to add FKs
                     {
-                        sb.AppendLine($"ALTER TABLE [{parentTable.SchemaName}].[{parentTable.TableName}] WITH CHECK ADD CONSTRAINT [{fk.FKName}] FOREIGN KEY ({colList}) REFERENCES [{fk.RefSchemaName}].[{fk.RefTableName}] ({refColList}) ON DELETE {onDelete} ON UPDATE {onUpdate}{notForRep};");
+                        sb.AppendLine($"ALTER TABLE {parentName} ADD CONSTRAINT {Quote(fk.FKName)} FOREIGN KEY ({colList}) REFERENCES {refTable} ({refColList}) ON DELETE {onDelete} ON UPDATE {onUpdate};");
                     }
-                    sb.AppendLine("GO");
                 }
                 sb.AppendLine();
             }
@@ -393,6 +483,7 @@ namespace BprDevKit.ScriptGenerator.Services
             {
                 var schema = details.SchemaName;
                 var tbl = details.TableName;
+                var fullTableName = FormatTable(schema, tbl);
 
                 // Identify insertable columns: exclude computed columns and timestamp/rowversion
                 var insertableColumns = details.Columns
@@ -404,11 +495,20 @@ namespace BprDevKit.ScriptGenerator.Services
                     .ToList();
 
                 var colSelect = insertableColumns.Count > 0
-                    ? string.Join(", ", insertableColumns.Select(c => $"[{c.ColumnName}]"))
+                    ? string.Join(", ", insertableColumns.Select(c => Quote(c.ColumnName)))
                     : "*";
 
-                var topClause = options.MaxDataRowsPerTable > 0 ? $"TOP ({options.MaxDataRowsPerTable}) " : "";
-                var dataQuery = $"SELECT {topClause}{colSelect} FROM [{schema}].[{tbl}] WITH (NOLOCK);";
+                string dataQuery;
+                if (_serverType == DatabaseServerType.SqlServer)
+                {
+                    var topClause = options.MaxDataRowsPerTable > 0 ? $"TOP ({options.MaxDataRowsPerTable}) " : "";
+                    dataQuery = $"SELECT {topClause}{colSelect} FROM [{schema}].[{tbl}] WITH (NOLOCK);";
+                }
+                else
+                {
+                    var limitClause = options.MaxDataRowsPerTable > 0 ? $" LIMIT {options.MaxDataRowsPerTable}" : "";
+                    dataQuery = $"SELECT {colSelect} FROM {fullTableName}{limitClause};";
+                }
 
                 var rows = new List<List<string>>();
                 List<string> columnNames = new();
@@ -423,7 +523,7 @@ namespace BprDevKit.ScriptGenerator.Services
                     var fieldCount = reader.FieldCount;
                     for (var f = 0; f < fieldCount; f++)
                     {
-                        columnNames.Add($"[{reader.GetName(f)}]");
+                        columnNames.Add(Quote(reader.GetName(f)));
                     }
 
                     while (await reader.ReadAsync())
@@ -448,7 +548,7 @@ namespace BprDevKit.ScriptGenerator.Services
                 {
                     if (options.IncludeComments)
                     {
-                        sb.AppendLine($"-- Error reading data for [{schema}].[{tbl}]: {ex.Message}");
+                        sb.AppendLine($"-- Error reading data for {fullTableName}: {ex.Message}");
                         sb.AppendLine();
                     }
                     continue;
@@ -462,12 +562,12 @@ namespace BprDevKit.ScriptGenerator.Services
 
                 if (options.IncludeComments)
                 {
-                    sb.AppendLine($"-- Data for [{schema}].[{tbl}] ({rows.Count} rows)");
+                    sb.AppendLine($"-- Data for {fullTableName} ({rows.Count} rows)");
                 }
 
-                if (hasIdentity)
+                if (hasIdentity && _serverType == DatabaseServerType.SqlServer)
                 {
-                    sb.AppendLine($"SET IDENTITY_INSERT [{schema}].[{tbl}] ON;");
+                    sb.AppendLine($"SET IDENTITY_INSERT {fullTableName} ON;");
                 }
 
                 var colListStr = string.Join(", ", columnNames);
@@ -476,7 +576,7 @@ namespace BprDevKit.ScriptGenerator.Services
                 for (var i = 0; i < rows.Count; i += batchSize)
                 {
                     var chunk = rows.Skip(i).Take(batchSize).ToList();
-                    sb.AppendLine($"INSERT INTO [{schema}].[{tbl}] ({colListStr})");
+                    sb.AppendLine($"INSERT INTO {fullTableName} ({colListStr})");
                     sb.AppendLine("VALUES");
 
                     for (var r = 0; r < chunk.Count; r++)
@@ -486,12 +586,12 @@ namespace BprDevKit.ScriptGenerator.Services
                     }
                 }
 
-                if (hasIdentity)
+                if (hasIdentity && _serverType == DatabaseServerType.SqlServer)
                 {
-                    sb.AppendLine($"SET IDENTITY_INSERT [{schema}].[{tbl}] OFF;");
+                    sb.AppendLine($"SET IDENTITY_INSERT {fullTableName} OFF;");
                 }
 
-                sb.AppendLine("GO");
+                AppendGoOrSeparator(sb);
                 sb.AppendLine();
             }
 
@@ -535,13 +635,20 @@ namespace BprDevKit.ScriptGenerator.Services
 
                 if (options.IncludeDropAndCreate)
                 {
-                    sb.AppendLine($"IF OBJECT_ID(N'[{schema}].[{viewName}]', N'V') IS NOT NULL");
-                    sb.AppendLine($"    DROP VIEW [{schema}].[{viewName}];");
-                    sb.AppendLine("GO");
+                    if (_serverType == DatabaseServerType.SqlServer)
+                    {
+                        sb.AppendLine($"IF OBJECT_ID(N'[{schema}].[{viewName}]', N'V') IS NOT NULL");
+                        sb.AppendLine($"    DROP VIEW [{schema}].[{viewName}];");
+                        sb.AppendLine("GO");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"DROP VIEW IF EXISTS {FormatTable(schema, viewName)};");
+                    }
                 }
 
                 sb.AppendLine(definition.Trim());
-                sb.AppendLine("GO");
+                AppendGoOrSeparator(sb);
                 sb.AppendLine();
             }
         }
@@ -579,13 +686,20 @@ namespace BprDevKit.ScriptGenerator.Services
 
                 if (options.IncludeDropAndCreate)
                 {
-                    sb.AppendLine($"IF OBJECT_ID(N'[{schema}].[{procName}]', N'P') IS NOT NULL");
-                    sb.AppendLine($"    DROP PROCEDURE [{schema}].[{procName}];");
-                    sb.AppendLine("GO");
+                    if (_serverType == DatabaseServerType.SqlServer)
+                    {
+                        sb.AppendLine($"IF OBJECT_ID(N'[{schema}].[{procName}]', N'P') IS NOT NULL");
+                        sb.AppendLine($"    DROP PROCEDURE [{schema}].[{procName}];");
+                        sb.AppendLine("GO");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"DROP PROCEDURE IF EXISTS {FormatTable(schema, procName)};");
+                    }
                 }
 
                 sb.AppendLine(definition.Trim());
-                sb.AppendLine("GO");
+                AppendGoOrSeparator(sb);
                 sb.AppendLine();
             }
         }
@@ -623,13 +737,20 @@ namespace BprDevKit.ScriptGenerator.Services
 
                 if (options.IncludeDropAndCreate)
                 {
-                    sb.AppendLine($"IF OBJECT_ID(N'[{schema}].[{funcName}]') IS NOT NULL");
-                    sb.AppendLine($"    DROP FUNCTION [{schema}].[{funcName}];");
-                    sb.AppendLine("GO");
+                    if (_serverType == DatabaseServerType.SqlServer)
+                    {
+                        sb.AppendLine($"IF OBJECT_ID(N'[{schema}].[{funcName}]') IS NOT NULL");
+                        sb.AppendLine($"    DROP FUNCTION [{schema}].[{funcName}];");
+                        sb.AppendLine("GO");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"DROP FUNCTION IF EXISTS {FormatTable(schema, funcName)};");
+                    }
                 }
 
                 sb.AppendLine(definition.Trim());
-                sb.AppendLine("GO");
+                AppendGoOrSeparator(sb);
                 sb.AppendLine();
             }
         }
@@ -667,71 +788,116 @@ namespace BprDevKit.ScriptGenerator.Services
 
                 if (options.IncludeDropAndCreate)
                 {
-                    sb.AppendLine($"IF OBJECT_ID(N'[{schema}].[{trigName}]', N'TR') IS NOT NULL");
-                    sb.AppendLine($"    DROP TRIGGER [{schema}].[{trigName}];");
-                    sb.AppendLine("GO");
+                    if (_serverType == DatabaseServerType.SqlServer)
+                    {
+                        sb.AppendLine($"IF OBJECT_ID(N'[{schema}].[{trigName}]', N'TR') IS NOT NULL");
+                        sb.AppendLine($"    DROP TRIGGER [{schema}].[{trigName}];");
+                        sb.AppendLine("GO");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"DROP TRIGGER IF EXISTS {FormatTable(schema, trigName)};");
+                    }
                 }
 
                 sb.AppendLine(definition.Trim());
-                sb.AppendLine("GO");
+                AppendGoOrSeparator(sb);
                 sb.AppendLine();
             }
         }
 
-        private static string BuildColumnDefinition(ColumnOperation.Information col)
+        private string BuildColumnDefinition(ColumnOperation.Information col)
         {
+            var colName = Quote(col.ColumnName);
+
             if (!string.IsNullOrWhiteSpace(col.ComputedFormula))
             {
                 var formula = col.ComputedFormula.Trim();
+                if (_serverType is DatabaseServerType.MySql or DatabaseServerType.MariaDb)
+                {
+                    var formulaParen = formula.StartsWith('(') && formula.EndsWith(')') ? formula : $"({formula})";
+                    var storage = col.IsPersisted ? "STORED" : "VIRTUAL";
+                    return $"{colName} {FormatColumnDataType(col)} AS {formulaParen} {storage}";
+                }
+                if (_serverType == DatabaseServerType.PostgreSql)
+                {
+                    var formulaParen = formula.StartsWith('(') && formula.EndsWith(')') ? formula : $"({formula})";
+                    return $"{colName} {FormatColumnDataType(col)} GENERATED ALWAYS AS {formulaParen} STORED";
+                }
                 var persisted = col.IsPersisted ? (col.IsNullable ? " PERSISTED" : " PERSISTED NOT NULL") : "";
-                return $"[{col.ColumnName}] AS {formula}{persisted}";
+                return $"{colName} AS {formula}{persisted}";
             }
 
             var typeDef = FormatColumnDataType(col);
-            var sb = new StringBuilder($"[{col.ColumnName}] {typeDef}");
+            var sb = new StringBuilder($"{colName} {typeDef}");
 
             if (col.IsIdentity)
             {
-                var seed = col.IdentitySeed != 0 ? col.IdentitySeed : 1;
-                var inc = col.IdentityIncrement != 0 ? col.IdentityIncrement : 1;
-                sb.Append($" IDENTITY({seed},{inc})");
-            }
-
-            sb.Append(col.IsNullable ? " NULL" : " NOT NULL");
-
-            if (!string.IsNullOrWhiteSpace(col.DefaultValue))
-            {
-                var defaultVal = col.DefaultValue.Trim();
-                if (!defaultVal.StartsWith("(") || !defaultVal.EndsWith(")"))
+                if (_serverType is DatabaseServerType.MySql or DatabaseServerType.MariaDb)
                 {
-                    defaultVal = $"({defaultVal})";
+                    sb.Append(" AUTO_INCREMENT");
                 }
-
-                string constraintName;
-                if (!string.IsNullOrWhiteSpace(col.DefaultConstraintName) &&
-                    !col.DefaultConstraintName.StartsWith("DF__", StringComparison.OrdinalIgnoreCase))
+                else if (_serverType == DatabaseServerType.PostgreSql)
                 {
-                    constraintName = col.DefaultConstraintName.Trim();
+                    sb.Append(" GENERATED BY DEFAULT AS IDENTITY");
+                }
+                else if (_serverType == DatabaseServerType.Sqlite)
+                {
+                    sb.Append(" PRIMARY KEY AUTOINCREMENT");
                 }
                 else
                 {
-                    var tbl = !string.IsNullOrWhiteSpace(col.TableName) ? col.TableName : "Table";
-                    constraintName = $"DF_{tbl}_{col.ColumnName}";
+                    var seed = col.IdentitySeed != 0 ? col.IdentitySeed : 1;
+                    var inc = col.IdentityIncrement != 0 ? col.IdentityIncrement : 1;
+                    sb.Append($" IDENTITY({seed},{inc})");
                 }
+            }
 
-                sb.Append($" CONSTRAINT [{constraintName}] DEFAULT {defaultVal}");
+            if (_serverType != DatabaseServerType.Sqlite || !col.IsIdentity)
+            {
+                sb.Append(col.IsNullable ? " NULL" : " NOT NULL");
+            }
+
+            if (!string.IsNullOrWhiteSpace(col.DefaultValue) && !col.IsIdentity)
+            {
+                var defaultVal = col.DefaultValue.Trim();
+                if (_serverType == DatabaseServerType.SqlServer)
+                {
+                    if (!defaultVal.StartsWith("(") || !defaultVal.EndsWith(")"))
+                    {
+                        defaultVal = $"({defaultVal})";
+                    }
+
+                    string constraintName;
+                    if (!string.IsNullOrWhiteSpace(col.DefaultConstraintName) &&
+                        !col.DefaultConstraintName.StartsWith("DF__", StringComparison.OrdinalIgnoreCase))
+                    {
+                        constraintName = col.DefaultConstraintName.Trim();
+                    }
+                    else
+                    {
+                        var tbl = !string.IsNullOrWhiteSpace(col.TableName) ? col.TableName : "Table";
+                        constraintName = $"DF_{tbl}_{col.ColumnName}";
+                    }
+
+                    sb.Append($" CONSTRAINT [{constraintName}] DEFAULT {defaultVal}");
+                }
+                else
+                {
+                    sb.Append($" DEFAULT {defaultVal}");
+                }
             }
 
             return sb.ToString();
         }
 
-        public static string FormatColumnList(string? rawCols)
+        public string FormatColumnList(string? rawCols)
         {
             if (string.IsNullOrWhiteSpace(rawCols)) return string.Empty;
             var cols = rawCols.Split(',')
-                .Select(c => c.Trim().Trim('[', ']'))
+                .Select(c => c.Trim().Trim('[', ']', '`', '"'))
                 .Where(c => !string.IsNullOrEmpty(c))
-                .Select(c => $"[{c}]");
+                .Select(Quote);
             return string.Join(", ", cols);
         }
 
@@ -786,16 +952,14 @@ namespace BprDevKit.ScriptGenerator.Services
                 }
             }
 
-            // Topologically sort schemas
-            var sortedSchemas = TopologicalSort(schemas, schemaDependencies);
+            var orderedSchemas = TopologicalSort(schemas, schemaDependencies);
 
-            // Topologically sort tables within each schema
+            // Topologically sort tables within each schema group
             var result = new List<TableOperation.Information>();
-            foreach (var schema in sortedSchemas)
+            foreach (var schema in orderedSchemas)
             {
-                var schemaTables = tables
-                    .Where(t => string.Equals(t.SchemaName, schema, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                var schemaTables = tables.Where(t => string.Equals(t.SchemaName, schema, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (schemaTables.Count == 0) continue;
 
                 var localDeps = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
                 foreach (var t in schemaTables)
@@ -860,9 +1024,68 @@ namespace BprDevKit.ScriptGenerator.Services
             return sorted;
         }
 
-        private static string FormatColumnDataType(ColumnOperation.Information col)
+        private string FormatColumnDataType(ColumnOperation.Information col)
         {
             var dt = (col.DataType ?? string.Empty).ToLowerInvariant();
+
+            if (_serverType is DatabaseServerType.MySql or DatabaseServerType.MariaDb)
+            {
+                return dt switch
+                {
+                    "nvarchar" or "varchar" => col.Length == -1 ? "LONGTEXT" : $"VARCHAR({col.Length ?? 255})",
+                    "nchar" or "char" => $"CHAR({(col.Length > 0 ? col.Length : 1)})",
+                    "text" or "ntext" => "LONGTEXT",
+                    "binary" or "varbinary" or "image" => "LONGBLOB",
+                    "bit" or "boolean" => "TINYINT(1)",
+                    "uniqueidentifier" or "uuid" => "CHAR(36)",
+                    "decimal" or "numeric" => $"DECIMAL({col.Precision ?? 18},{col.Scale ?? 0})",
+                    "datetime2" => "DATETIME",
+                    "datetimeoffset" => "TIMESTAMP",
+                    "int" or "integer" => "INT",
+                    "bigint" => "BIGINT",
+                    "smallint" => "SMALLINT",
+                    "tinyint" => "TINYINT",
+                    "float" => "DOUBLE",
+                    "real" => "FLOAT",
+                    _ => dt.ToUpperInvariant()
+                };
+            }
+
+            if (_serverType == DatabaseServerType.PostgreSql)
+            {
+                return dt switch
+                {
+                    "nvarchar" or "varchar" => col.Length == -1 ? "TEXT" : $"VARCHAR({col.Length ?? 255})",
+                    "nchar" or "char" => $"CHAR({(col.Length > 0 ? col.Length : 1)})",
+                    "text" or "ntext" => "TEXT",
+                    "binary" or "varbinary" or "image" or "blob" => "BYTEA",
+                    "bit" => "BOOLEAN",
+                    "uniqueidentifier" or "guid" => "UUID",
+                    "decimal" or "numeric" => $"NUMERIC({col.Precision ?? 18},{col.Scale ?? 0})",
+                    "datetime" or "datetime2" => "TIMESTAMP",
+                    "datetimeoffset" => "TIMESTAMPTZ",
+                    "int" or "integer" => "INTEGER",
+                    "bigint" => "BIGINT",
+                    "smallint" => "SMALLINT",
+                    "tinyint" => "SMALLINT",
+                    "float" => "DOUBLE PRECISION",
+                    "real" => "REAL",
+                    _ => dt
+                };
+            }
+
+            if (_serverType == DatabaseServerType.Sqlite)
+            {
+                return dt switch
+                {
+                    "int" or "integer" or "bigint" or "smallint" or "tinyint" or "bit" or "boolean" => "INTEGER",
+                    "float" or "double" or "real" or "decimal" or "numeric" => "REAL",
+                    "binary" or "varbinary" or "image" or "blob" => "BLOB",
+                    _ => "TEXT"
+                };
+            }
+
+            // SqlServer / Oracle fallback
             return dt switch
             {
                 "nvarchar" or "nchar" => col.Length == -1 ? $"{dt}(MAX)" : $"{dt}({col.Length ?? 50})",
@@ -873,7 +1096,7 @@ namespace BprDevKit.ScriptGenerator.Services
             };
         }
 
-        public static string FormatSqlLiteral(object? value)
+        public string FormatSqlLiteral(object? value)
         {
             if (value is null || value is DBNull) return "NULL";
 
@@ -897,8 +1120,8 @@ namespace BprDevKit.ScriptGenerator.Services
                 TimeOnly tOnly => $"'{tOnly:HH:mm:ss.fff}'",
                 TimeSpan ts => $"'{ts}'",
                 Guid g => $"'{g}'",
-                byte[] bytes => "0x" + Convert.ToHexString(bytes),
-                _ => $"N'{value.ToString()?.Replace("'", "''") ?? ""}'"
+                byte[] bytes => _serverType == DatabaseServerType.PostgreSql ? $"E'\\\\x{Convert.ToHexString(bytes)}'" : "0x" + Convert.ToHexString(bytes),
+                _ => (_serverType == DatabaseServerType.SqlServer ? $"N'{value.ToString()?.Replace("'", "''") ?? ""}'" : $"'{value.ToString()?.Replace("'", "''") ?? ""}'")
             };
         }
     }

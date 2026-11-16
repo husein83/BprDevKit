@@ -18,16 +18,38 @@ namespace BprDevKit.DatabaseManagement.SqlGenerators
             return "SELECT SYS_CONTEXT('USERENV', 'DB_NAME') AS DatabaseName FROM dual;";
         }
 
+        public override string GenerateGetCollationsScript()
+        {
+            return "SELECT value FROM v$nls_valid_values WHERE parameter = 'SORT' ORDER BY value;";
+        }
+
         public override string GenerateCreateDatabaseScript(DatabaseOperation.Create config)
         {
             ArgumentNullException.ThrowIfNull(config);
             throw new NotSupportedException("Oracle pluggable database creation requires an explicitly supplied administrator password and is not available through this operation.");
         }
 
+        public override string GenerateAlterDatabaseScript(DatabaseOperation.Alter config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            return "-- Database-level ALTER operations require SYSDBA privileges in Oracle.";
+        }
+
         public override string GenerateDropDatabaseScript(DatabaseOperation.Drop config)
         {
             ArgumentNullException.ThrowIfNull(config);
             return $"DROP PLUGGABLE DATABASE \"{config.DatabaseName}\" INCLUDING DATAFILES;";
+        }
+
+        public override string GenerateGetDatabaseInfoScript(DatabaseOperation.Information config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            return @"SELECT 
+    SYS_CONTEXT('USERENV', 'DB_NAME') AS DatabaseName,
+    SYS_CONTEXT('USERENV', 'NLS_SORT') AS Collation,
+    SYS_CONTEXT('USERENV', 'NLS_TERRITORY') AS Territory,
+    'ONLINE' AS State
+FROM dual;";
         }
         #endregion
 
@@ -347,6 +369,59 @@ ORDER BY owner, object_name;";
         public override string GenerateDropFunctionScript(string databaseName, string schemaName, string functionName)
         {
             return $"DROP FUNCTION \"{schemaName.ToUpperInvariant()}\".\"{functionName.ToUpperInvariant()}\";";
+        }
+        #endregion
+
+        #region Foreign Key Operations
+        public override string GenerateCreateForeignKeyScript(ForeignKeyOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var schema = !string.IsNullOrWhiteSpace(config.SchemaName) ? config.SchemaName.ToUpperInvariant() : "SYSTEM";
+            var refSchema = !string.IsNullOrWhiteSpace(config.RefSchemaName) ? config.RefSchemaName.ToUpperInvariant() : schema;
+            var fkName = !string.IsNullOrWhiteSpace(config.FKName) ? config.FKName.ToUpperInvariant() : $"FK_{config.TableName}_{config.RefTableName}".ToUpperInvariant();
+            var cols = string.Join(", ", config.Columns.ConvertAll(c => $"\"{c.ColumnName.ToUpperInvariant()}\""));
+            var refCols = string.Join(", ", config.Columns.ConvertAll(c => $"\"{c.RefColumnName.ToUpperInvariant()}\""));
+            var onDelete = string.IsNullOrWhiteSpace(config.OnDelete) ? "" : $" ON DELETE {config.OnDelete}";
+
+            return $"ALTER TABLE \"{schema}\".\"{config.TableName.ToUpperInvariant()}\" ADD CONSTRAINT \"{fkName}\" FOREIGN KEY ({cols}) REFERENCES \"{refSchema}\".\"{config.RefTableName.ToUpperInvariant()}\" ({refCols}){onDelete};";
+        }
+
+        public override string GenerateDropForeignKeyScript(ForeignKeyOperation.Drop config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var schema = !string.IsNullOrWhiteSpace(config.SchemaName) ? config.SchemaName.ToUpperInvariant() : "SYSTEM";
+            return $"ALTER TABLE \"{schema}\".\"{config.TableName.ToUpperInvariant()}\" DROP CONSTRAINT \"{config.FKName.ToUpperInvariant()}\";";
+        }
+        #endregion
+
+        #region View Operations
+        public override string GenerateCreateViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true)
+        {
+            var schema = !string.IsNullOrWhiteSpace(schemaName) ? schemaName.ToUpperInvariant() : "SYSTEM";
+            return $"CREATE OR REPLACE VIEW \"{schema}\".\"{viewName.ToUpperInvariant()}\" AS\n{selectStatement.Trim()};";
+        }
+
+        public override string GenerateAlterViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true)
+            => GenerateCreateViewScript(databaseName, schemaName, viewName, selectStatement, withEncryption);
+
+        public override string GenerateDropViewScript(string databaseName, string schemaName, string viewName)
+        {
+            var schema = !string.IsNullOrWhiteSpace(schemaName) ? schemaName.ToUpperInvariant() : "SYSTEM";
+            return $"DROP VIEW \"{schema}\".\"{viewName.ToUpperInvariant()}\";";
+        }
+
+        public override string GenerateGetViewInfoScript(string databaseName, string schemaName, string viewName)
+        {
+            var schema = !string.IsNullOrWhiteSpace(schemaName) ? schemaName.ToUpperInvariant() : "SYSTEM";
+            return $@"SELECT
+    owner AS SchemaName,
+    view_name AS ViewName,
+    text AS ViewDefinition,
+    0 AS IsEncrypted,
+    SYSDATE AS CreateDate,
+    SYSDATE AS ModifyDate
+FROM all_views
+WHERE owner = '{Escape(schema)}' AND view_name = '{Escape(viewName.ToUpperInvariant())}';";
         }
         #endregion
 

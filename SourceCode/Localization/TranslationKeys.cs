@@ -149,7 +149,17 @@ namespace BprDevKit.Localization
         public const string ServerEncryptConnection = "Server.EncryptConnection";
         public const string ServerTestingConnection = "Server.TestingConnection";
         public const string ServerTestConnectionFailed = "Server.TestConnectionFailed";
+        public const string ServerMariaDbMismatchError = "Server.MariaDbMismatchError";
+        public const string ServerMySqlMismatchError = "Server.MySqlMismatchError";
         public const string ServerVersion = "Server.Version";
+
+        // Database Capabilities & Unsupported Feature Notices
+        public const string DbFeatureNotSupported = "Db.FeatureNotSupported";
+        public const string DbFeatureNotSupportedDesc = "Db.FeatureNotSupportedDesc";
+        public const string DbSchemasNotSupported = "Db.SchemasNotSupported";
+        public const string DbStoredProceduresNotSupported = "Db.StoredProceduresNotSupported";
+        public const string DbFunctionsNotSupported = "Db.FunctionsNotSupported";
+        public const string DbFileGroupsNotSupported = "Db.FileGroupsNotSupported";
 
         // Home Page
         public const string HomeEyebrow = "Home.Eyebrow";

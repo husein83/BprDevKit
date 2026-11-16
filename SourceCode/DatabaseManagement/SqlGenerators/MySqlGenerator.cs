@@ -18,16 +18,59 @@ namespace BprDevKit.DatabaseManagement.SqlGenerators
             return "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys') ORDER BY schema_name;";
         }
 
+        public override string GenerateGetCollationsScript()
+        {
+            return "SELECT collation_name FROM information_schema.collations ORDER BY collation_name;";
+        }
+
         public override string GenerateCreateDatabaseScript(DatabaseOperation.Create config)
         {
             ArgumentNullException.ThrowIfNull(config);
-            return $"CREATE DATABASE `{config.DatabaseName}`;";
+            var collationClause = !string.IsNullOrWhiteSpace(config.Collation) ? $" COLLATE {config.Collation}" : "";
+            return $"CREATE DATABASE `{config.DatabaseName}`{collationClause};";
+        }
+
+        public override string GenerateAlterDatabaseScript(DatabaseOperation.Alter config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var sb = new StringBuilder();
+            var db = Escape(config.DatabaseName);
+
+            if (!string.IsNullOrWhiteSpace(config.Collation))
+            {
+                sb.AppendLine($"ALTER DATABASE `{db}` COLLATE {config.Collation};");
+            }
+
+            if (sb.Length == 0)
+            {
+                sb.AppendLine($"-- No alterations applied for database `{db}`");
+            }
+
+            return sb.ToString();
         }
 
         public override string GenerateDropDatabaseScript(DatabaseOperation.Drop config)
         {
             ArgumentNullException.ThrowIfNull(config);
             return $"DROP DATABASE IF EXISTS `{config.DatabaseName}`;";
+        }
+
+        public override string GenerateGetDatabaseInfoScript(DatabaseOperation.Information config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var db = Escape(config.DatabaseName);
+            return $@"SELECT 
+    s.schema_name AS DatabaseName,
+    s.default_character_set_name AS CharacterSet,
+    s.default_collation_name AS Collation,
+    'ONLINE' AS `State`,
+    COALESCE(ROUND((SELECT SUM(data_length + index_length) FROM information_schema.tables WHERE table_schema = s.schema_name) / 1024 / 1024, 2), 0) AS DataFileSizeMB,
+    (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = s.schema_name) AS TableCount,
+    (SELECT MIN(create_time) FROM information_schema.tables WHERE table_schema = s.schema_name) AS CreateDate,
+    @@datadir AS DataFilePath,
+    CASE WHEN @@read_only = 1 THEN 1 ELSE 0 END AS IsReadOnly
+FROM information_schema.schemata s
+WHERE s.schema_name = '{db}';";
         }
         #endregion
 
@@ -104,7 +147,7 @@ WHERE table_schema = '{Escape(db)}' AND table_name = '{Escape(config.TableName)}
     column_name AS ColumnName,
     data_type AS DataType,
     COALESCE(character_maximum_length, 0) AS MaxLength,
-    COALESCE(numeric_precision, datetime_precision, 0) AS Precision,
+    COALESCE(numeric_precision, datetime_precision, 0) AS `Precision`,
     COALESCE(numeric_scale, 0) AS Scale,
     CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END AS IsNullable,
     CASE WHEN extra LIKE '%auto_increment%' THEN 1 ELSE 0 END AS IsIdentity,
@@ -334,6 +377,94 @@ FROM information_schema.views
 WHERE table_schema = '{Escape(databaseName)}'
 ORDER BY table_name;";
         }
+
+        public override string GenerateCreateViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true)
+        {
+            var db = !string.IsNullOrWhiteSpace(schemaName) ? schemaName : databaseName;
+            return $"CREATE OR REPLACE VIEW `{Escape(db)}`.`{Escape(viewName)}` AS\n{selectStatement.Trim()};";
+        }
+
+        public override string GenerateAlterViewScript(string databaseName, string schemaName, string viewName, string selectStatement, bool withEncryption = true)
+            => GenerateCreateViewScript(databaseName, schemaName, viewName, selectStatement, withEncryption);
+
+        public override string GenerateDropViewScript(string databaseName, string schemaName, string viewName)
+        {
+            var db = !string.IsNullOrWhiteSpace(schemaName) ? schemaName : databaseName;
+            return $"DROP VIEW IF EXISTS `{Escape(db)}`.`{Escape(viewName)}`;";
+        }
+
+        public override string GenerateGetViewInfoScript(string databaseName, string schemaName, string viewName)
+        {
+            var db = !string.IsNullOrWhiteSpace(schemaName) ? schemaName : databaseName;
+            return $@"SELECT
+    table_schema AS SchemaName,
+    table_name AS ViewName,
+    COALESCE(view_definition, '') AS ViewDefinition,
+    0 AS IsEncrypted,
+    NOW() AS CreateDate,
+    NOW() AS ModifyDate
+FROM information_schema.views
+WHERE table_schema = '{Escape(db)}' AND table_name = '{Escape(viewName)}';";
+        }
+        #endregion
+
+        #region Foreign Key Operations
+        public override string GenerateCreateForeignKeyScript(ForeignKeyOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var db = !string.IsNullOrWhiteSpace(config.SchemaName) ? config.SchemaName : config.DatabaseName;
+            var refDb = !string.IsNullOrWhiteSpace(config.RefSchemaName) ? config.RefSchemaName : db;
+            var fkName = !string.IsNullOrWhiteSpace(config.FKName) ? config.FKName : $"FK_{config.TableName}_{config.RefTableName}";
+            var cols = string.Join(", ", config.Columns.ConvertAll(c => $"`{Escape(c.ColumnName)}`"));
+            var refCols = string.Join(", ", config.Columns.ConvertAll(c => $"`{Escape(c.RefColumnName)}`"));
+            var onDelete = string.IsNullOrWhiteSpace(config.OnDelete) ? "NO ACTION" : config.OnDelete;
+            var onUpdate = string.IsNullOrWhiteSpace(config.OnUpdate) ? "NO ACTION" : config.OnUpdate;
+
+            return $"ALTER TABLE `{Escape(db)}`.`{Escape(config.TableName)}` ADD CONSTRAINT `{Escape(fkName)}` FOREIGN KEY ({cols}) REFERENCES `{Escape(refDb)}`.`{Escape(config.RefTableName)}` ({refCols}) ON DELETE {onDelete} ON UPDATE {onUpdate};";
+        }
+
+        public override string GenerateDropForeignKeyScript(ForeignKeyOperation.Drop config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var db = !string.IsNullOrWhiteSpace(config.SchemaName) ? config.SchemaName : config.DatabaseName;
+            return $"ALTER TABLE `{Escape(db)}`.`{Escape(config.TableName)}` DROP FOREIGN KEY `{Escape(config.FKName)}`;";
+        }
+        #endregion
+
+        #region Index Operations
+        public override string GenerateCreateIndexScript(IndexOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var db = !string.IsNullOrWhiteSpace(config.SchemaName) ? config.SchemaName : config.DatabaseName;
+            var unique = config.IsUnique ? "UNIQUE " : "";
+            var cols = string.Join(", ", config.Columns.ConvertAll(c => $"`{Escape(c.ColumnName)}`"));
+            return $"CREATE {unique}INDEX `{Escape(config.IndexName ?? "")}` ON `{Escape(db)}`.`{Escape(config.TableName)}` ({cols});";
+        }
+
+        public override string GenerateDropIndexScript(IndexOperation.Drop config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var db = !string.IsNullOrWhiteSpace(config.SchemaName) ? config.SchemaName : config.DatabaseName;
+            return $"DROP INDEX `{Escape(config.IndexName ?? "")}` ON `{Escape(db)}`.`{Escape(config.TableName)}`;";
+        }
+        #endregion
+
+        #region Check Constraint Operations
+        public override string GenerateCreateCheckConstraintScript(CheckConstraintOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var db = !string.IsNullOrWhiteSpace(config.SchemaName) ? config.SchemaName : config.DatabaseName;
+            var expr = config.CheckExpression.Trim();
+            if (!expr.StartsWith('(') || !expr.EndsWith(')')) expr = $"({expr})";
+            return $"ALTER TABLE `{Escape(db)}`.`{Escape(config.TableName)}` ADD CONSTRAINT `{Escape(config.ConstraintName ?? "")}` CHECK {expr};";
+        }
+
+        public override string GenerateDropCheckConstraintScript(CheckConstraintOperation.Drop config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            var db = !string.IsNullOrWhiteSpace(config.SchemaName) ? config.SchemaName : config.DatabaseName;
+            return $"ALTER TABLE `{Escape(db)}`.`{Escape(config.TableName)}` DROP CHECK `{Escape(config.ConstraintName ?? "")}`;";
+        }
         #endregion
 
         #region Routine Operations (Procedures and Functions)
@@ -351,6 +482,31 @@ WHERE routine_type = 'PROCEDURE' AND routine_schema = '{Escape(databaseName)}'
 ORDER BY routine_name;";
         }
 
+        public override string GenerateCreateProcedureScript(string databaseName, string schemaName, string procName, string body, bool withEncryption = true)
+        {
+            return body.Trim();
+        }
+
+        public override string GenerateDropProcedureScript(string databaseName, string schemaName, string procName)
+        {
+            var db = !string.IsNullOrWhiteSpace(schemaName) ? schemaName : databaseName;
+            return $"DROP PROCEDURE IF EXISTS `{Escape(db)}`.`{Escape(procName)}`;";
+        }
+
+        public override string GenerateGetProcedureInfoScript(string databaseName, string schemaName, string procName)
+        {
+            var db = !string.IsNullOrWhiteSpace(schemaName) ? schemaName : databaseName;
+            return $@"SELECT
+    routine_schema AS SchemaName,
+    routine_name AS ProcedureName,
+    COALESCE(routine_definition, '') AS ProcedureDefinition,
+    0 AS IsEncrypted,
+    created AS CreateDate,
+    last_altered AS ModifyDate
+FROM information_schema.routines
+WHERE routine_type = 'PROCEDURE' AND routine_schema = '{Escape(db)}' AND routine_name = '{Escape(procName)}';";
+        }
+
         public override string GenerateGetFunctionsScript(string databaseName)
         {
             return $@"SELECT
@@ -364,6 +520,83 @@ ORDER BY routine_name;";
 FROM information_schema.routines
 WHERE routine_type = 'FUNCTION' AND routine_schema = '{Escape(databaseName)}'
 ORDER BY routine_name;";
+        }
+
+        public override string GenerateCreateFunctionScript(string databaseName, string schemaName, string funcName, string body, bool withEncryption = true)
+        {
+            return body.Trim();
+        }
+
+        public override string GenerateDropFunctionScript(string databaseName, string schemaName, string funcName)
+        {
+            var db = !string.IsNullOrWhiteSpace(schemaName) ? schemaName : databaseName;
+            return $"DROP FUNCTION IF EXISTS `{Escape(db)}`.`{Escape(funcName)}`;";
+        }
+
+        public override string GenerateGetFunctionInfoScript(string databaseName, string schemaName, string funcName)
+        {
+            var db = !string.IsNullOrWhiteSpace(schemaName) ? schemaName : databaseName;
+            return $@"SELECT
+    routine_schema AS SchemaName,
+    routine_name AS FunctionName,
+    'SCALAR' AS FunctionType,
+    COALESCE(routine_definition, '') AS FunctionDefinition,
+    0 AS IsEncrypted,
+    created AS CreateDate,
+    last_altered AS ModifyDate
+FROM information_schema.routines
+WHERE routine_type = 'FUNCTION' AND routine_schema = '{Escape(db)}' AND routine_name = '{Escape(funcName)}';";
+        }
+        #endregion
+
+        #region Trigger Operations
+        public override string GenerateGetTriggersScript(string databaseName)
+        {
+            return $@"SELECT
+    trigger_schema AS SchemaName,
+    trigger_name AS TriggerName,
+    event_object_schema AS TableSchema,
+    event_object_table AS TableName,
+    0 AS IsDisabled,
+    0 AS IsInsteadOfTrigger,
+    action_timing AS TriggerEvents,
+    0 AS IsEncrypted,
+    created AS CreateDate,
+    created AS ModifyDate
+FROM information_schema.triggers
+WHERE trigger_schema = '{Escape(databaseName)}'
+ORDER BY trigger_name;";
+        }
+
+        public override string GenerateGetTriggerInfoScript(string databaseName, string schemaName, string triggerName)
+        {
+            var db = !string.IsNullOrWhiteSpace(schemaName) ? schemaName : databaseName;
+            return $@"SELECT
+    trigger_schema AS SchemaName,
+    trigger_name AS TriggerName,
+    event_object_schema AS TableSchema,
+    event_object_table AS TableName,
+    0 AS IsDisabled,
+    0 AS IsInsteadOfTrigger,
+    action_timing AS TriggerEvents,
+    COALESCE(action_statement, '') AS TriggerDefinition,
+    0 AS IsEncrypted,
+    created AS CreateDate,
+    created AS ModifyDate
+FROM information_schema.triggers
+WHERE trigger_schema = '{Escape(db)}' AND trigger_name = '{Escape(triggerName)}';";
+        }
+
+        public override string GenerateCreateTriggerScript(TriggerOperation.Create config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            return config.Body.Trim();
+        }
+
+        public override string GenerateDropTriggerScript(string databaseName, string schemaName, string triggerName)
+        {
+            var db = !string.IsNullOrWhiteSpace(schemaName) ? schemaName : databaseName;
+            return $"DROP TRIGGER IF EXISTS `{Escape(db)}`.`{Escape(triggerName)}`;";
         }
         #endregion
 
