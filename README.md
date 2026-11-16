@@ -303,9 +303,22 @@ dotnet run --project SourceCode/BprDevKit.csproj
 
 #### ساخت نسخه پرتابل مستقل (Self-Contained Single-File برای ویندوز بدون نیاز به نصب بودن .NET روی سیستم مقصد):
 ```bash
-dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.5.0-Standalone
+dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.6.0-Standalone
 ```
 فایل خروجی `BprDevKit.exe` یک نسخه کاملاً مستقل و خودکفا است که بدون نیاز به پیش‌نیاز ران‌تایم، بر روی هر سیستم ویندوز ۶۴ بیتی با دو بار کلیک اجرا می‌شود.
+
+---
+
+### ویژگی‌ها و تغییرات نسخه ۱.۶.۰ (Version 1.6.0 Changelog):
+- **پشتیبانی کامل چند دیتابیسی در Script Generator:** تولید اسکریپت ساختار (DDL) و داده‌ها (DML) با سینتکس، تفکیک‌کننده‌ها و شناسه‌های استاندارد برای تمام موتورهای PostgreSQL ،MySQL ،MariaDB ،SQLite و SQL Server بدون محدودیت.
+- **اعتبارسنجی دقیق موتور سرور (Engine Mismatch Validation):** تشخیص خودکار ناهماهنگی نسخه‌های سرور MySQL و MariaDB در تست اتصال با پیام‌های خطای دو زبانه.
+- **تکمیل متدهای DDL در تمام پایگاه‌های داده:** پیاده‌سازی متدهای ایجاد و حذف کلیدهای خارجی، ایندکس‌ها، قیود چک، ویوها، پروسیجرها و تریگرها برای MySQL، MariaDB، PostgreSQL، SQLite و Oracle.
+- **مدیریت هوشمند قابلیت‌های پشتیبانی‌نشده (Feature Fallback):** نمایش پیام‌های راهنمای دوزبانه در تب‌های مدیریت دیتابیس برای قابلیت‌هایی که توسط یک موتور خاص پشتیبانی نمی‌شوند (مانند عدم وجود اسکیما در MySQL/SQLite یا پروسیجر در SQLite).
+- **ارتقای موتور DataModel Generator:**
+  - پشتیبانی کامل از روابط چند به چند و یک به چند روی جداول با کلیدهای ترکیبی (Composite PK) که ستون‌های کلید خارجی دارند.
+  - پشتیبانی از نوع `sql_variant` در قالب `object` در سی‌شارپ، `Any` در پایتون، `dynamic` در دارت و `any` در تایپ‌اسکریپت.
+  - هماهنگی کامل گزینه `Non-Nullable String Initialization` با سازنده و رفع مقداردهی مضاعف به Collectionها.
+  - رفع باگ کلمات رزرو شده مانند `Precision` در متادیتای ستون‌های MySQL و MariaDB.
 
 ---
 
@@ -594,9 +607,22 @@ Open your browser and navigate to `http://localhost:5000` or `https://localhost:
 
 #### Build Self-Contained Standalone Executable (Windows x64 - Zero .NET installation required on target machine):
 ```bash
-dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.5.0-Standalone
+dotnet publish SourceCode/BprDevKit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o Release/BprDevKit-v1.6.0-Standalone
 ```
 The output `BprDevKit.exe` is completely self-contained and ready to execute on any 64-bit Windows machine by double-clicking.
+
+---
+
+### Version 1.6.0 Changelog & Improvements:
+- **Full Multi-Provider Script Generator:** Generate database structure (DDL) and table data (DML) scripts formatted specifically for MySQL, MariaDB, PostgreSQL, SQLite, and SQL Server.
+- **Strict Server Engine Validation:** Automated detection of server engine mismatches (e.g. connecting to MySQL with a MariaDB profile or vice versa) during connection testing with localized error guidance.
+- **Comprehensive DDL Across All Engines:** Implemented foreign keys, indexes, check constraints, views, routines, and triggers generation for MySQL, MariaDB, PostgreSQL, SQLite, and Oracle.
+- **Graceful Capability Fallbacks:** Informative bilingual notices in Database Management tabs for engine-unsupported features (such as schemas in MySQL/SQLite or stored procedures in SQLite).
+- **Enhanced DataModel Generator:**
+  - Full relation and reference support for tables having composite primary keys that contain foreign key columns.
+  - Added `sql_variant` type mapping across C# (`object`), Python (`Any`), Dart (`dynamic`), and TypeScript (`any`).
+  - Strict alignment of `Non-Nullable String Initialization` with constructors and prevention of duplicate collection initializations.
+  - Escaped reserved keywords such as `Precision` in MySQL/MariaDB metadata queries.
 
 ---
 
