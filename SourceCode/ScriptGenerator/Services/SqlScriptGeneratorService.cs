@@ -895,9 +895,31 @@ namespace BprDevKit.ScriptGenerator.Services
         {
             if (string.IsNullOrWhiteSpace(rawCols)) return string.Empty;
             var cols = rawCols.Split(',')
-                .Select(c => c.Trim().Trim('[', ']', '`', '"'))
-                .Where(c => !string.IsNullOrEmpty(c))
-                .Select(Quote);
+                .Select(item =>
+                {
+                    var trimmed = item.Trim();
+                    if (string.IsNullOrEmpty(trimmed)) return string.Empty;
+
+                    // Match optional ASC/DESC direction (e.g. "[TimestampUtc] DESC" or "TimestampUtc DESC")
+                    var match = System.Text.RegularExpressions.Regex.Match(
+                        trimmed,
+                        @"^(.*?)\s+(ASC|DESC)$",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                    if (match.Success)
+                    {
+                        var colName = match.Groups[1].Value.Trim().Trim('[', ']', '`', '"');
+                        var direction = match.Groups[2].Value.ToUpperInvariant();
+                        return string.IsNullOrEmpty(colName) ? string.Empty : $"{Quote(colName)} {direction}";
+                    }
+                    else
+                    {
+                        var colName = trimmed.Trim('[', ']', '`', '"');
+                        return string.IsNullOrEmpty(colName) ? string.Empty : Quote(colName);
+                    }
+                })
+                .Where(c => !string.IsNullOrEmpty(c));
+
             return string.Join(", ", cols);
         }
 
