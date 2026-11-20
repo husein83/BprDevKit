@@ -20,6 +20,11 @@ namespace BprDevKit.Config
         [System.Text.Json.Serialization.JsonIgnore]
         public EntityState EntityState { get; set; } = EntityState.Unchanged;
 
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string DisplayName => string.IsNullOrWhiteSpace(Server?.Alias)
+            ? (Server?.ServerName ?? string.Empty)
+            : $"{Server.Alias} ({Server.ServerName})";
+
         // Connection settings
         public ServerSettings Server { get; set; } = new();
 
@@ -168,6 +173,12 @@ namespace BprDevKit.Config
     {
         public string ServerName { get; set; } = "localhost";
         public string? Alias { get; set; }
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string DisplayName => string.IsNullOrWhiteSpace(Alias)
+            ? ServerName
+            : $"{Alias} ({ServerName})";
+
         public string DefaultDatabase { get; set; } = "master";
         public DatabaseServerType DatabaseServerType { get; set; }
         public bool UseWindowsAuth { get; set; } = false;

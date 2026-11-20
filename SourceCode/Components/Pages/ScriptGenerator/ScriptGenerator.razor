@@ -1162,12 +1162,7 @@
         _bprMessage = null;
     }
 
-    private static string GetServerDisplayName(ServerConfiguration configuration)
-    {
-        return string.IsNullOrWhiteSpace(configuration.Server.Alias)
-            ? configuration.Server.ServerName
-            : $"{configuration.Server.Alias} ({configuration.Server.ServerName})";
-    }
+    private static string GetServerDisplayName(ServerConfiguration configuration) => configuration.DisplayName;
 
     public void Dispose()
     {

@@ -1167,8 +1167,5 @@
         ClearOutput();
     }
 
-    private static string GetServerDisplayName(ServerConfiguration config) =>
-        config.Server.Port.HasValue
-            ? $"{config.Server.ServerName}:{config.Server.Port}"
-            : config.Server.ServerName;
+    private static string GetServerDisplayName(ServerConfiguration config) => config.DisplayName;
 }

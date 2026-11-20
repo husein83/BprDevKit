@@ -320,12 +320,7 @@
         return ManagementTabs.First(tab => tab.Key == _activeTab);
     }
 
-    private static string GetServerDisplayName(ServerConfiguration configuration)
-    {
-        return string.IsNullOrWhiteSpace(configuration.Server.Alias)
-            ? configuration.Server.ServerName
-            : $"{configuration.Server.Alias} ({configuration.Server.ServerName})";
-    }
+    private static string GetServerDisplayName(ServerConfiguration configuration) => configuration.DisplayName;
 
     private Task NotifyOperationCompleted(string message)
     {

@@ -990,9 +990,17 @@ namespace BprDevKit.DataModelGenerator.Generators
                         }
                         else
                         {
-                            if (options.UseNameofInAttributes && localPropNames.Count == 1)
+                            if (options.UseNameofInAttributes)
                             {
-                                sb.AppendLine($"{indent}    [ForeignKey(nameof({localPropName}))]");
+                                if (localPropNames.Count == 1)
+                                {
+                                    sb.AppendLine($"{indent}    [ForeignKey(nameof({localPropNames[0]}))]");
+                                }
+                                else
+                                {
+                                    var nameofArgs = string.Join(", ", localPropNames.Select(p => $"{{nameof({p})}}"));
+                                    sb.AppendLine($"{indent}    [ForeignKey($\"{nameofArgs}\")]");
+                                }
                             }
                             else
                             {
